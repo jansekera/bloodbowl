@@ -159,11 +159,6 @@ final class RerollHandler
 
         $target = new Position($pending->getTargetX(), $pending->getTargetY());
 
-        // P289: povedený skok (nebo jeho GFI) -- zbylé GFI skoku a dopad
-        if ($pending->isLeap()) {
-            return $this->moveHandler->dokoncitSkokPoPrehozu($state, $player->getId(), $target, $pending->getGfiRemaining(), $events);
-        }
-
         if ($pending->getRollType() === 'pickup') {
             $pos = $player->getPosition();
             if ($pos !== null) {
@@ -235,10 +230,6 @@ final class RerollHandler
             return ActionResult::turnover($state->withTurnoverPending(true), $events);
         }
 
-        if ($pending->isLeap()) {
-            return $this->moveHandler->skokSelhal($state, $player, new Position($pending->getTargetX(), $pending->getTargetY()), $events);
-        }
-
         // Dodge or GFI: player falls
         // OPRAVENO 08.10.2026 (audit parity, nalezy 4a a 4b) -- tady byla vlastni kopie padu:
         //   u uhybu nechavala hrace na VYCHOZIM poli (jen GFI slo na cilove) a po padu se
@@ -265,8 +256,7 @@ final class RerollHandler
     {
         return match ($pending->getRollType()) {
             'dodge' => GameEvent::dodgeAttempt($pending->getPlayerId(), $pending->getTarget(), $roll, $success),
-            'gfi', 'leap_gfi' => GameEvent::gfiAttempt($pending->getPlayerId(), $roll, $success),
-            'leap' => GameEvent::leap($pending->getPlayerId(), $pending->getTarget(), $roll, $success),
+            'gfi' => GameEvent::gfiAttempt($pending->getPlayerId(), $roll, $success),
             default => GameEvent::ballPickup($pending->getPlayerId(), $pending->getTarget(), $roll, $success),
         };
     }

@@ -15,7 +15,7 @@ use App\Enum\TeamSide;
 
 /**
  * Jediné místo žebříčku přehozu „Pro -> týmový přehoz s Lonerem" bez dialogu: hody, které nejdou přes Pass skill
- * (přihrávka, bomba, Always Hungry u Throw Team-Mate) a přehozy AI u Leapu (MoveHandler::prehozAi). Parita s C++ `rerollThrow` (helpers.cpp, P258).
+ * (přihrávka, bomba, Always Hungry u Throw Team-Mate), hody pohybu (MoveHandler::prehoz). Parita s C++ `rerollThrow` (helpers.cpp, P258).
  *
  * Jeden hod = nejvýš jeden přehoz (r. 925-927): má-li hráč Pro a ještě ho nepoužil, jde Pro (po neúspěšném hodu
  * Pro smí týmový přehoz jen hod Pro, ProCheck); jinak týmový přehoz (r. 929-936, Loner 4+ r. 8287-8290).
@@ -25,8 +25,8 @@ use App\Enum\TeamSide;
 final class ThrowReroll
 {
     /**
-     * P289: nabídka přehozu kouči-člověku (dialog uprostřed akce); null = není co nabídnout. Jediné místo stavby
-     * nabídky pro Leap (MoveHandler) i velké hráče (ActionResolver).
+     * P289: nabídka přehozu kouči-člověku (dialog uprostřed akce); null = není co nabídnout. Zbývá jen pro velké
+     * hráče (ActionResolver; P294 krok 5e).
      *
      * @param array<string, mixed> $resumeParams
      */
@@ -38,7 +38,6 @@ final class ThrowReroll
         int $roll,
         ?Position $at,
         bool $teamAllowed = true,
-        int $gfiRemaining = 0,
         ?ActionType $resumeAction = null,
         array $resumeParams = [],
     ): ?PendingRerollDTO {
@@ -58,7 +57,6 @@ final class ThrowReroll
             $at?->getY() ?? 0,
             resumeAction: $resumeAction,
             resumeParams: $resumeParams,
-            gfiRemaining: $gfiRemaining,
         );
     }
 

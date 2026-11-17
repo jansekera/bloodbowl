@@ -25,8 +25,6 @@ use App\Engine\TacklezoneCalculator;
 
 final class MoveHandler implements ActionHandlerInterface
 {
-    private bool $interactiveRerolls = false;
-
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
@@ -117,11 +115,6 @@ final class MoveHandler implements ActionHandlerInterface
         return $this->coach ??= new Coach();
     }
 
-    public function setInteractiveRerolls(bool $interactive): void
-    {
-        $this->interactiveRerolls = $interactive;
-    }
-
     /**
      * @param array<string, mixed> $params
      */
@@ -201,15 +194,14 @@ final class MoveHandler implements ActionHandlerInterface
                 $success = $roll >= $leapTarget;
                 $events[] = GameEvent::leap($playerId, $leapTarget, $roll, $success);
                 if (!$success) {
-                    // P289: kouč-člověk dostane nabídku přehozu (ř. 929-931)
-                    $nabidka = $this->nabidkaPrehozu($currentState, $currentPlayer, 'leap', $leapTarget, $roll, $to, $gfiSkoku, $teamRerollUsed);
-                    if ($nabidka !== null) {
-                        return ActionResult::success($currentState->withPendingReroll($nabidka), $events);
-                    }
-                    $success = $this->prehozAi(
+                    // P294 krok 5c: Pro → týmový přehoz (ř. 929-931); kouče-člověka se zeptá přehráním (dřív dialog P289)
+                    $success = $this->prehoz(
                         $currentState,
                         $currentPlayer,
+                        'leap',
                         $leapTarget,
+                        $roll,
+                        $to,
                         $teamRerollUsed,
                         $events,
                         static fn(int $r, bool $ok) => GameEvent::leap($playerId, $leapTarget, $r, $ok),
@@ -506,20 +498,12 @@ final class MoveHandler implements ActionHandlerInterface
         return null;
     }
 
-    /** P289: nabídka přehozu kouči-člověku (jen v interaktivním režimu); AI dostane `null`. */
-    private function nabidkaPrehozu(GameState $state, MatchPlayerDTO $hrac, string $druh, int $cil, int $hod, Position $kam, int $gfiZbyva, bool $teamRerollUsed): ?PendingRerollDTO
-    {
-        return $this->interactiveRerolls
-            ? ThrowReroll::offer($state, $hrac, $druh, $cil, $hod, $kam, !$teamRerollUsed, $gfiZbyva)
-            : null;
-    }
-
     /**
      * Nepovedený skok nebo jeho GFI: sražen v cílovém poli + brnění (ř. 8274-8276, 1702-1703), turnover.
      *
      * @param list<GameEvent> $events
      */
-    public function skokSelhal(GameState $state, MatchPlayerDTO $hrac, Position $to, array $events): ActionResult
+    private function skokSelhal(GameState $state, MatchPlayerDTO $hrac, Position $to, array $events): ActionResult
     {
         $events[] = GameEvent::playerFell($hrac->getId());
         $events[] = GameEvent::turnover('Failed leap');
@@ -529,22 +513,7 @@ final class MoveHandler implements ActionHandlerInterface
     }
 
     /**
-     * Po povedeném hodu na skok (i přehozeném v dialogu, P289): GFI skoku, dopad, Shadowing, míč.
-     *
-     * @param list<GameEvent> $events
-     */
-    public function dokoncitSkokPoPrehozu(GameState $state, int $playerId, Position $to, int $gfi, array $events): ActionResult
-    {
-        $hrac = $state->requirePlayer($playerId);
-        $teamRerollUsed = false;
-        $konec = $this->dokoncitSkok($state, $hrac, $hrac->getPosition(), $to, $gfi, $teamRerollUsed, $events);
-
-        // P296: pohyb po skoku zůstává otevřený (movedThisTurn bez hasMoved) — kouč smí táhnout dál, táž akce
-        return $konec ?? ActionResult::success($state, $events);
-    }
-
-    /**
-     * GFI skoku a dopad. Vrací výsledek, když tah skončí (pád, nabídka přehozu, nezvednutý míč), jinak `null`
+     * GFI skoku a dopad. Vrací výsledek, když tah skončí (pád, nezvednutý míč), jinak `null`
      * a stav s hráčem v cílovém poli.
      *
      * @param list<GameEvent> $events
@@ -565,14 +534,13 @@ final class MoveHandler implements ActionHandlerInterface
                 $events[] = GameEvent::rerollUsed($playerId, 'Sure Feet');
                 $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
             } elseif (!$success) {
-                $nabidka = $this->nabidkaPrehozu($state, $hrac, 'leap_gfi', $gfiCil, $roll, $to, $gfi - $g - 1, $teamRerollUsed);
-                if ($nabidka !== null) {
-                    return ActionResult::success($state->withPendingReroll($nabidka), $events);
-                }
-                $success = $this->prehozAi(
+                $success = $this->prehoz(
                     $state,
                     $hrac,
+                    'leap_gfi',
                     $gfiCil,
+                    $roll,
+                    $to,
                     $teamRerollUsed,
                     $events,
                     static fn(int $r, bool $ok) => GameEvent::gfiAttempt($playerId, $r, $ok),
@@ -610,7 +578,7 @@ final class MoveHandler implements ActionHandlerInterface
     }
 
     /**
-     * P294 krok 5b: přehoz nepovedeného hodu pohybu (úhyb, GFI) — Pro → týmový přehoz s Lonerem (`ThrowReroll`); AI
+     * P294 krok 5b/5c: přehoz nepovedeného hodu pohybu (úhyb, GFI, Leap a jeho GFI) — Pro → týmový přehoz s Lonerem (`ThrowReroll`); AI
      * rozhoduje sama, kouče-člověka se zeptá (`Coach`, přehrání akce; otázka nese stav s hráčem na poli, odkud hází,
      * a cíl `$kam`). Nový hod a jeho událost (`$udalost`) tady. Vrací, jestli hod nakonec vyšel.
      *
@@ -644,36 +612,6 @@ final class MoveHandler implements ActionHandlerInterface
         $ok = $roll >= $cil;
         $events[] = $udalost($roll, $ok);
 
-        return $ok;
-    }
-
-    /**
-     * P277: přehoz nepovedeného hodu bez dialogu (AI; ř. 929-931) — Pro (ř. 8381-8387, ProCheck), jinak týmový přehoz
-     * (Loner 4+, ř. 8287-8290); jeden hod nejvýš jednou (ř. 925-927). Kouč-člověk (interaktivní přehozy) dostane
-     * místo toho nabídku (`nabidkaPrehozu`, P289).
-     *
-     * @param list<GameEvent> $events
-     * @param callable(int, bool): GameEvent $udalost
-     */
-    private function prehozAi(GameState &$state, MatchPlayerDTO &$hrac, int $cil, bool &$teamRerollUsed, array &$events, callable $udalost): bool
-    {
-        if ($this->interactiveRerolls) {
-            return false;
-        }
-        $strana = $hrac->getTeamSide();
-        $tymPred = $state->getTeamState($strana)->canUseReroll();
-        $res = ThrowReroll::proThenTeam($this->dice, $state, $hrac, $strana, !$teamRerollUsed, $events);
-        $state = $res['state'];
-        $hrac = $res['thrower'];
-        if ($tymPred && !$state->getTeamState($strana)->canUseReroll()) {
-            $teamRerollUsed = true;
-        }
-        if (!$res['rerolled']) {
-            return false;
-        }
-        $roll = $this->dice->rollD6();
-        $ok = $roll >= $cil;
-        $events[] = $udalost($roll, $ok);
         return $ok;
     }
 

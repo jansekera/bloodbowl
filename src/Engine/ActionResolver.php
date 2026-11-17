@@ -168,7 +168,6 @@ final class ActionResolver
     public function setInteractiveRerolls(bool $interactive): void
     {
         $this->interactiveRerolls = $interactive;
-        $this->moveHandler->setInteractiveRerolls($interactive);
     }
 
     public function getBlockHandler(): Action\BlockHandler

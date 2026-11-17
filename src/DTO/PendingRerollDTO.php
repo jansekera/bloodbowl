@@ -11,7 +11,7 @@ use App\Enum\ActionType;
  *
  * P289 (10.11.2026): i hody velkých hráčů (`bone_head`, `really_stupid`, `wild_animal`) a Leap (`leap`,
  * `leap_gfi`). U velkého hráče nese ohlášenou akci (`resumeAction`, `resumeParams`), která po povedeném
- * přehozu doběhne; u Leapu kolik GFI skoku ještě zbývá hodit (`gfiRemaining`).
+ * přehozu doběhne. Leap od P294 kroku 5c přehráním (`replay`).
  *
  * P292 (10.11.2026): přehoz hodu přes ThrowReroll (přihrávka `pass`, bomba `bomb`, hod spoluhráčem `ttm`, přistání
  * `ttm_landing`, Always Hungry `always_hungry`). Stav je pak stav PŘED akcí; po odpovědi se akce přehraje
@@ -34,7 +34,6 @@ final class PendingRerollDTO
         private readonly ?ActionType $resumeAction = null,
         /** @var array<string, mixed> */
         private readonly array $resumeParams = [],
-        private readonly int $gfiRemaining = 0,
         private readonly ?ReplayContext $replay = null,
     ) {}
 
@@ -86,11 +85,6 @@ final class PendingRerollDTO
         return $this->resumeParams;
     }
 
-    public function getGfiRemaining(): int
-    {
-        return $this->gfiRemaining;
-    }
-
     /** P294 krok 4: přehrání akce (přehoz přes ThrowReroll, P292); null = dialog uprostřed akce (resume*) */
     public function getReplay(): ?ReplayContext
     {
@@ -111,14 +105,8 @@ final class PendingRerollDTO
             proFailed: true,
             resumeAction: $this->resumeAction,
             resumeParams: $this->resumeParams,
-            gfiRemaining: $this->gfiRemaining,
             replay: $this->replay,
         );
-    }
-
-    public function isLeap(): bool
-    {
-        return $this->rollType === 'leap' || $this->rollType === 'leap_gfi';
     }
 
     /**
@@ -155,7 +143,6 @@ final class PendingRerollDTO
             'proFailed' => $this->proFailed,
             'resumeAction' => $this->resumeAction?->value,
             'resumeParams' => $this->resumeParams,
-            'gfiRemaining' => $this->gfiRemaining,
             'replay' => $this->replay?->toArray(),
         ];
     }
@@ -177,7 +164,6 @@ final class PendingRerollDTO
             proFailed: (bool) ($data['proFailed'] ?? false),
             resumeAction: isset($data['resumeAction']) ? ActionType::from((string) $data['resumeAction']) : null,
             resumeParams: (array) ($data['resumeParams'] ?? []),
-            gfiRemaining: (int) ($data['gfiRemaining'] ?? 0),
             replay: isset($data['replay']) ? ReplayContext::fromArray((array) $data['replay']) : null,
         );
     }

@@ -34,6 +34,8 @@ final class CoachRerollDialogTest extends TestCase
     {
         $r = new ActionResolver($dice);
         $r->setInteractiveRerolls(true);
+        // P294 krok 5c: Leap se ptá kouče přehráním (`Coach`), velcí hráči zatím dialogem (krok 5e)
+        $r->setCoachSides([TeamSide::HOME]);
 
         return $r;
     }
@@ -206,6 +208,8 @@ final class CoachRerollDialogTest extends TestCase
         $pending = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($pending);
         $this->assertSame('leap_gfi', $pending->getRollType());
+        $this->assertSame(7, $pending->getTargetX(), 'otázka ukazuje cíl skoku');
+        $this->assertSame(5, $r->getNewState()->requirePlayer(1)->requirePosition()->getX(), 'u otázky stojí na výchozím poli');
 
         $r = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
         $p = $r->getNewState()->requirePlayer(1);
