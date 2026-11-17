@@ -59,24 +59,28 @@ final class ThrowRerollCoachTest extends TestCase
 
     public function testOdmitnutiPrehozPrihravkaZustaneNepresnaAPrehozZustane(): void
     {
-        $s = $this->resolver([2])->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5])->getNewState();
+        $otazka = $this->resolver([2])->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]);
+        $s = $otazka->getNewState();
         // rozptyl 3× D8, pak odraz
         $r = $this->resolver(array_fill(0, 8, 2))->resolve($s, ActionType::RESOLVE_REROLL, ['choice' => 'decline']);
 
         $this->assertNull($r->getNewState()->getPendingReroll());
         $this->assertTrue($r->getNewState()->getHomeTeam()->canUseReroll(), 'přehoz nespotřebován');
-        $hody = array_values(array_filter($r->getEvents(), static fn($e) => $e->getType() === 'pass'));
+        // P294 krok 5a: první hod kouč vidí už u otázky, v odpovědi se neopakuje
+        $hody = array_values(array_filter([...$otazka->getEvents(), ...$r->getEvents()], static fn($e) => $e->getType() === 'pass'));
         $this->assertCount(1, $hody, 'hází se jen jednou');
     }
 
     public function testTymovyPrehozPrihravkuPrehodi(): void
     {
-        $s = $this->resolver([2])->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5])->getNewState();
+        $otazka = $this->resolver([2])->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]);
+        $s = $otazka->getNewState();
         // přehoz 6 = přesná; chytat nikdo nechytá (prázdné pole) ⇒ odraz D8
         $r = $this->resolver([6, 2, 2, 2])->resolve($s, ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
 
         $this->assertFalse($r->getNewState()->getHomeTeam()->canUseReroll());
-        $hody = array_values(array_filter($r->getEvents(), static fn($e) => $e->getType() === 'pass'));
+        $this->assertCount(1, array_filter($otazka->getEvents(), static fn($e) => $e->getType() === 'pass'), 'u otázky kouč vidí nepovedený hod');
+        $hody = array_values(array_filter([...$otazka->getEvents(), ...$r->getEvents()], static fn($e) => $e->getType() === 'pass'));
         $this->assertCount(2, $hody);
     }
 

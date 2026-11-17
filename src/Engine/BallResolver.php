@@ -80,7 +80,7 @@ final class BallResolver
                     if (count($skacou) >= 2) {
                         break;
                     }
-                    $odpoved = $this->coach()->divingCatch($hrac->getId(), $landing, count($kandidati) - 1 - $odmitli, ($skacou[0] ?? null)?->getId());
+                    $odpoved = $this->coach()->divingCatch($hrac->getId(), $landing, count($kandidati) - 1 - $odmitli, ($skacou[0] ?? null)?->getId(), $state);
                     if ($odpoved) {
                         $skacou[] = $hrac;
                     } else {

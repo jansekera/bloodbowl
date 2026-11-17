@@ -65,7 +65,9 @@ final class BombaKamHoditTest extends TestCase
         $this->assertContains(['x' => 14, 'y' => 7, 'range' => 'short_pass'], $otazka->getTargets(), 'nabídka = legální pole hodu z (10,7)');
         $this->assertNotContains(10, array_map(static fn(array $t) => $t['x'] === 10 && $t['y'] === 7 ? 10 : 0, $otazka->getTargets()), 'vlastní pole ne');
         $this->assertSame(['x' => 5, 'y' => 7], $otazka->getSuggested(), 'doporučení = volba enginu (na bombardiera bez rukou)');
-        $this->assertFalse($q->requirePlayer(1)->hasActed(), 'do odpovědi stav před akcí (akce se přehraje)');
+        // P294 krok 5a: zobrazí se okamžik otázky (bomba letěla, bombardier hrál), přehrává se ze stavu před akcí
+        $this->assertTrue($q->requirePlayer(1)->hasActed(), 'zobrazený stav = okamžik otázky');
+        $this->assertFalse($otazka->getReplay()->base?->requirePlayer(1)->hasActed(), 'přehrání ze stavu před akcí');
         $this->assertSame(
             [ActionType::RESOLVE_BOMB_RETHROW->value],
             array_column((new RulesEngine())->getAvailableActions($q), 'type'),

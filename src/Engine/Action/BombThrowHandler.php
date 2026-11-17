@@ -247,6 +247,8 @@ final class BombThrowHandler implements ActionHandlerInterface
                 $drziId,
                 ThrowTarget::cile($state, $drzi, true),
                 ['x' => $cil->getX(), 'y' => $cil->getY()],
+                $state,
+                $events,
             );
             $cil = new Position($odpoved['x'], $odpoved['y']);
         }

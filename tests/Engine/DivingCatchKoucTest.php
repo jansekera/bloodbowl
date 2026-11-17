@@ -100,7 +100,9 @@ final class DivingCatchKoucTest extends TestCase
         $this->assertNotNull($otazka, 'jediný kandidát kouče-člověka ⇒ otázka');
         $this->assertSame(2, $otazka->getPlayerId());
         $this->assertSame([10, 6], [$otazka->getLanding()->getX(), $otazka->getLanding()->getY()]);
-        $this->assertSame(1, $q->getNewState()->getBall()->getCarrierId(), 'do odpovědi se stav nemění (akce se přehraje)');
+        // P294 krok 5a: zobrazí se okamžik otázky (míč letí), přehrává se ze stavu před akcí
+        $this->assertNull($q->getNewState()->getBall()->getCarrierId(), 'zobrazený stav = míč v letu');
+        $this->assertSame(1, $otazka->getReplay()->base?->getBall()->getCarrierId(), 'přehrání ze stavu před akcí');
         $this->assertSame(
             [ActionType::RESOLVE_DIVING_CATCH->value],
             array_column((new RulesEngine())->getAvailableActions($q->getNewState()), 'type'),

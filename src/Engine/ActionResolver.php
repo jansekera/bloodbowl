@@ -305,15 +305,54 @@ final class ActionResolver
      */
     private function resolveSPrehranim(GameState $state, ReplayContext $replay): ActionResult
     {
+        // P294 krok 5a: zobrazený stav může být okamžik otázky ⇒ přehrává se z výchozího stavu akce
+        $zaklad = $replay->base ?? $state;
         $this->replayDice->begin($replay->dice);
         $this->coach->begin($replay->answers);
         try {
-            return $this->resolveJednou($state, $replay->action, $replay->params);
+            $r = $this->resolveJednou($zaklad, $replay->action, $replay->params);
+
+            return new ActionResult($r->getNewState(), $r->isSuccess(), $r->isTurnover(), self::bezUkazanych($r->getEvents(), $replay->shown));
         } catch (CoachQuestion $q) {
-            return ActionResult::success($q->pending($state, new ReplayContext($replay->action, $replay->params, $this->replayDice->getLog(), $replay->answers)), []);
+            $kontext = new ReplayContext(
+                $replay->action,
+                $replay->params,
+                $this->replayDice->getLog(),
+                $replay->answers,
+                $zaklad,
+                array_map(static fn(GameEvent $e): array => $e->toArray(), $q->events),
+            );
+
+            return ActionResult::success($q->pending($q->snapshot ?? $zaklad, $kontext), self::bezUkazanych($q->events, $replay->shown));
         } finally {
             $this->coach->end();
         }
+    }
+
+    /**
+     * Události bez těch, které kouč už viděl u dřívější otázky téže akce (první souvislý výskyt; když tam nejsou,
+     * nechá všechny).
+     *
+     * @param list<GameEvent> $udalosti
+     * @param list<array<string, mixed>> $ukazane
+     * @return list<GameEvent>
+     */
+    private static function bezUkazanych(array $udalosti, array $ukazane): array
+    {
+        $n = count($ukazane);
+        if ($n === 0) {
+            return $udalosti;
+        }
+        $pole = array_map(static fn(GameEvent $e): array => $e->toArray(), $udalosti);
+        for ($i = 0; $i + $n <= count($pole); $i++) {
+            if (array_slice($pole, $i, $n) === $ukazane) {
+                array_splice($udalosti, $i, $n);
+
+                return $udalosti;
+            }
+        }
+
+        return $udalosti;
     }
 
     /**

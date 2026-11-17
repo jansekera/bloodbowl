@@ -158,7 +158,7 @@ final class FoulHandler implements ActionHandlerInterface
             $volba = null;
             $moznosti = $this->coach()->decides($strana) ? RefereeCall::options($state, $strana) : null;
             if ($moznosti !== null) {
-                $volba = $this->coach()->referee($attackerId, $moznosti['bribe'], $moznosti['argue']);
+                $volba = $this->coach()->referee($attackerId, $moznosti['bribe'], $moznosti['argue'], $state, $events);
             }
             $vyrok = RefereeCall::sendOff($state, $attackerId, $strana, true, $this->dice, $events, $volba);
             $state = $vyrok['state'];
