@@ -93,29 +93,13 @@ final class ThrowReroll
         int $hod = 0,
         int $cil = 0,
     ): array {
-        // P292: hráče kouče-člověka se zeptá (druh / hod / cíl jen pro dialog)
-        if ($kouc !== null && $kouc->decides($side)) {
-            return self::sKoucem($dice, $state, $thrower, $side, $teamAllowed, $events, $kouc, $druh, $hod, $cil);
-        }
-        $teamAvailable = $teamAllowed && $state->getTeamState($side)->canUseReroll();
+        // P292: hráče kouče-člověka se zeptá (druh / hod / cíl jen pro dialog). P294: AI je „kouč“, který vždy bere
+        //   Pro (bez Pro týmový přehoz) a po neúspěšném hodu Pro týmový přehoz — jeden žebříček pro oba.
+        $volba = ($kouc !== null && $kouc->decides($side))
+            ? static fn (bool $pro, bool $team, bool $proFailed): string => $kouc->ask($thrower->getId(), $druh, $hod, $cil, $pro, $team, $proFailed)
+            : static fn (bool $pro, bool $team, bool $proFailed): string => ($pro && !$proFailed) ? 'pro' : 'team_reroll';
 
-        if ($thrower->hasSkill(SkillName::Pro) && !$thrower->isProUsedThisTurn()) {
-            $thrower = $thrower->withProUsedThisTurn(true);
-            $state = $state->withPlayer($thrower);
-            $pro = ProCheck::roll($dice, $thrower, $teamAvailable, $events);
-            if ($pro['teamRerollUsed']) {
-                $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
-            }
-
-            return ['state' => $state, 'thrower' => $thrower, 'rerolled' => $pro['allowed']];
-        }
-
-        if (!$teamAvailable) {
-            return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
-        }
-        $tym = self::teamReroll($dice, $state, $thrower, $side, $events);
-
-        return ['state' => $tym['state'], 'thrower' => $thrower, 'rerolled' => $tym['ok']];
+        return self::zebricek($dice, $state, $thrower, $side, $teamAllowed, $events, $volba);
     }
 
     /**
@@ -141,39 +125,37 @@ final class ThrowReroll
     }
 
     /**
-     * P292: totéž jako výše, ale o Pro / týmovém přehozu rozhoduje kouč. Hody v témže pořadí jako u AI: hod Pro, po
-     * jeho neúspěchu druhá otázka (týmový přehoz hodu Pro, ř. 8385-8387), Loner, nový hod Pro.
+     * P294: jeden žebříček Pro → týmový přehoz → Loner; o každém kroku rozhoduje `$volba` (AI nebo kouč-člověk).
+     * Pořadí hodů: hod Pro, po jeho neúspěchu druhá otázka (týmový přehoz hodu Pro, ř. 8385-8387), Loner, nový hod Pro.
      *
      * @param list<GameEvent> $events
+     * @param \Closure(bool, bool, bool): string $volba (pro smí, týmový smí, Pro už selhal) → 'pro'|'team_reroll'|'decline'
      * @return array{state: GameState, thrower: MatchPlayerDTO, rerolled: bool}
      */
-    private static function sKoucem(
+    private static function zebricek(
         DiceRollerInterface $dice,
         GameState $state,
         MatchPlayerDTO $thrower,
         TeamSide $side,
         bool $teamAllowed,
         array &$events,
-        CoachRerolls $kouc,
-        string $druh,
-        int $hod,
-        int $cil,
+        \Closure $volba,
     ): array {
         $smi = self::available($state, $thrower, $teamAllowed);
         if (!$smi['pro'] && !$smi['team']) {
             return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
         }
-        $volba = $kouc->ask($thrower->getId(), $druh, $hod, $cil, $smi['pro'], $smi['team']);
-        if ($volba === 'decline') {
+        $vybral = $volba($smi['pro'], $smi['team'], false);
+        if ($vybral === 'decline') {
             return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
         }
-        if ($volba === 'pro') {
+        if ($vybral === 'pro') {
             $thrower = $thrower->withProUsedThisTurn(true);
             $state = $state->withPlayer($thrower);
             if (ProCheck::roll($dice, $thrower, false, $events)['allowed']) {
                 return ['state' => $state, 'thrower' => $thrower, 'rerolled' => true];
             }
-            if (!$smi['team'] || $kouc->ask($thrower->getId(), $druh, $hod, $cil, false, true, true) === 'decline') {
+            if (!$smi['team'] || $volba(false, true, true) === 'decline') {
                 return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
             }
         }
@@ -183,7 +165,7 @@ final class ThrowReroll
             return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
         }
         // po neúspěšném Pro přehazuje týmový přehoz HOD PRO (ř. 8387), ne původní kostku
-        $rerolled = $volba === 'pro' ? ProCheck::roll($dice, $thrower, false, $events)['allowed'] : true;
+        $rerolled = $vybral === 'pro' ? ProCheck::roll($dice, $thrower, false, $events)['allowed'] : true;
 
         return ['state' => $state, 'thrower' => $thrower, 'rerolled' => $rerolled];
     }
