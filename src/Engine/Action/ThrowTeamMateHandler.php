@@ -166,16 +166,10 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         //   nepřesný (ř. 8609-8612), takže přehazuje se jen fumble — Pass, jinak Pro → týmový (Loner). Parita
         //   s C++ ttm_handler.cpp (rerollThrow).
         if ($fumble) {
-            $prehozeno = false;
-            if ($thrower->hasSkill(SkillName::Pass)) {
-                $events[] = GameEvent::rerollUsed($throwerId, 'Pass');
-                $prehozeno = true;
-            } else {
-                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events, $this->koucPrehozy, 'ttm', $roll, max(2, 2 - $modifikator));
-                $state = $res['state'];
-                $thrower = $res['thrower'];
-                $prehozeno = $res['rerolled'];
-            }
+            $res = ThrowReroll::reroll($this->dice, $state, $thrower, $activeSide, true, $events, $this->koucPrehozy, 'ttm', $roll, max(2, 2 - $modifikator), SkillName::Pass);
+            $state = $res['state'];
+            $thrower = $res['thrower'];
+            $prehozeno = $res['rerolled'];
             if ($prehozeno) {
                 $roll = $this->dice->rollD6();
                 $fumble = $roll === 1 || ($roll + $modifikator) <= 1;

@@ -164,27 +164,22 @@ final class BombThrowHandler implements ActionHandlerInterface
         //   P264: hod chycené bomby hráčem týmu, který není na tahu, týmový přehoz nesmí.
         //   Parita s C++ (bomb_handler.cpp, rerollThrow).
         if ($fumble) {
-            $skillRerolled = false;
-            if ($thrower->hasSkill(SkillName::Pass)) {
-                $skillRerolled = true;
-                $events[] = GameEvent::rerollUsed($throwerId, 'Pass');
-            } else {
-                $res = ThrowReroll::proThenTeam(
-                    $this->dice,
-                    $state,
-                    $thrower,
-                    $thrower->getTeamSide(),
-                    !$thrower->hasSkill(SkillName::Loner) && $thrower->getTeamSide() === $activeSide,
-                    $events,
-                    $this->koucPrehozy,
-                    'bomb',
-                    $roll,
-                    max(2, 2 - $modifier),
-                );
-                $state = $res['state'];
-                $thrower = $res['thrower'];
-                $skillRerolled = $res['rerolled'];
-            }
+            $res = ThrowReroll::reroll(
+                $this->dice,
+                $state,
+                $thrower,
+                $thrower->getTeamSide(),
+                !$thrower->hasSkill(SkillName::Loner) && $thrower->getTeamSide() === $activeSide,
+                $events,
+                $this->koucPrehozy,
+                'bomb',
+                $roll,
+                max(2, 2 - $modifier),
+                SkillName::Pass,
+            );
+            $state = $res['state'];
+            $thrower = $res['thrower'];
+            $skillRerolled = $res['rerolled'];
             if ($skillRerolled) {
                 $roll = $this->dice->rollD6();
                 $fumble = $roll === 1 || $roll + $modifier <= 1;

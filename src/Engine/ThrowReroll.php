@@ -103,6 +103,36 @@ final class ThrowReroll
     }
 
     /**
+     * P294 krok 2: přehoz hodu s volitelným skillem zdarma (Pass u přihrávky, bomby a hodu hráčem, ř. 8336-8337) — jediné
+     * místo vzoru „skill zdarma, jinak Pro → týmový přehoz“. Skill má přednost (zdarma, nespotřebuje Pro ani týmový
+     * přehoz); kostku znovu hodí a událost zapíše volající.
+     *
+     * @param list<GameEvent> $events
+     * @return array{state: GameState, thrower: MatchPlayerDTO, rerolled: bool}
+     */
+    public static function reroll(
+        DiceRollerInterface $dice,
+        GameState $state,
+        MatchPlayerDTO $thrower,
+        TeamSide $side,
+        bool $teamAllowed,
+        array &$events,
+        ?CoachRerolls $kouc,
+        string $druh,
+        int $hod,
+        int $cil,
+        ?SkillName $skillZdarma = null,
+    ): array {
+        if ($skillZdarma !== null && $thrower->hasSkill($skillZdarma)) {
+            $events[] = GameEvent::rerollUsed($thrower->getId(), $skillZdarma->value);
+
+            return ['state' => $state, 'thrower' => $thrower, 'rerolled' => true];
+        }
+
+        return self::proThenTeam($dice, $state, $thrower, $side, $teamAllowed, $events, $kouc, $druh, $hod, $cil);
+    }
+
+    /**
      * Spotřebuje týmový přehoz; s Lonerem napřed 4+ (ř. 8287-8290: na 1-3 přehoz propadne). P294: jediné místo
      * i pro dialog přehozu (`RerollHandler`).
      *

@@ -3,4 +3,5 @@
 d0945ff306d2fc71a9f837affe2399b415ce90db
 # 2026-10-02  formát PHP testů (check-lint padal na 54f6bc94)
 2541a1c90b3562fa3a312d02ae6b36b15dbc9fc8
-c3b70d8d03932b6ab6f3b171d5ee492e1275d568 # P294 krok 1: jen formát (php-cs-fixer)
+# 2026-11-17  P294 krok 1: jen formát (php-cs-fixer)
+c3b70d8d03932b6ab6f3b171d5ee492e1275d568

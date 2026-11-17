@@ -126,33 +126,17 @@ final class PassResolver
         // OPRAVENO 6.11.2026 (P252, review P247) — přehazoval se i fumble, který Safe Throw podrží (r. 8440-8443);
         //   nový hod mohl dát přirozenou 1 = skutečný fumble a turnover. Parita s C++ P78 (`inaccurateFirst`).
         if (!$accurate && !$this->safeThrowKeeps($thrower, $roll, $fumble)) {
-            $skillRerollUsed = false;
-            $teamRerollUsed = false;
-
-            // Pass skill reroll
-            if ($thrower->hasSkill(SkillName::Pass)) {
-                $skillRerollUsed = true;
+            // Pass skill zdarma, jinak Pro -> týmový přehoz: ThrowReroll::reroll (společné s bombou a hodem hráčem;
+            //   ⛔ OPRAVA 18.09.2026, r. 8381-8387, 926: Pro jen na nepřehozenou kostku, po Pro týmový přehoz jen hodu Pro).
+            $res = ThrowReroll::reroll($this->dice, $state, $thrower, $activeSide, true, $events, $this->koucPrehozy, 'pass', $roll, $accuracyTarget, SkillName::Pass);
+            $state = $res['state'];
+            $thrower = $res['thrower'];
+            if ($res['rerolled']) {
                 $roll = $this->dice->rollD6();
                 $fumble = $this->jeFumble($roll, $passModifier);
                 $accurate = !$fumble && $roll >= $accuracyTarget;
                 $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
-                $events[] = GameEvent::rerollUsed($playerId, 'Pass');
                 $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
-            }
-
-            // Pro -> týmový přehoz: ThrowReroll (společné s bombou a Always Hungry; ⛔ OPRAVA 18.09.2026,
-            //   r. 8381-8387, 926: Pro jen na nepřehozenou kostku, po Pro týmový přehoz jen hodu Pro).
-            if (!$skillRerollUsed) {
-                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events, $this->koucPrehozy, 'pass', $roll, $accuracyTarget);
-                $state = $res['state'];
-                $thrower = $res['thrower'];
-                if ($res['rerolled']) {
-                    $roll = $this->dice->rollD6();
-                    $fumble = $this->jeFumble($roll, $passModifier);
-                    $accurate = !$fumble && $roll >= $accuracyTarget;
-                    $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
-                    $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
-                }
             }
         }
 
