@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -20,7 +21,6 @@ use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\TeamStateDTO;
 use App\Engine\ActionResolver;
-use App\Engine\RandomDiceRoller;
 use App\Engine\RulesEngine;
 use App\Enum\ActionType;
 use App\Enum\GamePhase;
@@ -57,13 +57,14 @@ function createAI(string $type, ?string $weightsFile, float $epsilon): AICoachIn
 
 require_once __DIR__ . '/race_rosters.php';
 require_once __DIR__ . '/developed_rosters.php';
+require_once __DIR__ . '/dice_factory.php';   // P294 krok 0: BB_DICE_SEED ⇒ opakovatelné zápasy (refaktor = stejné zápasy)
 
 /** @var list<string> Available race names for random selection */
 $availableRaces = array_keys(RACE_ROSTERS);
 
-function simulateMatch(AICoachInterface $homeAi, AICoachInterface $awayAi, bool $verbose, ?GameLogger $logger, string $homeRace = 'Human', string $awayRace = 'Human', int $tv = 1000): array
+function simulateMatch(AICoachInterface $homeAi, AICoachInterface $awayAi, bool $verbose, ?GameLogger $logger, string $homeRace = 'Human', string $awayRace = 'Human', int $tv = 1000, int $gameIndex = 0): array
 {
-    $dice = new RandomDiceRoller();
+    $dice = bbDice($gameIndex);
     $rules = new RulesEngine();
 
     // Build initial state
@@ -241,7 +242,7 @@ for ($i = 0; $i < $numMatches; $i++) {
     }
 
     $gameStart = microtime(true);
-    $result = simulateMatch($homeAi, $awayAi, $verbose, $logger, $matchHomeRace, $matchAwayRace, $tv);
+    $result = simulateMatch($homeAi, $awayAi, $verbose, $logger, $matchHomeRace, $matchAwayRace, $tv, $i);
     $results[] = $result;
 
     if ($result['homeScore'] > $result['awayScore']) {
