@@ -151,6 +151,7 @@ final class NoBlockAfterMoveTest extends TestCase
     {
         $resolver = new ActionResolver(new FixedDiceRoller([1, 6]));
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1] + $cil);
         $this->assertSame($typHodu, $r->getNewState()->getPendingReroll()?->getRollType(), 'fixtura: čeká dialog přehozu');
 

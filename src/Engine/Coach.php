@@ -107,9 +107,10 @@ final class Coach
         bool $proFailed = false,
         ?GameState $stav = null,
         array $udalosti = [],
+        ?Position $kam = null,
     ): string {
         $a = array_shift($this->rerolls)
-            ?? throw self::sPrubehem(new RerollQuestion($playerId, $rollType, $roll, $target, $pro, $team, $proFailed), $stav, $udalosti);
+            ?? throw self::sPrubehem(new RerollQuestion($playerId, $rollType, $roll, $target, $pro, $team, $proFailed, $kam), $stav, $udalosti);
 
         return match (true) {
             $a === 'decline' => 'decline',

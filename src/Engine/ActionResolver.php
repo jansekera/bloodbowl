@@ -90,6 +90,7 @@ final class ActionResolver
         $this->bombThrowHandler = new BombThrowHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver);
         // P294 krok 3: jeden kouč-člověk pro všechny otázky uprostřed akce
         $this->ballResolver->setCoach($this->coach);
+        $this->moveHandler->setCoach($this->coach);   // P294 krok 5b: přehoz úhybu / GFI
         $this->gameFlowResolver->setCoach($this->coach);
         $this->foulHandler->setCoach($this->coach);
         $this->ttmHandler->setCoach($this->coach);
@@ -330,6 +331,22 @@ final class ActionResolver
     }
 
     /**
+     * Pole se seřazenými klíči asociativních polí (do hloubky), ať se dvě kopie téže události porovnají bez ohledu na
+     * pořadí klíčů.
+     *
+     * @param array<mixed> $a
+     * @return array<mixed>
+     */
+    private static function serazeneKlice(array $a): array
+    {
+        if (!array_is_list($a)) {
+            ksort($a);
+        }
+
+        return array_map(static fn(mixed $v): mixed => is_array($v) ? self::serazeneKlice($v) : $v, $a);
+    }
+
+    /**
      * Události bez těch, které kouč už viděl u dřívější otázky téže akce (první souvislý výskyt; když tam nejsou,
      * nechá všechny).
      *
@@ -343,7 +360,11 @@ final class ActionResolver
         if ($n === 0) {
             return $udalosti;
         }
-        $pole = array_map(static fn(GameEvent $e): array => $e->toArray(), $udalosti);
+        // porovnání v kanonickém JSON: `shown` prošlo uložením stavu do DB a `jsonb` přeřadí klíče objektů (P294 5b,
+        //   našel Playwright — `===` na polích pak neshodlo nic a kouč viděl hod v logu dvakrát)
+        $json = static fn(array $a): string => (string) json_encode(self::serazeneKlice($a));
+        $pole = array_map(static fn(GameEvent $e): string => $json($e->toArray()), $udalosti);
+        $ukazane = array_map($json, $ukazane);
         for ($i = 0; $i + $n <= count($pole); $i++) {
             if (array_slice($pole, $i, $n) === $ukazane) {
                 array_splice($udalosti, $i, $n);

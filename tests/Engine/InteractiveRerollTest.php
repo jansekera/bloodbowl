@@ -27,6 +27,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([2]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -69,6 +70,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([2, /* reroll: */ 4]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -107,6 +109,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([2, 1, 1]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -137,6 +140,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([2, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -158,6 +162,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([2]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -182,6 +187,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([1]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 12, // 7 squares = 1 GFI
@@ -203,6 +209,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([1, /* reroll: */ 5]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 12,
@@ -261,6 +268,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([2]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -296,6 +304,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([2]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -331,6 +340,7 @@ final class InteractiveRerollTest extends TestCase
         $dice = new FixedDiceRoller([2, /* pro check: */ 2, /* team reroll of Pro roll: */ 5, /* dodge reroll: */ 5]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,

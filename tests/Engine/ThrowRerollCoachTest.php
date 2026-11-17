@@ -71,6 +71,28 @@ final class ThrowRerollCoachTest extends TestCase
         $this->assertCount(1, $hody, 'hází se jen jednou');
     }
 
+    /**
+     * P294 krok 5b (Playwright): stav s otázkou jde přes DB (`jsonb` přeřadí klíče objektů) ⇒ události, které kouč
+     * u otázky viděl, se po odpovědi nesmí v logu objevit znovu.
+     */
+    public function testUkazanyHodSePoUlozeniDoDbNeopakuje(): void
+    {
+        $otazka = $this->resolver([2])->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]);
+        $prehazet = static function (mixed $v) use (&$prehazet): mixed {
+            if (!is_array($v)) {
+                return $v;
+            }
+            $v = array_map($prehazet, $v);
+
+            return array_is_list($v) ? $v : array_reverse($v, true);   // jako jsonb: jiné pořadí klíčů
+        };
+        $s = GameState::fromArray($prehazet(json_decode((string) json_encode($otazka->getNewState()->toArray()), true)));
+        $r = $this->resolver([6, 2, 2, 2])->resolve($s, ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
+
+        $hody = array_values(array_filter($r->getEvents(), static fn($e) => $e->getType() === 'pass'));
+        $this->assertCount(1, $hody, 'v odpovědi jen nový hod — první kouč viděl u otázky');
+    }
+
     public function testTymovyPrehozPrihravkuPrehodi(): void
     {
         $otazka = $this->resolver([2])->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]);

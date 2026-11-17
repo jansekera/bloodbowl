@@ -7,6 +7,7 @@ namespace App\Engine;
 use App\DTO\PendingRerollDTO;
 use App\DTO\GameState;
 use App\DTO\ReplayContext;
+use App\ValueObject\Position;
 
 /**
  * P292: nepovedený hod hráče kouče-člověka (přihrávka, bomba, hod spoluhráčem…) a kouč ještě neřekl, jestli přehodí
@@ -23,13 +24,14 @@ final class RerollQuestion extends CoachQuestion
         public readonly bool $pro,
         public readonly bool $team,
         public readonly bool $proFailed,
+        public readonly ?Position $at = null,   // P294 krok 5b: cílové pole hodu (úhyb / GFI: kam hráč jde)
     ) {
         parent::__construct('Reroll question pending');
     }
 
     public function pending(GameState $state, ReplayContext $replay): GameState
     {
-        $hrac = $state->getPlayer($this->playerId)?->getPosition();
+        $hrac = $this->at ?? $state->getPlayer($this->playerId)?->getPosition();
 
         return $state->withPendingReroll(new PendingRerollDTO(
             $this->rollType,

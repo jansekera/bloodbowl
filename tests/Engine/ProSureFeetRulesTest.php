@@ -203,6 +203,7 @@ final class ProSureFeetRulesTest extends TestCase
 
         $resolver = new ActionResolver(new FixedDiceRoller([1, 1, 1, 1]));
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 8]);
 
         $this->assertNull($r->getNewState()->getPendingReroll(), 'r. 926: po Dodge uz zadny prehoz');
@@ -271,6 +272,7 @@ final class ProSureFeetRulesTest extends TestCase
 
         $resolver = new ActionResolver(new FixedDiceRoller([2, 4, 1, 1, 1]));
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $this->assertNotNull($r->getNewState()->getPendingReroll());
 
@@ -414,6 +416,7 @@ final class ProSureFeetRulesTest extends TestCase
         // s vadou Pro 5 a uhyb 6 = uspech (r. 8381 1x za kolo, r. 926).
         $resolver = new ActionResolver(new FixedDiceRoller([2, 3, 5, 6]));
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($this->uhybState([SkillName::Pro]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
         $this->assertFalse($r2->getNewState()->requirePendingReroll()->isProAvailable(), 'fixtura: Pro uz neni nabidnut');
@@ -426,6 +429,7 @@ final class ProSureFeetRulesTest extends TestCase
     {
         $resolver = new ActionResolver(new FixedDiceRoller([2, 5, 6]));
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($this->uhybState([]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $this->assertFalse($r->getNewState()->requirePendingReroll()->isProAvailable(), 'fixtura: hrac nema Pro');
 
@@ -437,6 +441,7 @@ final class ProSureFeetRulesTest extends TestCase
     {
         $resolver = new ActionResolver(new FixedDiceRoller([2, 6]));
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($this->uhybState([SkillName::Pro], rerolls: 0), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $this->assertFalse($r->getNewState()->requirePendingReroll()->isTeamRerollAvailable(), 'fixtura: zadny tymovy prehoz');
 
@@ -450,6 +455,7 @@ final class ProSureFeetRulesTest extends TestCase
         // (Kdyby tymovy prehoz sel na uhyb, 3 by na cil 3+ stacila.)
         $resolver = new ActionResolver(new FixedDiceRoller([2, 2, 3, 1, 1]));
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($this->uhybState([SkillName::Pro]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
         $r3 = $resolver->resolve($r2->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
@@ -467,6 +473,7 @@ final class ProSureFeetRulesTest extends TestCase
         // GFI 1, Pro 3, tymovy prehoz hodu Pro 4 => smi, GFI prehoz 2 = uspech
         $resolver = new ActionResolver(new FixedDiceRoller([1, 3, 4, 2]));
         $resolver->setInteractiveRerolls(true);
+        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 10, 'y' => 7]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
         $this->assertTrue($r2->getNewState()->requirePendingReroll()->isProFailed());

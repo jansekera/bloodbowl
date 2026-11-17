@@ -132,6 +132,20 @@ function drawBombSuggestion(state: import('./api/types').GameState): void {
     }
 }
 
+/** P294 krok 5b (uživatel 17.11.: „je dobře označit správně situaci, která chce reroll“): u čekajícího přehozu pohybu
+ *  šipka z pole hráče na pole, kam hází (úhyb, GFI, skok), a zvýraznění toho pole. */
+const MOVE_ROLLS = new Set(['dodge', 'gfi', 'leap', 'leap_gfi']);
+function drawRerollSituation(state: import('./api/types').GameState): void {
+    const pending = state.pendingReroll;
+    if (!pending || !MOVE_ROLLS.has(pending.rollType)) return;
+    const player = state.players.find(p => p.id === pending.playerId);
+    const to = { x: pending.targetX, y: pending.targetY };
+    if (player?.position && (player.position.x !== to.x || player.position.y !== to.y)) {
+        renderer.drawMovePath(player.position, [{ ...to, dodge: pending.rollType === 'dodge', gfi: pending.rollType !== 'dodge' && pending.rollType !== 'leap' }]);
+    }
+    renderer.drawSelectedTarget(to);
+}
+
 function renderFrame(): void {
     const state = stateManager.getGameState();
     if (!state) return;
@@ -153,6 +167,7 @@ function renderFrame(): void {
     if (state.phase === 'setup') {
         renderer.drawSetupZone(state.activeTeam);
     }
+    drawRerollSituation(state);
     // Block/blitz target highlights
     const currentMode = actionPanel.getSelectedMode();
     if ((currentMode === 'block' || currentMode === 'blitz') && blockTargets.length > 0) {
@@ -478,6 +493,7 @@ function showRerollModal(state: import('./api/types').GameState): void {
     rerollModal.show(
         pending,
         playerName,
+        player?.position ?? null,
         async (choice: string) => {
             isProcessing = true;
             try {

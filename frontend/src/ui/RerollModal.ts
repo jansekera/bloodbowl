@@ -1,4 +1,4 @@
-import type { PendingReroll } from '../api/types';
+import type { PendingReroll, Position } from '../api/types';
 import { escapeHtml } from './escapeHtml';
 
 const ROLL_TYPE_LABELS: Record<string, string> = {
@@ -18,6 +18,17 @@ const ROLL_TYPE_LABELS: Record<string, string> = {
     jump_up: 'Jump Up (blok z lehu)',
 };
 
+/** Hody pohybu: neúspěch po odmítnutí = pád a turnover (ř. 497-499, 1702-1703, 8264-8277). */
+const MOVE_ROLLS = new Set(['dodge', 'gfi', 'leap', 'leap_gfi']);
+
+/** P294 krok 5b (uživatel 17.11.: „je dobře označit správně situaci, která chce reroll“): odkud kam a co je v sázce. */
+function situation(pending: PendingReroll, from: Position | null): string {
+    if (!MOVE_ROLLS.has(pending.rollType)) return '';
+    const odkud = from ? `from (${from.x}, ${from.y}) ` : '';
+    return `<div class="reroll-modal__info">${odkud}to (${pending.targetX}, ${pending.targetY})</div>`
+        + '<div class="reroll-modal__info">Accept Failure = the player falls (armour roll) and the turn ends.</div>';
+}
+
 export class RerollModal {
     private container: HTMLElement;
     private onChoice: ((choice: string) => void) | null = null;
@@ -32,6 +43,7 @@ export class RerollModal {
     show(
         pending: PendingReroll,
         playerName: string,
+        from: Position | null,
         onChoice: (choice: string) => void,
     ): void {
         this.onChoice = onChoice;
@@ -52,6 +64,7 @@ export class RerollModal {
             <div class="reroll-modal__content">
                 <div class="reroll-modal__title">${label} Failed!</div>
                 <div class="reroll-modal__info">${escapeHtml(playerName)} rolled <strong>${pending.roll}</strong> (needed ${pending.target}+)</div>
+                ${situation(pending, from)}
                 ${pending.proFailed ? '<div class="reroll-modal__info">Pro roll failed — a team re-roll may re-roll the Pro roll.</div>' : ''}
                 <div class="reroll-modal__buttons">${buttons}</div>
             </div>
@@ -62,8 +75,11 @@ export class RerollModal {
         this.container.querySelectorAll('.reroll-modal__btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const choice = (btn as HTMLElement).dataset.choice ?? 'decline';
+                // OPRAVENO 17.11.2026 — `hide()` maže `onChoice`, a volalo se až po něm ⇒ klik na tlačítko nic
+                //   neodeslal (od vzniku dialogu 9.3.2026; našel Playwright při P294 krok 5b)
+                const onChoice = this.onChoice;
                 this.hide();
-                this.onChoice?.(choice);
+                onChoice?.(choice);
             });
         });
     }
