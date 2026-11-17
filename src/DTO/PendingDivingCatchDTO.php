@@ -21,8 +21,6 @@ use App\ValueObject\Position;
  */
 final class PendingDivingCatchDTO
 {
-    /**
-     */
     public function __construct(
         private readonly int $playerId,
         private readonly Position $landing,

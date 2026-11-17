@@ -16,7 +16,7 @@ import { LevelUpModal } from './ui/LevelUpModal';
 import { DugoutPanel } from './ui/DugoutPanel';
 import { PlayerCard } from './ui/PlayerCard';
 import { BlockDiceModal } from './ui/BlockDiceModal';
-import { RerollModal } from './ui/RerollModal';
+import { RerollModal, MOVE_ROLLS } from './ui/RerollModal';
 import { ApothecaryModal } from './ui/ApothecaryModal';
 import { GrabModal } from './ui/GrabModal';
 import { StandFirmModal } from './ui/StandFirmModal';
@@ -134,7 +134,6 @@ function drawBombSuggestion(state: import('./api/types').GameState): void {
 
 /** P294 krok 5b (uživatel 17.11.: „je dobře označit správně situaci, která chce reroll“): u čekajícího přehozu pohybu
  *  šipka z pole hráče na pole, kam hází (úhyb, GFI, skok), a zvýraznění toho pole. */
-const MOVE_ROLLS = new Set(['dodge', 'gfi', 'leap', 'leap_gfi']);
 function drawRerollSituation(state: import('./api/types').GameState): void {
     const pending = state.pendingReroll;
     if (pending && (pending.rollType === 'pickup' || pending.rollType === 'catch')) {
@@ -253,7 +252,7 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     }
 
     // Show reroll modal if there's a pending reroll
-    if (rerollIsForHuman(result.state)) {
+    if (result.state.pendingReroll) {   // P294: otázku na přehoz server klade jen kouči-člověku
         showRerollModal(result.state);
     }
 
@@ -480,11 +479,6 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
         },
         opponentPicks,
     );
-}
-
-/** P294 krok 5f: otázku na přehoz server klade jen kouči-člověku (`setHumanSides`), i v tahu soupeře (chycená bomba). */
-function rerollIsForHuman(state: import('./api/types').GameState): boolean {
-    return !!state.pendingReroll;
 }
 
 function showRerollModal(state: import('./api/types').GameState): void {
@@ -1329,7 +1323,7 @@ async function init(): Promise<void> {
                 showBlockDiceModal(state);
             }
             // P292: čekající přehoz i po obnovení stránky — server jinou akci nepřijme
-            if (rerollIsForHuman(state)) {
+            if (state.pendingReroll) {
                 showRerollModal(state);
             }
             // P224: čekající otázka na Grab i po obnovení stránky — server jinou akci nepřijme

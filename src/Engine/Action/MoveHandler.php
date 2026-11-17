@@ -13,11 +13,9 @@ use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\Weather;
 use App\ValueObject\Position;
-use App\DTO\PendingRerollDTO;
 use App\Engine\CoachQuestion;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
-use App\Engine\ProCheck;
 use App\Engine\Coach;
 use App\Engine\ThrowReroll;
 use App\Engine\Pathfinder;
@@ -159,8 +157,6 @@ final class MoveHandler implements ActionHandlerInterface
         $currentState = $state;
         $currentPlayer = $player;
 
-        // Track team reroll availability
-        $activeSide = $currentState->getActiveTeam();
         $teamRerollUsed = false;
 
         foreach ($path->getSteps() as $step) {

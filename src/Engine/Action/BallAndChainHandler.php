@@ -476,9 +476,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
     {
         $events[] = GameEvent::playerFell($cil->getId());
         $mb = $bnc->hasSkill(SkillName::MightyBlow) && $cil->getTeamSide() !== $bnc->getTeamSide();
-        [$state, $events] = $this->ballResolver->srazit($state, $cil, $this->injuryResolver, $events, $mb);
-
-        return [$state, $events];
+        return $this->ballResolver->srazit($state, $cil, $this->injuryResolver, $events, $mb);
     }
 
     /**

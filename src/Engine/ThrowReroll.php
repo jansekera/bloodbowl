@@ -49,15 +49,15 @@ final class ThrowReroll
         TeamSide $side,
         bool $teamAllowed,
         array &$events,
-        ?Coach $kouc = null,
-        string $druh = '',
-        int $hod = 0,
-        int $cil = 0,
+        Coach $kouc,
+        string $druh,
+        int $hod,
+        int $cil,
         ?Position $kam = null,
     ): array {
         // P292: hráče kouče-člověka se zeptá (druh / hod / cíl jen pro dialog). P294: AI je „kouč“, který vždy bere
         //   Pro (bez Pro týmový přehoz) a po neúspěšném hodu Pro týmový přehoz — jeden žebříček pro oba.
-        $volba = ($kouc !== null && $kouc->decides($side))
+        $volba = $kouc->decides($side)
             ? static function (bool $pro, bool $team, bool $proFailed, GameState $stav) use ($kouc, $thrower, $druh, $hod, $cil, $kam, &$events): string {
                 // P294 krok 5a: otázka nese stav a dosavadní události (kouč vidí, co padlo); `$kam` = cílové pole hodu (5b).
                 //   OPRAVENO 17.11. (review P294 nález 3): stav v okamžiku TÉTO otázky (po hodu Pro je Pro použité), dřív
@@ -84,7 +84,7 @@ final class ThrowReroll
         TeamSide $side,
         bool $teamAllowed,
         array &$events,
-        ?Coach $kouc,
+        Coach $kouc,
         string $druh,
         int $hod,
         int $cil,

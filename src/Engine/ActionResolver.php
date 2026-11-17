@@ -9,7 +9,6 @@ use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingApothecaryDTO;
-use App\DTO\PendingRerollDTO;
 use App\DTO\ReplayContext;
 use App\DTO\BallState;
 use App\Engine\Action\BallAndChainHandler;
@@ -557,13 +556,12 @@ final class ActionResolver
             ActionType::AUTO_SETUP => $this->setupHandler->resolveAutoSetup($state, $params),
             ActionType::CHOOSE_BLOCK_DIE => $this->blockHandler->resolveBlockChoice($state, $params),
             ActionType::REROLL_BLOCK => $this->blockHandler->resolveBlockReroll($state, $params),
-            ActionType::RESOLVE_REROLL => throw new \LogicException('RESOLVE_REROLL se vyřizuje v resolve()'),
             ActionType::RESOLVE_APOTHECARY => $this->resolveApothecary($state, $params),
             ActionType::RESOLVE_GRAB => $this->resolveGrab($state, $params),
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
-            ActionType::RESOLVE_DIVING_CATCH => throw new \LogicException('RESOLVE_DIVING_CATCH se vyřizuje v resolve()'),
-            ActionType::RESOLVE_BOMB_RETHROW => throw new \LogicException('RESOLVE_BOMB_RETHROW se vyřizuje v resolve()'),
-            ActionType::RESOLVE_REFEREE => throw new \LogicException('RESOLVE_REFEREE se vyřizuje v resolve()'),
+            // odpovědi na otázky kouče se přehrávají v `resolve()` (P294)
+            ActionType::RESOLVE_REROLL, ActionType::RESOLVE_DIVING_CATCH, ActionType::RESOLVE_BOMB_RETHROW,
+            ActionType::RESOLVE_REFEREE => throw new \LogicException("{$action->value} se vyřizuje v resolve()"),
         });
 
         // Prepend pre-action events (e.g. Bloodlust bite)

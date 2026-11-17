@@ -12,7 +12,6 @@ use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Engine\RefereeCall;
 use App\Engine\Coach;
-use App\Enum\TeamSide;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;

@@ -706,7 +706,7 @@ final class BallResolver
      * Událost pádu (playerFell / bombExplosion) zapíše volající.
      *
      * @param list<GameEvent> $events
-     * @return array{0: GameState, 1: list<GameEvent>, 2: MatchPlayerDTO}
+     * @return array{0: GameState, 1: list<GameEvent>}
      */
     public function srazit(GameState $state, MatchPlayerDTO $hrac, InjuryResolver $zraneni, array $events, bool $mightyBlow = false): array
     {
@@ -715,9 +715,7 @@ final class BallResolver
         $inj = $zraneni->resolve($hrac, $this->dice, mightyBlow: $mightyBlow);
         $state = $state->withPlayer($inj['player']);
         $events = array_merge($events, $inj['events']);
-        [$state, $events] = $this->handleBallOnPlayerDown($state, $inj['player'], $events);
-
-        return [$state, $events, $inj['player']];
+        return $this->handleBallOnPlayerDown($state, $inj['player'], $events);
     }
 
     /**

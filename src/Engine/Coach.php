@@ -57,11 +57,11 @@ final class Coach
 
     public function end(): void
     {
-        $this->begin(new ReplayAnswers());
+        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = [];
     }
 
     /** Skočí hráč pro míč? (ř. 8065 "can attempt") */
-    public function divingCatch(int $playerId, Position $landing, int $otherCandidates, ?int $attemptingId, ?GameState $stav = null): bool
+    public function divingCatch(int $playerId, Position $landing, int $otherCandidates, ?int $attemptingId, GameState $stav): bool
     {
         return array_shift($this->divingCatch)
             ?? throw self::sPrubehem(new DivingCatchQuestion($playerId, $landing, $otherCandidates, $attemptingId), $stav, []);
@@ -75,7 +75,7 @@ final class Coach
      * @param list<GameEvent> $udalosti
      * @return array{x: int, y: int}
      */
-    public function bombTarget(int $playerId, array $targets, ?array $suggested, ?GameState $stav = null, array $udalosti = []): array
+    public function bombTarget(int $playerId, array $targets, ?array $suggested, GameState $stav, array $udalosti): array
     {
         return array_shift($this->bombTargets) ?? throw self::sPrubehem(new BombRethrowQuestion($playerId, $targets, $suggested), $stav, $udalosti);
     }
@@ -86,7 +86,7 @@ final class Coach
      * @param list<GameEvent> $udalosti
      * @return array{bribe: bool, argue: bool}
      */
-    public function referee(int $playerId, bool $canBribe, bool $canArgue, ?GameState $stav = null, array $udalosti = []): array
+    public function referee(int $playerId, bool $canBribe, bool $canArgue, GameState $stav, array $udalosti): array
     {
         return array_shift($this->referee) ?? throw self::sPrubehem(new RefereeQuestion($playerId, $canBribe, $canArgue), $stav, $udalosti);
     }
@@ -104,9 +104,9 @@ final class Coach
         int $target,
         bool $pro,
         bool $team,
-        bool $proFailed = false,
-        ?GameState $stav = null,
-        array $udalosti = [],
+        bool $proFailed,
+        GameState $stav,
+        array $udalosti,
         ?Position $kam = null,
     ): string {
         $a = array_shift($this->rerolls)
@@ -121,12 +121,12 @@ final class Coach
     }
 
     /**
-     * Otázka s průběhem akce v okamžiku hodu (P294 krok 5a), když ho volající zná.
+     * Otázka s průběhem akce v okamžiku hodu (P294 krok 5a).
      *
      * @param list<GameEvent> $udalosti
      */
-    private static function sPrubehem(CoachQuestion $q, ?GameState $stav, array $udalosti): CoachQuestion
+    private static function sPrubehem(CoachQuestion $q, GameState $stav, array $udalosti): CoachQuestion
     {
-        return $stav === null ? $q : $q->naStavu($stav, $udalosti);
+        return $q->naStavu($stav, $udalosti);
     }
 }

@@ -20,7 +20,7 @@ const ROLL_TYPE_LABELS: Record<string, string> = {
 };
 
 /** Hody pohybu: neúspěch po odmítnutí = pád a turnover (ř. 497-499, 1702-1703, 8264-8277). */
-const MOVE_ROLLS = new Set(['dodge', 'gfi', 'leap', 'leap_gfi']);
+export const MOVE_ROLLS: ReadonlySet<string> = new Set(['dodge', 'gfi', 'leap', 'leap_gfi']);
 
 /** P294 krok 5b (uživatel 17.11.: „je dobře označit správně situaci, která chce reroll“): odkud kam a co je v sázce. */
 /** P294 krok 5d: zvednutí a chytání — kde a co odmítnutí znamená (nepovedené zvednutí = turnover ř. 371-375, chytání ne ř. 376-378). */
