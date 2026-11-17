@@ -427,7 +427,7 @@ final class GameState
     public function hasPendingReplayQuestion(): bool
     {
         return $this->pendingDivingCatch !== null || $this->pendingBombRethrow !== null || $this->pendingReferee !== null
-            || $this->pendingReroll?->getReplayAction() !== null;   // P292: přehoz hodu (i v tahu soupeře)
+            || $this->pendingReroll?->getReplay() !== null;   // P292: přehoz hodu (i v tahu soupeře)
     }
 
     public function getDeclaredBlitzerId(): ?int

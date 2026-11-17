@@ -6,8 +6,7 @@ namespace App\Engine;
 
 use App\DTO\PendingRefereeDTO;
 use App\DTO\GameState;
-use App\DTO\ReplayAnswers;
-use App\Enum\ActionType;
+use App\DTO\ReplayContext;
 
 /**
  * P291: rozhodčí uprostřed faulu vylučuje hráče kouče-člověka a kouč ještě neřekl, jestli použije úplatek / protest
@@ -23,17 +22,14 @@ final class RefereeQuestion extends CoachQuestion
         parent::__construct('Referee question pending');
     }
 
-    public function pending(GameState $state, ActionType $action, array $params, array $dice, ReplayAnswers $answers): GameState
+    public function pending(GameState $state, ReplayContext $replay): GameState
     {
         return $state->withPendingReferee(new PendingRefereeDTO(
             $this->playerId,
             true,
             $this->canBribe,
             $this->canArgue,
-            $action,
-            $params,
-            $dice,
-            $answers,
+            $replay,
         ));
     }
 }

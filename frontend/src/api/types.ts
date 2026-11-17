@@ -71,7 +71,7 @@ export interface PendingReroll {
     /** Pro neprošel: týmový přehoz už jen hodu Pro (ř. 8385-8387) */
     proFailed?: boolean;
     /** P292: přehoz hodu (přihrávka, bomba, hod spoluhráčem) — stav je stav PŘED akcí, server ji přehraje */
-    replayAction?: string | null;
+    replay?: ReplayContext | null;
 }
 
 /** P206 (b): čekající volba o lékárníkovi */
@@ -122,34 +122,37 @@ export interface ReplayAnswers {
     rerolls: string[];
 }
 
+/** P294 krok 4: přehrání přerušené akce (akce, parametry, dosud padlé hody, odpovědi kouče) */
+export interface ReplayContext {
+    action: string;
+    params: Record<string, unknown>;
+    dice: number[];
+    answers: ReplayAnswers;
+}
+
 /**
  * P291: rozhodčí vylučuje hráče kouče-člověka — úplatek / protest? U faulu (`foul`) je stav stav PŘED akcí a server
- * ji po odpovědi přehraje; u tajné zbraně na konci drive (`action` null) čekají další hráči ve frontě `queue`.
+ * ji po odpovědi přehraje; u tajné zbraně na konci drive (`replay` null) čekají další hráči ve frontě `queue`.
  */
 export interface PendingReferee {
     playerId: number;
     foul: boolean;
     canBribe: boolean;
     canArgue: boolean;
-    action: string | null;
-    params: Record<string, unknown>;
-    dice: number[];
-    answers: ReplayAnswers;
+    /** null = tajná zbraň na konci drive (odpověď hned) */
+    replay: ReplayContext | null;
     queue: number[];
 }
 
 /**
  * 30.10.2026: kouč-člověk volí, jestli jeho hráč použije Diving Catch (`rules_bb2016.txt` ř. 8065-8071).
- * Stav je stav PŘED přerušenou akcí; po odpovědi ji server přehraje (`action`, `params`, `dice`, `answers`).
+ * Stav je stav PŘED přerušenou akcí; po odpovědi ji server přehraje (`replay`).
  */
 export interface PendingDivingCatch {
     playerId: number;
     /** prázdné pole v jeho tackle zóně, kam míč dopadá */
     landing: { x: number; y: number };
-    action: string;
-    params: Record<string, unknown>;
-    dice: number[];
-    answers: ReplayAnswers;
+    replay: ReplayContext;
     /** varianta B (30.10.2026): počet DALŠÍCH hráčů s Diving Catch v dosahu dopadu */
     otherCandidates: number;
     /** hráč, který už se pokouší (null = nikdo); dva pokusy se ruší (ř. 8069-8071) */
@@ -166,10 +169,7 @@ export interface PendingBombRethrow {
     targets: PassTarget[];
     /** pole, které by zvolil engine */
     suggested: { x: number; y: number } | null;
-    action: string;
-    params: Record<string, unknown>;
-    dice: number[];
-    answers: ReplayAnswers;
+    replay: ReplayContext;
 }
 
 /** Full game state sent from the server */

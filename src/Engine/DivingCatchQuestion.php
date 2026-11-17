@@ -6,8 +6,7 @@ namespace App\Engine;
 
 use App\DTO\PendingDivingCatchDTO;
 use App\DTO\GameState;
-use App\DTO\ReplayAnswers;
-use App\Enum\ActionType;
+use App\DTO\ReplayContext;
 use App\ValueObject\Position;
 
 /**
@@ -25,15 +24,12 @@ final class DivingCatchQuestion extends CoachQuestion
         parent::__construct('Diving Catch question pending');
     }
 
-    public function pending(GameState $state, ActionType $action, array $params, array $dice, ReplayAnswers $answers): GameState
+    public function pending(GameState $state, ReplayContext $replay): GameState
     {
         return $state->withPendingDivingCatch(new PendingDivingCatchDTO(
             $this->playerId,
             $this->landing,
-            $action,
-            $params,
-            $dice,
-            $answers,
+            $replay,
             $this->otherCandidates,
             $this->attemptingId,
         ));

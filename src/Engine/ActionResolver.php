@@ -10,7 +10,7 @@ use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingApothecaryDTO;
 use App\DTO\PendingRerollDTO;
-use App\DTO\ReplayAnswers;
+use App\DTO\ReplayContext;
 use App\DTO\BallState;
 use App\Engine\Action\BallAndChainHandler;
 use App\Engine\Action\BlitzHandler;
@@ -253,25 +253,21 @@ final class ActionResolver
         //   a po odpovědi se přehraje se zapsanými hody a všemi dosavadními odpověďmi (`ReplayDiceRoller`).
         if ($action === ActionType::RESOLVE_DIVING_CATCH) {
             $pending = $state->getPendingDivingCatch() ?? throw new \InvalidArgumentException('No pending Diving Catch question');
+            $r = $pending->getReplay();
 
             return $this->resolveSPrehranim(
                 $state->withPendingDivingCatch(null),
-                $pending->getAction(),
-                $pending->getParams(),
-                $pending->getDice(),
-                $pending->getAnswers()->withDivingCatch((bool) ($params['use'] ?? false)),
+                $r->withAnswers($r->answers->withDivingCatch((bool) ($params['use'] ?? false))),
             );
         }
         // P272 (10.11.2026): kam hodit chycenou bombu — stejné přehrání jako u Diving Catch.
         if ($action === ActionType::RESOLVE_BOMB_RETHROW) {
             $pending = $state->getPendingBombRethrow() ?? throw new \InvalidArgumentException('No pending bomb rethrow question');
+            $r = $pending->getReplay();
 
             return $this->resolveSPrehranim(
                 $state->withPendingBombRethrow(null),
-                $pending->getAction(),
-                $pending->getParams(),
-                $pending->getDice(),
-                $pending->getAnswers()->withBombTarget(['x' => (int) ($params['targetX'] ?? -1), 'y' => (int) ($params['targetY'] ?? -1)]),
+                $r->withAnswers($r->answers->withBombTarget(['x' => (int) ($params['targetX'] ?? -1), 'y' => (int) ($params['targetY'] ?? -1)])),
             );
         }
 
@@ -279,57 +275,42 @@ final class ActionResolver
         if ($action === ActionType::RESOLVE_REFEREE) {
             $pending = $state->getPendingReferee() ?? throw new \InvalidArgumentException('No pending referee question');
             $volba = ['bribe' => (bool) ($params['bribe'] ?? false), 'argue' => (bool) ($params['argue'] ?? false)];
-            $akce = $pending->getAction();
-            if ($akce === null) {
-                $r = $this->gameFlowResolver->resolveRefereeAnswer($state, $volba);
+            $r = $pending->getReplay();
+            if ($r === null) {
+                $vyrok = $this->gameFlowResolver->resolveRefereeAnswer($state, $volba);
 
-                return ActionResult::success($r['state'], $r['events']);
+                return ActionResult::success($vyrok['state'], $vyrok['events']);
             }
 
-            return $this->resolveSPrehranim(
-                $state->withPendingReferee(null),
-                $akce,
-                $pending->getParams(),
-                $pending->getDice(),
-                $pending->getAnswers()->withReferee($volba),
-            );
+            return $this->resolveSPrehranim($state->withPendingReferee(null), $r->withAnswers($r->answers->withReferee($volba)));
         }
 
         // P292: přehoz hodu přes ThrowReroll (přihrávka, bomba, hod spoluhráčem) — přehrání jako výše
         $prehoz = $state->getPendingReroll();
-        $prehozAkce = $prehoz?->getReplayAction();
-        if ($action === ActionType::RESOLVE_REROLL && $prehoz !== null && $prehozAkce !== null) {
+        $r = $prehoz?->getReplay();
+        if ($action === ActionType::RESOLVE_REROLL && $prehoz !== null && $r !== null) {
             $volba = (string) ($params['choice'] ?? 'decline');
             $prehoz->assertChoice($volba);
 
-            return $this->resolveSPrehranim(
-                $state->withPendingReroll(null),
-                $prehozAkce,
-                $prehoz->getReplayParams(),
-                $prehoz->getReplayDice(),
-                $prehoz->getReplayAnswers()->withReroll($volba),
-            );
+            return $this->resolveSPrehranim($state->withPendingReroll(null), $r->withAnswers($r->answers->withReroll($volba)));
         }
 
-        return $this->resolveSPrehranim($state, $action, $params, [], new ReplayAnswers());
+        return $this->resolveSPrehranim($state, new ReplayContext($action, $params));
     }
 
     /**
-     * Akce s otázkami kouči uprostřed (Diving Catch, kam hodit bombu, rozhodčí u faulu, přehoz hodu): hody `$hody`
-     * a odpovědi z dřívějších přerušení se přehrají, nová otázka akci přeruší a vrátí stav PŘED ní s čekající
-     * otázkou. Odpovědi všech druhů jdou spolu (`ReplayAnswers`, P292).
-     *
-     * @param array<string, mixed> $params
-     * @param list<int> $hody
+     * Akce s otázkami kouči uprostřed (Diving Catch, kam hodit bombu, rozhodčí u faulu, přehoz hodu): hody
+     * a odpovědi z dřívějších přerušení (`ReplayContext`) se přehrají, nová otázka akci přeruší a vrátí stav PŘED ní
+     * s čekající otázkou. Odpovědi všech druhů jdou spolu (`ReplayAnswers`, P292).
      */
-    private function resolveSPrehranim(GameState $state, ActionType $action, array $params, array $hody, ReplayAnswers $odpovedi): ActionResult
+    private function resolveSPrehranim(GameState $state, ReplayContext $replay): ActionResult
     {
-        $this->replayDice->begin($hody);
-        $this->coach->begin($odpovedi);
+        $this->replayDice->begin($replay->dice);
+        $this->coach->begin($replay->answers);
         try {
-            return $this->resolveJednou($state, $action, $params);
+            return $this->resolveJednou($state, $replay->action, $replay->params);
         } catch (CoachQuestion $q) {
-            return ActionResult::success($q->pending($state, $action, $params, $this->replayDice->getLog(), $odpovedi), []);
+            return ActionResult::success($q->pending($state, new ReplayContext($replay->action, $replay->params, $this->replayDice->getLog(), $replay->answers)), []);
         } finally {
             $this->coach->end();
         }

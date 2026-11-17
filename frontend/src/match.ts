@@ -465,7 +465,7 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
 
 /** Čekající přehoz patří kouči-člověku: na jeho tahu, nebo přehoz hodu (P292 replay) i v tahu soupeře (chycená bomba). */
 function rerollIsForHuman(state: import('./api/types').GameState): boolean {
-    return !!state.pendingReroll && (state.aiTeam !== state.activeTeam || !!state.pendingReroll.replayAction);
+    return !!state.pendingReroll && (state.aiTeam !== state.activeTeam || !!state.pendingReroll.replay);
 }
 
 function showRerollModal(state: import('./api/types').GameState): void {

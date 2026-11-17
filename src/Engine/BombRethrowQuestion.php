@@ -6,8 +6,7 @@ namespace App\Engine;
 
 use App\DTO\PendingBombRethrowDTO;
 use App\DTO\GameState;
-use App\DTO\ReplayAnswers;
-use App\Enum\ActionType;
+use App\DTO\ReplayContext;
 
 /**
  * P272: hráč kouče-člověka chytil / zachytil bombu a kouč ještě neřekl, kam ji hodit dál (viz `ReplayDiceRoller`).
@@ -27,16 +26,13 @@ final class BombRethrowQuestion extends CoachQuestion
         parent::__construct('Bomb rethrow target question pending');
     }
 
-    public function pending(GameState $state, ActionType $action, array $params, array $dice, ReplayAnswers $answers): GameState
+    public function pending(GameState $state, ReplayContext $replay): GameState
     {
         return $state->withPendingBombRethrow(new PendingBombRethrowDTO(
             $this->playerId,
             $this->targets,
             $this->suggested,
-            $action,
-            $params,
-            $dice,
-            $answers,
+            $replay,
         ));
     }
 }

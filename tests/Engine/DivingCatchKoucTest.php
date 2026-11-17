@@ -301,7 +301,7 @@ final class DivingCatchKoucTest extends TestCase
         $this->assertNotNull($druha);
         $this->assertSame(3, $druha->getPlayerId(), 'druhá otázka u vhazování');
         $this->assertSame([10, 5], [$druha->getLanding()->getX(), $druha->getLanding()->getY()]);
-        $this->assertSame([false], $druha->getAnswers()->divingCatch);
+        $this->assertSame([false], $druha->getReplay()->answers->divingCatch);
 
         $r = $this->resolver([6], [TeamSide::HOME])->resolve($q2, ActionType::RESOLVE_DIVING_CATCH, ['use' => true]);
         $this->assertNull($r->getNewState()->getPendingDivingCatch());

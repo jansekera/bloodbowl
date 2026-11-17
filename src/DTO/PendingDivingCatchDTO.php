@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
-use App\Enum\ActionType;
 use App\ValueObject\Position;
 
 /**
@@ -16,22 +15,17 @@ use App\ValueObject\Position;
  * `otherCandidates` = počet dalších kandidátů, `attemptingId` = kdo už skáče (null = nikdo). Dva
  * a víc pokusů se ruší (ř. 8069-8071).
  *
- * Stav s touto otázkou je stav PŘED akcí `action` (`params`): po odpovědi se akce přehraje se
- * zapsanými hody `dice` a odpověďmi `answers` (všech druhů, ReplayAnswers) + novou (viz `ReplayDiceRoller`).
+ * Stav s touto otázkou je stav PŘED přerušenou akcí: po odpovědi se akce přehraje (`replay`: akce, zapsané hody
+ * a odpovědi všech druhů + nová; viz `ReplayDiceRoller`).
  */
 final class PendingDivingCatchDTO
 {
     /**
-     * @param array<string, mixed> $params
-     * @param list<int> $dice
      */
     public function __construct(
         private readonly int $playerId,
         private readonly Position $landing,
-        private readonly ActionType $action,
-        private readonly array $params,
-        private readonly array $dice,
-        private readonly ReplayAnswers $answers,
+        private readonly ReplayContext $replay,
         private readonly int $otherCandidates = 0,
         private readonly ?int $attemptingId = null,
     ) {}
@@ -46,27 +40,10 @@ final class PendingDivingCatchDTO
         return $this->landing;
     }
 
-    public function getAction(): ActionType
+    /** P294 krok 4: akce, hody a odpovědi k přehrání */
+    public function getReplay(): ReplayContext
     {
-        return $this->action;
-    }
-
-    /** @return array<string, mixed> */
-    public function getParams(): array
-    {
-        return $this->params;
-    }
-
-    /** @return list<int> */
-    public function getDice(): array
-    {
-        return $this->dice;
-    }
-
-    /** Odpovědi z dřívějších přerušení této akce (všechny druhy otázek, P292). */
-    public function getAnswers(): ReplayAnswers
-    {
-        return $this->answers;
+        return $this->replay;
     }
 
     public function getOtherCandidates(): int
@@ -85,10 +62,7 @@ final class PendingDivingCatchDTO
         return [
             'playerId' => $this->playerId,
             'landing' => ['x' => $this->landing->getX(), 'y' => $this->landing->getY()],
-            'action' => $this->action->value,
-            'params' => $this->params,
-            'dice' => $this->dice,
-            'answers' => $this->answers->toArray(),
+            'replay' => $this->replay->toArray(),
             'otherCandidates' => $this->otherCandidates,
             'attemptingId' => $this->attemptingId,
         ];
@@ -102,10 +76,7 @@ final class PendingDivingCatchDTO
         return new self(
             (int) $data['playerId'],
             new Position((int) $landing['x'], (int) $landing['y']),
-            ActionType::from((string) $data['action']),
-            (array) ($data['params'] ?? []),
-            array_values(array_map('intval', (array) ($data['dice'] ?? []))),
-            ReplayAnswers::fromArray((array) ($data['answers'] ?? [])),
+            ReplayContext::fromArray((array) $data['replay']),
             (int) ($data['otherCandidates'] ?? 0),
             isset($data['attemptingId']) ? (int) $data['attemptingId'] : null,
         );
