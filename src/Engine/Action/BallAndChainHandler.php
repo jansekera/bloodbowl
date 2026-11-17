@@ -475,12 +475,10 @@ final class BallAndChainHandler implements ActionHandlerInterface
     private function srazitCil(GameState $state, MatchPlayerDTO $bnc, MatchPlayerDTO $cil, array $events): array
     {
         $events[] = GameEvent::playerFell($cil->getId());
-        $cil = $cil->withState(PlayerState::PRONE);
         $mb = $bnc->hasSkill(SkillName::MightyBlow) && $cil->getTeamSide() !== $bnc->getTeamSide();
-        $inj = $this->injuryResolver->resolve($cil, $this->dice, mightyBlow: $mb);
-        $state = $state->withPlayer($inj['player']);
-        $events = array_merge($events, $inj['events']);
-        return $this->ballResolver->handleBallOnPlayerDown($state, $inj['player'], $events);
+        [$state, $events] = $this->ballResolver->srazit($state, $cil, $this->injuryResolver, $events, $mb);
+
+        return [$state, $events];
     }
 
     /**

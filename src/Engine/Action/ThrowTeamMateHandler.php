@@ -302,12 +302,8 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             if (!$naHraci) {
                 // P281: sražený spoluhráč = turnover (ř. 366-367) — vyhlásí se až na konci dopadu
                 $srazenSpoluhrac = $occupant->getTeamSide() === $state->getActiveTeam();
-                $srazen = $occupant->getState() === PlayerState::STUNNED ? $occupant : $occupant->withState(PlayerState::PRONE);
-                $events[] = GameEvent::playerFell($srazen->getId());
-                $inj = $this->injuryResolver->resolve($srazen, $this->dice);
-                $state = $state->withPlayer($inj['player']);
-                $events = array_merge($events, $inj['events']);
-                [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $inj['player'], $events);
+                $events[] = GameEvent::playerFell($occupant->getId());
+                [$state, $events] = $this->ballResolver->srazit($state, $occupant, $this->injuryResolver, $events);
             }
             $newPos = $this->scatterCalc->scatterOnce($landingPos, $this->dice->rollD8());
             return $this->resolveLanding($state, $projectile, $newPos, $hadBall, $events, $landingPos, true, $srazenSpoluhrac);

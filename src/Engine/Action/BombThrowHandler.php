@@ -299,15 +299,7 @@ final class BombThrowHandler implements ActionHandlerInterface
                 if ($player->getTeamSide() === $activeSide) {
                     $srazenNas = true;
                 }
-                $player = $player->withState(
-                    $player->getState() === PlayerState::STUNNED ? PlayerState::STUNNED : PlayerState::PRONE,
-                );
-                $state = $state->withPlayer($player);
-                $injResult = $this->injuryResolver->resolve($player, $this->dice);
-                $player = $injResult['player'];
-                $state = $state->withPlayer($player);
-                $events = array_merge($events, $injResult['events']);
-                [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $player, $events);
+                [$state, $events] = $this->ballResolver->srazit($state, $player, $this->injuryResolver, $events);
             }
         }
 

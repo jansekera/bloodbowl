@@ -710,6 +710,27 @@ final class BallResolver
     }
 
     /**
+     * P294 krok 7: hráč na svém poli je sražen (Knocked Down) něčím jiným než pohybem — dopad hozeného hráče
+     * (ř. 8617-8619), výbuch bomby (ř. 7957-7958), blok Ball & Chain: leží (omráčený zůstane omráčený, „roll for Armour
+     * even if already Prone or Stunned“), hod na brnění a zranění, nesl-li míč, odskočí (ř. 678-679). Dřív tři kopie.
+     * Událost pádu (playerFell / bombExplosion) zapíše volající.
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>, 2: MatchPlayerDTO}
+     */
+    public function srazit(GameState $state, MatchPlayerDTO $hrac, InjuryResolver $zraneni, array $events, bool $mightyBlow = false): array
+    {
+        $hrac = $hrac->getState() === PlayerState::STUNNED ? $hrac : $hrac->withState(PlayerState::PRONE);
+        $state = $state->withPlayer($hrac);
+        $inj = $zraneni->resolve($hrac, $this->dice, mightyBlow: $mightyBlow);
+        $state = $state->withPlayer($inj['player']);
+        $events = array_merge($events, $inj['events']);
+        [$state, $events] = $this->handleBallOnPlayerDown($state, $inj['player'], $events);
+
+        return [$state, $events, $inj['player']];
+    }
+
+    /**
      * Handle ball when a player goes down (drop and bounce).
      *
      * @param list<GameEvent> $events
