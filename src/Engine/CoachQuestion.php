@@ -10,8 +10,9 @@ use App\DTO\ReplayContext;
 
 /**
  * P294 krok 3: společný předek otázek kouči-člověku uprostřed akce (Diving Catch, kam hodit bombu, rozhodčí, přehoz
- * hodu). Akce se přeruší, `ActionResolver` vrátí stav PŘED ní s čekající otázkou (`pending`) a po odpovědi ji přehraje
- * se zapsanými hody a odpověďmi (`ReplayDiceRoller`, `ReplayAnswers`). Jeden `catch` místo čtyř.
+ * hodu). Akce se přeruší, `ActionResolver` vrátí stav v okamžiku otázky (od P294 kroku 5a; jen k zobrazení) s čekající
+ * otázkou (`pending`) a po odpovědi ji přehraje z výchozího stavu akce (`ReplayContext::$base`) se zapsanými hody
+ * a odpověďmi (`ReplayDiceRoller`, `ReplayAnswers`). Jeden `catch` místo čtyř.
  */
 abstract class CoachQuestion extends \RuntimeException
 {

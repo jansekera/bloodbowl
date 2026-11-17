@@ -10,7 +10,7 @@ use App\DTO\ReplayContext;
 
 /**
  * P272: hráč kouče-člověka chytil / zachytil bombu a kouč ještě neřekl, kam ji hodit dál (viz `ReplayDiceRoller`).
- * Chytá ji jen `ActionResolver::resolve`, který vrátí stav PŘED akcí s `PendingBombRethrowDTO`.
+ * Chytá ji jen `ActionResolver::resolve`, který vrátí stav v okamžiku otázky (rozpracovaná akce, jen k zobrazení; P294 krok 5a) s `PendingBombRethrowDTO`.
  */
 final class BombRethrowQuestion extends CoachQuestion
 {

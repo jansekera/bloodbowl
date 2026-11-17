@@ -9,7 +9,7 @@ namespace App\DTO;
  * Rozhodčí vylučuje hráče kouče-člověka `playerId`; kouč volí úplatek (`rules_bb2016.txt` ř. 2871-2879) a protest
  * Argue the call (ř. 1091-1102). Ptá se jen na to, co jde (`canBribe`, `canArgue`).
  *
- * - Faul (`foul`): stav je stav PŘED akcí; po odpovědi se akce přehraje (`replay`, jako PendingDivingCatchDTO).
+ * - Faul (`foul`): stav je okamžik otázky (jen k zobrazení, P294 5a); po odpovědi se akce přehraje z `replay->base` (`replay`, jako PendingDivingCatchDTO).
  * - Tajná zbraň na konci drive: `replay` je null, odpověď se vyhodnotí hned; `queue` = další hráči kouče
  *   s tajnou zbraní, na které rozhodčí ještě čeká.
  */

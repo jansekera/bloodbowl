@@ -295,8 +295,7 @@ final class DivingCatchKandidatiTest extends TestCase
             ->build();
         $dice = new FixedDiceRoller([3, 2, 3, 4, 3, 3, 7]);
         $scatter = new ScatterCalculator();
-        $ball = new BallResolver($dice, new TacklezoneCalculator(), $scatter);
-        $ball->setCoach(self::kouc([TeamSide::HOME, TeamSide::AWAY], new ReplayAnswers($odpovedi)));
+        $ball = new BallResolver($dice, new TacklezoneCalculator(), $scatter, coach: self::kouc([TeamSide::HOME, TeamSide::AWAY], new ReplayAnswers($odpovedi)));
         try {
             (new KickoffResolver($dice, $scatter, $ball, new InjuryResolver()))->resolveKickoff($s, new Position(10, 7));
         } catch (DivingCatchQuestion $q) {
@@ -447,8 +446,7 @@ final class DivingCatchKandidatiTest extends TestCase
             ->build();
         $dice = new FixedDiceRoller([3, 2, 3, 4, 3, 3, 7, 1, 1, 1]);
         $scatter = new ScatterCalculator();
-        $ball = new BallResolver($dice, new TacklezoneCalculator(), $scatter);
-        $ball->setCoach(self::kouc($lide, new ReplayAnswers($odpovedi)));
+        $ball = new BallResolver($dice, new TacklezoneCalculator(), $scatter, coach: self::kouc($lide, new ReplayAnswers($odpovedi)));
 
         return (new KickoffResolver($dice, $scatter, $ball, new InjuryResolver()))->resolveKickoff($s, new Position(10, 7));
     }

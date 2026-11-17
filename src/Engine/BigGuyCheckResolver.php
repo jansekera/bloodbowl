@@ -86,19 +86,54 @@ final class BigGuyCheckResolver
     /**
      * Vyhodnotí hod `$roll` kontroly Bone Head / Really Stupid / Wild Animal. P289 (10.11.2026): týž výpočet
      * pro první hod i pro přehoz kouče — neúspěch nese `reroll` (druh, cíl, hod) pro nabídku přehozu.
+     * `$zapsatUspech` (přehoz kouče, P294 5e): i povedený hod se zapíše do událostí (kouč chce vidět, co padlo);
+     * AI povedenou kontrolu nezapisuje.
      *
      * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
      */
-    public function judgeRerollableCheck(GameState $state, MatchPlayerDTO $player, ActionType $action, int $roll): ?array
+    public function judgeRerollableCheck(GameState $state, MatchPlayerDTO $player, ActionType $action, int $roll, bool $zapsatUspech = false): ?array
     {
         if ($player->hasSkill(SkillName::BoneHead)) {
-            return $this->resolveBoneHead($state, $player, $roll);
+            $r = $this->resolveBoneHead($state, $player, $roll);
+            $uspech = GameEvent::boneHeadPass($player->getId(), $roll);
+        } elseif ($player->hasSkill(SkillName::ReallyStupid)) {
+            $r = $this->resolveReallyStupid($state, $player, $roll);
+            $uspech = GameEvent::reallyStupidPass($player->getId(), $roll, $this->hasReallyStupidSupport($state, $player));
+        } else {
+            $r = $this->resolveWildAnimal($state, $player, $action, $roll);
+            $uspech = GameEvent::wildAnimalPass($player->getId(), $roll);
         }
-        if ($player->hasSkill(SkillName::ReallyStupid)) {
-            return $this->resolveReallyStupid($state, $player, $roll);
+        if (!$zapsatUspech || isset($r['reroll'])) {
+            return $r;
         }
 
-        return $this->resolveWildAnimal($state, $player, $action, $roll);
+        return ['state' => $r['state'] ?? $state, 'events' => [...($r['events'] ?? []), $uspech], 'proceed' => true];
+    }
+
+    /**
+     * P294 krok 5e (přesunuto z `ActionResolver`, review P294 nález 4): neúspěch kontroly kouč-člověk smí přehodit
+     * (ř. 929-931; Pro ř. 8381) — otázka přehráním (`Coach`, stav před hodem, hráč na svém poli); po přehozu se hod
+     * vyhodnotí znovu. AI hody velkých hráčů nepřehazuje (parita s C++ P130) — volá se jen pro kouče-člověka.
+     * Vrací výsledek kontroly jako `judgeRerollableCheck` (vždy pole: povedený přehoz = `proceed`), s událostmi
+     * neúspěchu, přehozu a nového hodu.
+     *
+     * @param array{state: GameState, events: list<GameEvent>, reroll: array{type: string, target: int, roll: int}} $neuspech
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}
+     */
+    public function prehozKouce(GameState $state, MatchPlayerDTO $player, ActionType $action, array $neuspech, Coach $kouc, DiceRollerInterface $dice): array
+    {
+        $kontrola = $neuspech['reroll'];
+        $udalosti = $neuspech['events'];
+        $res = ThrowReroll::proThenTeam($dice, $state, $player, $player->getTeamSide(), true, $udalosti, $kouc, $kontrola['type'], $kontrola['roll'], $kontrola['target'], $player->getPosition());
+        if (!$res['rerolled']) {
+            // platí původní hod; událost neúspěchu už je v `$udalosti` (u otázky)
+            $znovu = $this->judgeRerollableCheck($res['state'], $res['thrower'], $action, $kontrola['roll']) ?? [];
+
+            return ['events' => $udalosti] + $znovu + ['state' => $res['state']];
+        }
+        $znovu = $this->judgeRerollableCheck($res['state'], $res['thrower'], $action, $dice->rollD6(), true) ?? [];
+
+        return ['events' => [...$udalosti, ...($znovu['events'] ?? [])]] + $znovu + ['state' => $res['state']];
     }
 
     /**

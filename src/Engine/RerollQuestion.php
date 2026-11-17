@@ -11,7 +11,7 @@ use App\ValueObject\Position;
 
 /**
  * P292: nepovedený hod hráče kouče-člověka (přihrávka, bomba, hod spoluhráčem…) a kouč ještě neřekl, jestli přehodí
- * (viz `Coach::reroll`, `ReplayDiceRoller`). Chytá ji jen `ActionResolver::resolve`, který vrátí stav PŘED akcí
+ * (viz `Coach::reroll`, `ReplayDiceRoller`). Chytá ji jen `ActionResolver::resolve`, který vrátí stav v okamžiku otázky (rozpracovaná akce, jen k zobrazení; P294 krok 5a)
  * s `PendingRerollDTO` (replay).
  */
 final class RerollQuestion extends CoachQuestion

@@ -71,28 +71,21 @@ final class ActionResolver
         $strCalc = new StrengthCalculator();
         $injuryResolver = new InjuryResolver();
         $this->injuryResolver = $injuryResolver;
-        $this->ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
+        $this->ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc, $this->coach);
         $kickoffResolver = new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver, $injuryResolver);
-        $this->gameFlowResolver = new GameFlowResolver($dice);
+        $this->gameFlowResolver = new GameFlowResolver($dice, coach: $this->coach);
         // ⭐ 11.09.2026 (PHP22): Bloodlust potrebuje hod na zraneni a odraz
         //   mice, takze uz to neni bezzavisla trida.
         $this->bigGuyCheckResolver = new BigGuyCheckResolver($injuryResolver, $this->ballResolver);
 
-        $this->moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $this->ballResolver, $injuryResolver);
-        $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver, $this->moveHandler, $this->getPassResolver());
+        $this->moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $this->ballResolver, $injuryResolver, coach: $this->coach);
+        $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver, $this->moveHandler, $this->getPassResolver(), coach: $this->coach);
         $this->blitzHandler = new BlitzHandler($this->moveHandler, $this->blockHandler, $pathfinder);
-        $this->foulHandler = new FoulHandler($dice, $injuryResolver, $this->ballResolver);
+        $this->foulHandler = new FoulHandler($dice, $injuryResolver, $this->ballResolver, coach: $this->coach);
         $this->handOffHandler = new HandOffHandler($this->ballResolver, $dice);
-        $this->ttmHandler = new ThrowTeamMateHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver);
-        $this->bombThrowHandler = new BombThrowHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver);
+        $this->ttmHandler = new ThrowTeamMateHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver, coach: $this->coach);
+        $this->bombThrowHandler = new BombThrowHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver, coach: $this->coach);
         // P294 krok 3: jeden kouč-člověk pro všechny otázky uprostřed akce
-        $this->ballResolver->setCoach($this->coach);
-        $this->moveHandler->setCoach($this->coach);   // P294 krok 5b: přehoz úhybu / GFI
-        $this->gameFlowResolver->setCoach($this->coach);
-        $this->foulHandler->setCoach($this->coach);
-        $this->ttmHandler->setCoach($this->coach);
-        $this->bombThrowHandler->setCoach($this->coach);
-        $this->blockHandler->setCoach($this->coach);   // P303 Jump Up
         $this->hypnoticGazeHandler = new HypnoticGazeHandler($dice, $this->tzCalc);
         $this->ballAndChainHandler = new BallAndChainHandler($dice, $injuryResolver, $this->ballResolver, $this->scatterCalc, $this->blockHandler);
         $this->setupHandler = new SetupHandler($kickoffResolver);
@@ -102,8 +95,7 @@ final class ActionResolver
     public function getPassResolver(): PassResolver
     {
         if ($this->passResolver === null) {
-            $this->passResolver = new PassResolver($this->dice, $this->tzCalc, $this->scatterCalc, $this->ballResolver);
-            $this->passResolver->setCoach($this->coach);
+            $this->passResolver = new PassResolver($this->dice, $this->tzCalc, $this->scatterCalc, $this->ballResolver, $this->coach);
         }
         return $this->passResolver;
     }
@@ -240,8 +232,8 @@ final class ActionResolver
     public function resolve(GameState $state, ActionType $action, array $params): ActionResult
     {
         // 30.10.2026: Diving Catch jako otázka kouči (ř. 8065 "can attempt"). Otázka přijde uprostřed
-        //   akce, až po hodech; akce se přeruší (`DivingCatchQuestion`), vrátí se stav PŘED ní s otázkou
-        //   a po odpovědi se přehraje se zapsanými hody a všemi dosavadními odpověďmi (`ReplayDiceRoller`).
+        //   akce, až po hodech; akce se přeruší (`DivingCatchQuestion`), vrátí se stav v okamžiku otázky
+        //   (P294 5a, jen k zobrazení) a po odpovědi se přehraje z výchozího stavu se zapsanými hody a všemi dosavadními odpověďmi (`ReplayDiceRoller`).
         if ($action === ActionType::RESOLVE_DIVING_CATCH) {
             $pending = $state->getPendingDivingCatch() ?? throw new \InvalidArgumentException('No pending Diving Catch question');
             $r = $pending->getReplay();
@@ -292,8 +284,8 @@ final class ActionResolver
 
     /**
      * Akce s otázkami kouči uprostřed (Diving Catch, kam hodit bombu, rozhodčí u faulu, přehoz hodu): hody
-     * a odpovědi z dřívějších přerušení (`ReplayContext`) se přehrají, nová otázka akci přeruší a vrátí stav PŘED ní
-     * s čekající otázkou. Odpovědi všech druhů jdou spolu (`ReplayAnswers`, P292).
+     * a odpovědi z dřívějších přerušení (`ReplayContext`) se přehrají, nová otázka akci přeruší a vrátí stav v okamžiku
+     * otázky (jen k zobrazení; přehrává se z `ReplayContext::$base`) s čekající otázkou. Odpovědi všech druhů jdou spolu (`ReplayAnswers`, P292).
      */
     private function resolveSPrehranim(GameState $state, ReplayContext $replay): ActionResult
     {
@@ -306,16 +298,18 @@ final class ActionResolver
 
             return new ActionResult($r->getNewState(), $r->isSuccess(), $r->isTurnover(), self::bezUkazanych($r->getEvents(), $replay->shown));
         } catch (CoachQuestion $q) {
+            // ukázat jen nové; `shown` = vše, co kouč v této akci viděl (u všech dosavadních otázek), review P294 nález 1
+            $nove = self::bezUkazanych($q->events, $replay->shown);
             $kontext = new ReplayContext(
                 $replay->action,
                 $replay->params,
                 $this->replayDice->getLog(),
                 $replay->answers,
                 $zaklad,
-                array_map(static fn(GameEvent $e): array => $e->toArray(), $q->events),
+                [...$replay->shown, ...array_map(static fn(GameEvent $e): array => $e->toArray(), $nove)],
             );
 
-            return ActionResult::success($q->pending($q->snapshot ?? $zaklad, $kontext), self::bezUkazanych($q->events, $replay->shown));
+            return ActionResult::success($q->pending($q->snapshot ?? $zaklad, $kontext), $nove);
         } finally {
             $this->coach->end();
         }
@@ -347,24 +341,27 @@ final class ActionResolver
      */
     private static function bezUkazanych(array $udalosti, array $ukazane): array
     {
-        $n = count($ukazane);
-        if ($n === 0) {
+        if ($ukazane === []) {
             return $udalosti;
         }
         // porovnání v kanonickém JSON: `shown` prošlo uložením stavu do DB a `jsonb` přeřadí klíče objektů (P294 5b,
         //   našel Playwright — `===` na polích pak neshodlo nic a kouč viděl hod v logu dvakrát)
+        // OPRAVENO 17.11.2026 (review P294, nález 1) — dřív se `shown` odebíralo jen jako jeden souvislý úsek; kouč ale
+        //   průběh vidí po kouscích (u každé otázky jen to, co znala) ⇒ úsek se v přehrané akci nenašel a události se
+        //   opakovaly. Teď se odebere každá ukázaná událost zvlášť (první dosud neodebraný výskyt).
         $json = static fn(array $a): string => (string) json_encode(self::serazeneKlice($a));
-        $pole = array_map(static fn(GameEvent $e): string => $json($e->toArray()), $udalosti);
-        $ukazane = array_map($json, $ukazane);
-        for ($i = 0; $i + $n <= count($pole); $i++) {
-            if (array_slice($pole, $i, $n) === $ukazane) {
-                array_splice($udalosti, $i, $n);
-
-                return $udalosti;
+        $zbyva = array_count_values(array_map($json, $ukazane));
+        $vysledek = [];
+        foreach ($udalosti as $e) {
+            $klic = $json($e->toArray());
+            if (($zbyva[$klic] ?? 0) > 0) {
+                $zbyva[$klic]--;
+                continue;
             }
+            $vysledek[] = $e;
         }
 
-        return $udalosti;
+        return $vysledek;
     }
 
     /**
@@ -502,26 +499,7 @@ final class ActionResolver
                 //   (stav před hodem, hráč na svém poli); po přehozu se hod vyhodnotí znovu. Dřív dialog s ohlášenou akcí
                 //   (`resume*`, `kontrolaProsla`, P289). AI hody velkých hráčů nepřehazuje (parita s C++ P130).
                 if (isset($checkResult['reroll']) && $this->coach->decides($player->getTeamSide())) {
-                    $kontrola = $checkResult['reroll'];
-                    $udalosti = $checkResult['events'];
-                    $res = ThrowReroll::proThenTeam($this->dice, $state, $player, $player->getTeamSide(), true, $udalosti, $this->coach, $kontrola['type'], $kontrola['roll'], $kontrola['target'], $player->getPosition());
-                    $hod = $res['rerolled'] ? $this->dice->rollD6() : $kontrola['roll'];
-                    $znovu = $this->bigGuyCheckResolver->judgeRerollableCheck($res['state'], $res['thrower'], $action, $hod);
-                    // bez přehozu je událost neúspěchu už v `$udalosti`; po přehozu přibude nový hod
-                    $udalosti = $res['rerolled'] ? [...$udalosti, ...($znovu['events'] ?? [])] : $udalosti;
-                    // povedená kontrola vlastní událost nemá (AI ji nevidí); po přehozu kouč chce vidět, co padlo
-                    if ($res['rerolled'] && ($znovu === null || !empty($znovu['proceed']))) {
-                        $udalosti[] = match ($kontrola['type']) {
-                            'bone_head' => GameEvent::boneHeadPass($player->getId(), $hod),
-                            'really_stupid' => GameEvent::reallyStupidPass($player->getId(), $hod, $kontrola['target'] === 2),
-                            default => GameEvent::wildAnimalPass($player->getId(), $hod),
-                        };
-                    }
-                    $state = $res['state'];
-                    $checkResult = $znovu === null ? null : ['events' => $udalosti] + $znovu;
-                    if ($znovu === null) {
-                        $preEvents = $udalosti;
-                    }
+                    $checkResult = $this->bigGuyCheckResolver->prehozKouce($state, $player, $action, $checkResult, $this->coach, $this->dice);
                 }
                 if ($checkResult !== null) {
                     // ⛔ PHP22: kontrola pred akci umi skoncit i TURNOVEREM --
@@ -559,7 +537,8 @@ final class ActionResolver
             }
         }
 
-        $result = match ($action) {
+        // review P294 nález 1: otázka položená v handleru nese i události kontroly před akcí (Bone Head …, Bloodlust)
+        $result = CoachQuestion::sPredchozimi($preEvents, fn(): ActionResult => match ($action) {
             ActionType::MOVE => $this->moveHandler->resolve($state, $params),
             ActionType::BLOCK => $this->blockHandler->resolve($state, $params),
             ActionType::BLITZ => $this->blitzHandler->resolve($state, $params),
@@ -585,7 +564,7 @@ final class ActionResolver
             ActionType::RESOLVE_DIVING_CATCH => throw new \LogicException('RESOLVE_DIVING_CATCH se vyřizuje v resolve()'),
             ActionType::RESOLVE_BOMB_RETHROW => throw new \LogicException('RESOLVE_BOMB_RETHROW se vyřizuje v resolve()'),
             ActionType::RESOLVE_REFEREE => throw new \LogicException('RESOLVE_REFEREE se vyřizuje v resolve()'),
-        };
+        });
 
         // Prepend pre-action events (e.g. Bloodlust bite)
         if ($preEvents !== []) {

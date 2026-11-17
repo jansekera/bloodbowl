@@ -15,7 +15,8 @@ use App\ValueObject\Position;
  * `otherCandidates` = počet dalších kandidátů, `attemptingId` = kdo už skáče (null = nikdo). Dva
  * a víc pokusů se ruší (ř. 8069-8071).
  *
- * Stav s touto otázkou je stav PŘED přerušenou akcí: po odpovědi se akce přehraje (`replay`: akce, zapsané hody
+ * Stav s touto otázkou je okamžik otázky (rozpracovaná akce, jen k zobrazení; P294 5a): po odpovědi se akce přehraje
+ * z výchozího stavu (`replay->base`) (`replay`: akce, zapsané hody
  * a odpovědi všech druhů + nová; viz `ReplayDiceRoller`).
  */
 final class PendingDivingCatchDTO

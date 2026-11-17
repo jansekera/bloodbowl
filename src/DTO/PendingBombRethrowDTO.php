@@ -9,7 +9,8 @@ namespace App\DTO;
  * po chycení“). `rules_bb2016.txt` ř. 7959-7963: chycenou / zachycenou bombu hráč hned hodí dál. Chytání je povinné;
  * kouče-člověka hráče `playerId` se ptá, kam (i v tahu soupeře). Parita s C++ `CoachQuestion::BOMB_RETHROW_TARGET`.
  *
- * Stav s touto otázkou je stav PŘED přerušenou akcí: po odpovědi se akce přehraje (`replay`: zapsané hody a cíle
+ * Stav s touto otázkou je okamžik otázky (rozpracovaná akce, jen k zobrazení; P294 5a): po odpovědi se akce přehraje
+ * z výchozího stavu (`replay->base`) (`replay`: zapsané hody a cíle
  * + nový; viz `ReplayDiceRoller`, jako PendingDivingCatchDTO).
  */
 final class PendingBombRethrowDTO

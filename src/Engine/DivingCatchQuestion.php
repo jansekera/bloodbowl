@@ -11,7 +11,7 @@ use App\ValueObject\Position;
 
 /**
  * Akce narazila na otázku Diving Catch pro kouče-člověka a odpověď ještě nemá (viz `ReplayDiceRoller`).
- * Chytá ji jen `ActionResolver::resolve`, který vrátí stav PŘED akcí s `PendingDivingCatchDTO`.
+ * Chytá ji jen `ActionResolver::resolve`, který vrátí stav v okamžiku otázky (rozpracovaná akce, jen k zobrazení; P294 krok 5a) s `PendingDivingCatchDTO`.
  */
 final class DivingCatchQuestion extends CoachQuestion
 {

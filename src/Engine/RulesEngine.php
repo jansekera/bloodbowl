@@ -46,8 +46,8 @@ final class RulesEngine
     {
         $errors = [];
 
-        // 30.10.2026: otázka na Diving Catch má přednost úplně před vším — stav je stav PŘED přerušenou akcí
-        //   (může nést i jiné čekající volby, ze kterých akce vyšla) a po odpovědi se akce přehraje.
+        // 30.10.2026: otázka na Diving Catch má přednost úplně před vším — stav je okamžik otázky uprostřed
+        //   akce (P294 5a; může nést i jiné čekající volby) a po odpovědi se akce přehraje z výchozího stavu.
         if ($state->getPendingDivingCatch() !== null) {
             return $action !== ActionType::RESOLVE_DIVING_CATCH ? ['Must answer the Diving Catch question first']
                 : (isset($params['use']) && is_bool($params['use']) ? [] : ['use must be a boolean']);

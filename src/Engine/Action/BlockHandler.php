@@ -47,21 +47,9 @@ final class BlockHandler implements ActionHandlerInterface
         private readonly MoveHandler $moveHandler,
         // Povinny (review P186, L7 -- tyz tvar): s nepovinnym se Dump-Off bez nej tise vynechal.
         private readonly PassResolver $passResolver,
+        // P294 review nález 5: kouč-člověk (strany + odpovědi z přehrání) z ActionResolveru; výchozí = nikdo (testy)
+        private readonly Coach $coach = new Coach(),
     ) {}
-
-    /** P303: kouče-člověka se ptá na přehoz hodu Jump Up (`ActionResolver`); bez nastavení přehazuje jako AI */
-    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
-    private ?Coach $coach = null;
-
-    public function setCoach(Coach $coach): void
-    {
-        $this->coach = $coach;
-    }
-
-    private function coach(): Coach
-    {
-        return $this->coach ??= new Coach();
-    }
 
     /**
      * P303 (14.11.2026): Block Action z lehu s Jump Up (`rules_bb2016.txt` ř. 8199-8203) — hod AG s +2; úspěch = vstane
@@ -81,7 +69,7 @@ final class BlockHandler implements ActionHandlerInterface
         $cil = max(2, min(6, 7 - $attacker->getStats()->getAgility() - 2));
         $hod = $this->dice->rollD6();
         if ($hod < $cil) {
-            $prehoz = ThrowReroll::proThenTeam($this->dice, $state, $attacker, $attacker->getTeamSide(), true, $events, $this->coach(), 'jump_up', $hod, $cil);
+            $prehoz = ThrowReroll::proThenTeam($this->dice, $state, $attacker, $attacker->getTeamSide(), true, $events, $this->coach, 'jump_up', $hod, $cil);
             $state = $prehoz['state'];
             $attacker = $prehoz['thrower'];
             if ($prehoz['rerolled']) {

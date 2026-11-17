@@ -28,19 +28,6 @@ use App\Engine\ThrowTarget;
 
 final class BombThrowHandler implements ActionHandlerInterface
 {
-    /** P292: kouče-člověka se při nepovedeném hodu zeptá na přehoz (sdílený objekt z ActionResolveru) */
-    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
-    private ?Coach $coach = null;
-
-    public function setCoach(Coach $coach): void
-    {
-        $this->coach = $coach;
-    }
-
-    private function coach(): Coach
-    {
-        return $this->coach ??= new Coach();
-    }
     private readonly PassResolver $passResolver;
 
 
@@ -50,10 +37,12 @@ final class BombThrowHandler implements ActionHandlerInterface
         private readonly ScatterCalculator $scatterCalc,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
+        // P294 review nález 5: kouč-člověk (strany + odpovědi z přehrání) z ActionResolveru; výchozí = nikdo (testy)
+        private readonly Coach $coach = new Coach(),
     ) {
         // Bomba se hazi "using the rules for throwing the ball" (r. Bombardier) --
         //   presnost, modifikatory a fumble bereme z prihravky.
-        $this->passResolver = new PassResolver($dice, $tzCalc, $scatterCalc, $ballResolver);
+        $this->passResolver = new PassResolver($dice, $tzCalc, $scatterCalc, $ballResolver, $this->coach);
     }
 
 
@@ -162,7 +151,7 @@ final class BombThrowHandler implements ActionHandlerInterface
                 $thrower->getTeamSide(),
                 !$thrower->hasSkill(SkillName::Loner) && $thrower->getTeamSide() === $activeSide,
                 $events,
-                $this->coach(),
+                $this->coach,
                 'bomb',
                 $roll,
                 max(2, 2 - $modifier),
@@ -240,8 +229,8 @@ final class BombThrowHandler implements ActionHandlerInterface
         if ($cil === null) {
             return $this->vybuch($state, $drzi->requirePosition(), $events);
         }
-        if ($this->coach()->decides($drzi->getTeamSide())) {
-            $odpoved = $this->coach()->bombTarget(
+        if ($this->coach->decides($drzi->getTeamSide())) {
+            $odpoved = $this->coach->bombTarget(
                 $drziId,
                 ThrowTarget::cile($state, $drzi, true),
                 ['x' => $cil->getX(), 'y' => $cil->getY()],

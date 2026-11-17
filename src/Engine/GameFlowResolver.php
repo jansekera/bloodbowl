@@ -20,20 +20,9 @@ final class GameFlowResolver
 {
     public function __construct(
         private readonly DiceRollerInterface $dice,
+        // P294 review nález 5: kouč-člověk (strany + odpovědi z přehrání) z ActionResolveru; výchozí = nikdo (testy)
+        private readonly Coach $coach = new Coach(),
     ) {}
-
-    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
-    private ?Coach $coach = null;
-
-    public function setCoach(Coach $coach): void
-    {
-        $this->coach = $coach;
-    }
-
-    private function coach(): Coach
-    {
-        return $this->coach ??= new Coach();
-    }
 
     /**
      * P291: odpověď kouče na otázku rozhodčího u tajné zbraně na konci drive; pak otázka na dalšího z fronty.
@@ -331,7 +320,7 @@ final class GameFlowResolver
             $jesteVeHre = $stav->isOnPitch() || $stav === PlayerState::KO || $stav === PlayerState::OFF_PITCH;
             if ($player->hasSkill(SkillName::SecretWeapon) && $hral && $jesteVeHre) {
                 // P291: hráče kouče-člověka rozhodčí vyřídí až po jeho odpovědi (před setupem dalšího drive)
-                if ($this->coach()->decides($player->getTeamSide())) {
+                if ($this->coach->decides($player->getTeamSide())) {
                     $fronta[] = $player->getId();
                     continue;
                 }

@@ -17,24 +17,13 @@ use App\ValueObject\Position;
 
 final class PassResolver
 {
-    /** P292: kouče-člověka se při nepovedeném hodu zeptá na přehoz (sdílený objekt z ActionResolveru) */
-    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
-    private ?Coach $coach = null;
-
-    public function setCoach(Coach $coach): void
-    {
-        $this->coach = $coach;
-    }
-
-    private function coach(): Coach
-    {
-        return $this->coach ??= new Coach();
-    }
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
         private readonly ScatterCalculator $scatterCalc,
         private readonly BallResolver $ballResolver,
+        // P294 review nález 5: kouč-člověk (strany + odpovědi z přehrání) z ActionResolveru; výchozí = nikdo (testy)
+        private readonly Coach $coach = new Coach(),
     ) {}
 
     /**
@@ -134,7 +123,7 @@ final class PassResolver
         if (!$accurate && !$this->safeThrowKeeps($thrower, $roll, $fumble)) {
             // Pass skill zdarma, jinak Pro -> týmový přehoz: ThrowReroll::reroll (společné s bombou a hodem hráčem;
             //   ⛔ OPRAVA 18.09.2026, r. 8381-8387, 926: Pro jen na nepřehozenou kostku, po Pro týmový přehoz jen hodu Pro).
-            $res = ThrowReroll::reroll($this->dice, $state, $thrower, $activeSide, true, $events, $this->coach(), 'pass', $roll, $accuracyTarget, SkillName::Pass);
+            $res = ThrowReroll::reroll($this->dice, $state, $thrower, $activeSide, true, $events, $this->coach, 'pass', $roll, $accuracyTarget, SkillName::Pass);
             $state = $res['state'];
             $thrower = $res['thrower'];
             if ($res['rerolled']) {

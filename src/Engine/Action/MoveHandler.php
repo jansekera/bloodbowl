@@ -34,6 +34,8 @@ final class MoveHandler implements ActionHandlerInterface
         // Povinny (review P186, L7): dokud byl `?InjuryResolver = null`, `knockDownAt` bez
         //   nej tise vynechal hod na brneni a zraneni (r. 498-499, 1702-1703).
         private readonly InjuryResolver $injuryResolver,
+        // P294 review nález 5: kouč-člověk (strany + odpovědi z přehrání) z ActionResolveru; výchozí = nikdo (testy)
+        private readonly Coach $coach = new Coach(),
     ) {}
 
 
@@ -101,19 +103,6 @@ final class MoveHandler implements ActionHandlerInterface
         }
 
         return [$state, $events];
-    }
-
-    /** P294 krok 5b: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
-    private ?Coach $coach = null;
-
-    public function setCoach(Coach $coach): void
-    {
-        $this->coach = $coach;
-    }
-
-    private function coach(): Coach
-    {
-        return $this->coach ??= new Coach();
     }
 
     /**
@@ -600,7 +589,7 @@ final class MoveHandler implements ActionHandlerInterface
         $strana = $hrac->getTeamSide();
         $state = $state->withPlayer($hrac);
         $tymPred = $state->getTeamState($strana)->canUseReroll();
-        $res = ThrowReroll::proThenTeam($this->dice, $state, $hrac, $strana, !$teamRerollUsed, $events, $this->coach(), $druh, $hod, $cil, $kam);
+        $res = ThrowReroll::proThenTeam($this->dice, $state, $hrac, $strana, !$teamRerollUsed, $events, $this->coach, $druh, $hod, $cil, $kam);
         $state = $res['state'];
         $hrac = $res['thrower'];
         if ($tymPred && !$state->getTeamState($strana)->canUseReroll()) {

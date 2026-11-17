@@ -130,8 +130,7 @@ final class RefereeQuestionTest extends TestCase
 
     private function flow(FixedDiceRoller $dice): GameFlowResolver
     {
-        $f = new GameFlowResolver($dice);
-        $f->setCoach(new Coach([TeamSide::HOME]));
+        $f = new GameFlowResolver($dice, coach: new Coach([TeamSide::HOME]));
 
         return $f;
     }

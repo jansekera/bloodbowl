@@ -131,8 +131,8 @@ export interface ReplayContext {
 }
 
 /**
- * P291: rozhodčí vylučuje hráče kouče-člověka — úplatek / protest? U faulu (`foul`) je stav stav PŘED akcí a server
- * ji po odpovědi přehraje; u tajné zbraně na konci drive (`replay` null) čekají další hráči ve frontě `queue`.
+ * P291: rozhodčí vylučuje hráče kouče-člověka — úplatek / protest? U faulu (`foul`) je stav okamžik otázky (jen
+ * k zobrazení) a server akci po odpovědi přehraje; u tajné zbraně na konci drive (`replay` null) čekají další hráči ve frontě `queue`.
  */
 export interface PendingReferee {
     playerId: number;
@@ -146,7 +146,7 @@ export interface PendingReferee {
 
 /**
  * 30.10.2026: kouč-člověk volí, jestli jeho hráč použije Diving Catch (`rules_bb2016.txt` ř. 8065-8071).
- * Stav je stav PŘED přerušenou akcí; po odpovědi ji server přehraje (`replay`).
+ * Stav je okamžik otázky (rozpracovaná akce, jen k zobrazení); po odpovědi ji server přehraje (`replay`).
  */
 export interface PendingDivingCatch {
     playerId: number;
@@ -161,7 +161,7 @@ export interface PendingDivingCatch {
 
 /**
  * P272 (10.11.2026): hráč kouče-člověka chytil / zachytil bombu a musí ji hned hodit dál (`rules_bb2016.txt`
- * ř. 7959-7963); kouč volí kam. Stav je stav PŘED přerušenou akcí; po odpovědi ji server přehraje.
+ * ř. 7959-7963); kouč volí kam. Stav je okamžik otázky (jen k zobrazení); po odpovědi server akci přehraje.
  */
 export interface PendingBombRethrow {
     playerId: number;

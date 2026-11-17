@@ -20,24 +20,13 @@ use App\Engine\StrengthCalculator;
 
 final class FoulHandler implements ActionHandlerInterface
 {
-    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
-    private ?Coach $coach = null;
-
-    public function setCoach(Coach $coach): void
-    {
-        $this->coach = $coach;
-    }
-
-    private function coach(): Coach
-    {
-        return $this->coach ??= new Coach();
-    }
-
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
         private readonly StrengthCalculator $strengthCalculator = new StrengthCalculator(),
+        // P294 review nález 5: kouč-člověk (strany + odpovědi z přehrání) z ActionResolveru; výchozí = nikdo (testy)
+        private readonly Coach $coach = new Coach(),
     ) {}
 
     /**
@@ -156,7 +145,7 @@ final class FoulHandler implements ActionHandlerInterface
             // P291: kouče-člověka se rozhodčí zeptá (jen když je co volit; P294 krok 6 přímo v `sendOff`); bez odpovědi
             //   se akce přeruší
             $strana = $attacker->getTeamSide();
-            $vyrok = RefereeCall::sendOff($state, $attackerId, $strana, true, $this->dice, $events, kouc: $this->coach());
+            $vyrok = RefereeCall::sendOff($state, $attackerId, $strana, true, $this->dice, $events, kouc: $this->coach);
             $state = $vyrok['state'];
             $vyloucen = $vyrok['outcome'] !== RefereeCall::CANCELLED;
             $doRezerv = $vyrok['outcome'] === RefereeCall::RESERVES;

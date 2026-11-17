@@ -24,20 +24,9 @@ final class BallResolver
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
         private readonly ScatterCalculator $scatterCalc,
+        // P294 review nález 5: kouč-člověk (strany + odpovědi z přehrání) z ActionResolveru; výchozí = nikdo (testy)
+        private readonly Coach $coach = new Coach(),
     ) {}
-
-    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
-    private ?Coach $coach = null;
-
-    public function setCoach(Coach $coach): void
-    {
-        $this->coach = $coach;
-    }
-
-    private function coach(): Coach
-    {
-        return $this->coach ??= new Coach();
-    }
 
     /**
      * Kdo skočí pro míč dopadající na prázdné `$landing` (null = nikdo). Skill je volba (ř. 8065 "can
@@ -75,12 +64,12 @@ final class BallResolver
         $odmitli = 0; // recenze 30.10. D/2: kdo už odmítl, do „dalších kandidátů“ v otázce nepatří
         foreach ([$naTahu, $naTahu->opponent()] as $strana) {
             $svoji = array_values(array_filter($kandidati, static fn(MatchPlayerDTO $p) => $p->getTeamSide() === $strana));
-            if ($this->coach()->decides($strana)) {
+            if ($this->coach->decides($strana)) {
                 foreach ($svoji as $hrac) {
                     if (count($skacou) >= 2) {
                         break;
                     }
-                    $odpoved = $this->coach()->divingCatch($hrac->getId(), $landing, count($kandidati) - 1 - $odmitli, ($skacou[0] ?? null)?->getId(), $state);
+                    $odpoved = $this->coach->divingCatch($hrac->getId(), $landing, count($kandidati) - 1 - $odmitli, ($skacou[0] ?? null)?->getId(), $state);
                     if ($odpoved) {
                         $skacou[] = $hrac;
                     } else {
@@ -191,7 +180,7 @@ final class BallResolver
         if (!$success && !$skillRerollUsed) {
             $strana = $player->getTeamSide();
             $tymPred = $state->getTeamState($strana)->canUseReroll();
-            $res = ThrowReroll::proThenTeam($this->dice, $state->withPlayer($player), $player, $strana, $teamRerollAvailable, $events, $this->coach(), 'pickup', $roll, $target, $pos);
+            $res = ThrowReroll::proThenTeam($this->dice, $state->withPlayer($player), $player, $strana, $teamRerollAvailable, $events, $this->coach, 'pickup', $roll, $target, $pos);
             $state = $res['state'];
             $player = $res['thrower'];
             $teamRerollUsed = $tymPred && !$state->getTeamState($strana)->canUseReroll();
@@ -246,7 +235,7 @@ final class BallResolver
         if (!$success && !$skillRerollUsed) {
             $strana = $catcher->getTeamSide();
             $tymPred = $state->getTeamState($strana)->canUseReroll();
-            $res = ThrowReroll::proThenTeam($this->dice, $state->withPlayer($catcher), $catcher, $strana, $teamRerollAvailable, $events, $this->coach(), 'catch', $roll, $target, $catcher->getPosition());
+            $res = ThrowReroll::proThenTeam($this->dice, $state->withPlayer($catcher), $catcher, $strana, $teamRerollAvailable, $events, $this->coach, 'catch', $roll, $target, $catcher->getPosition());
             $state = $res['state'];
             $catcher = $res['thrower'];
             $teamRerollUsed = $tymPred && !$state->getTeamState($strana)->canUseReroll();
@@ -376,7 +365,8 @@ final class BallResolver
             $events[] = GameEvent::divingCatch($catcher->getId());
         }
         $side = $catcher->getTeamSide();
-        $catchResult = $this->resolveCatch(
+        // review P294 nález 1: otázka na přehoz chytání nese i událost skoku (Diving Catch)
+        $catchResult = CoachQuestion::sPredchozimi($events, fn(): array => $this->resolveCatch(
             $state,
             $catcher,
             modifier: $accuratePass ? 1 : 0,
@@ -386,7 +376,7 @@ final class BallResolver
             // OPRAVENO 30. 10. 2026 (P223 review LOW) — hloubka se tu ztrácela (odraz po neúspěchu
             //   začínal od 0) ⇒ řetěz „vhazování → nechytí → odraz ven“ obcházel pojistku MAX_BOUNCES.
             depth: $depth,
-        );
+        ));
         $state = $catchResult['state'];   // P294 krok 5d: týmový přehoz už odečetl `hodNaChyceni`
 
         return ['state' => $state, 'events' => array_merge($events, $catchResult['events'])];

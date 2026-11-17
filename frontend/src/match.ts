@@ -229,8 +229,8 @@ async function handleActionResult(result: ActionResult): Promise<void> {
 
     stateManager.setGameState(result.state);
 
-    // 30.10.2026: Diving Catch má přednost před vším — stav je stav PŘED přerušenou akcí (může nést i jiné
-    //   čekající volby, ze kterých akce vyšla); po odpovědi ji server přehraje. I uprostřed tahu AI.
+    // 30.10.2026: Diving Catch má přednost před vším — stav je okamžik otázky uprostřed akce (může nést
+    //   i jiné čekající volby); po odpovědi ji server přehraje. I uprostřed tahu AI.
     if (result.state.pendingDivingCatch) {
         showDivingCatchModal(result.state);
         return;

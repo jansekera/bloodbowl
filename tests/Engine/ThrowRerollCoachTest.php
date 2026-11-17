@@ -124,6 +124,17 @@ final class ThrowRerollCoachTest extends TestCase
         $this->assertFalse($r->getNewState()->getHomeTeam()->canUseReroll());
     }
 
+    /** Review P294 nález 3: druhá otázka (po nepovedeném hodu Pro) ukazuje stav, kde je Pro už použité. */
+    public function testDruhaOtazkaUkazujePouziteProNaStavu(): void
+    {
+        $s = $this->resolver([2])->resolve($this->prihravka([SkillName::Pro]), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5])->getNewState();
+        $this->assertFalse($s->requirePlayer(1)->isProUsedThisTurn());
+        $s2 = $this->resolver([2])->resolve($s, ActionType::RESOLVE_REROLL, ['choice' => 'pro'])->getNewState();
+
+        $this->assertTrue($s2->getPendingReroll()?->isProFailed());
+        $this->assertTrue($s2->requirePlayer(1)->isProUsedThisTurn(), 'zobrazený stav = okamžik druhé otázky');
+    }
+
     public function testPrehozAPakDivingCatchVJedneAkciDobehne(): void
     {
         // review 10.11. bod 4: dvě různé otázky v jedné akci — odpovědi obou druhů se přehrají spolu
