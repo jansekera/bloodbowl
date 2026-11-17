@@ -119,12 +119,13 @@ final class ThrowReroll
     }
 
     /**
-     * Spotřebuje týmový přehoz; s Lonerem napřed 4+ (ř. 8287-8290: na 1-3 přehoz propadne).
+     * Spotřebuje týmový přehoz; s Lonerem napřed 4+ (ř. 8287-8290: na 1-3 přehoz propadne). P294: jediné místo
+     * i pro dialog přehozu (`RerollHandler`).
      *
      * @param list<GameEvent> $events
      * @return array{state: GameState, ok: bool}
      */
-    private static function teamReroll(DiceRollerInterface $dice, GameState $state, MatchPlayerDTO $thrower, TeamSide $side, array &$events): array
+    public static function teamReroll(DiceRollerInterface $dice, GameState $state, MatchPlayerDTO $thrower, TeamSide $side, array &$events): array
     {
         $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
         if ($thrower->hasSkill(SkillName::Loner)) {

@@ -11,7 +11,8 @@ use App\DTO\GameState;
 use App\DTO\PendingRerollDTO;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
-use App\Enum\SkillName;
+use App\Engine\ProCheck;
+use App\Engine\ThrowReroll;
 use App\ValueObject\Position;
 
 final class RerollHandler
@@ -103,12 +104,9 @@ final class RerollHandler
         $player = $player->withProUsedThisTurn(true);
         $state = $state->withPlayer($player);
 
-        $proRoll = $this->dice->rollD6();
         $events = [];
-
-        if ($proRoll < 4) {
-            $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, false, null);
-
+        // P294: hod Pro je jeden (`ProCheck`); o týmovém přehozu hodu Pro tu rozhoduje kouč další otázkou
+        if (!ProCheck::roll($this->dice, $player, false, $events)['allowed']) {
             // r. 8385-8387: puvodni vysledek plati; tymovy prehoz uz jen na hod Pro
             if ($pending->isTeamRerollAvailable()) {
                 return ActionResult::success($state->withPendingReroll($pending->withProFailed()), $events);
@@ -116,8 +114,6 @@ final class RerollHandler
 
             return $vyhodnotit($state, null, $events);
         }
-
-        $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, true, null);
 
         // ⛔ OPRAVA 18.09.2026: po prehozu kostky Pro se uz tymovy prehoz
         //   NENABIZI -- r. 926: "you may never re-roll a single dice roll more
@@ -129,35 +125,23 @@ final class RerollHandler
     private function resolveTeamReroll(GameState $state, PendingRerollDTO $pending, \Closure $vyhodnotit): ActionResult
     {
         $side = $state->getActiveTeam();
-        $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
-
         $player = $state->getPlayer($pending->getPlayerId());
         if ($player === null) {
-            return $vyhodnotit($state, null, []);
+            return $vyhodnotit($state->withTeamState($side, $state->getTeamState($side)->withRerollUsed()), null, []);
         }
 
         $events = [];
-
-        // Loner check
-        if ($player->hasSkill(SkillName::Loner)) {
-            $lonerRoll = $this->dice->rollD6();
-            if ($lonerRoll < 4) {
-                $events[] = GameEvent::lonerCheck($pending->getPlayerId(), $lonerRoll, false);
-                return $vyhodnotit($state, null, $events);
-            }
-            $events[] = GameEvent::lonerCheck($pending->getPlayerId(), $lonerRoll, true);
+        // P294: týmový přehoz s Lonerem jedním místem (`ThrowReroll::teamReroll`)
+        $tym = ThrowReroll::teamReroll($this->dice, $state, $player, $side, $events);
+        $state = $tym['state'];
+        if (!$tym['ok']) {
+            return $vyhodnotit($state, null, $events);
         }
-
-        $events[] = GameEvent::rerollUsed($pending->getPlayerId(), 'Team Reroll');
 
         // ⛔ OPRAVA 18.09.2026: po neuspesnem Pro prehazuje tymovy prehoz HOD
         //   PRO, ne puvodni kostku (`rules_bb2016.txt` r. 8385-8387).
-        if ($pending->isProFailed()) {
-            $proRoll = $this->dice->rollD6();
-            $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, $proRoll >= 4, null);
-            if ($proRoll < 4) {
-                return $vyhodnotit($state, null, $events);
-            }
+        if ($pending->isProFailed() && !ProCheck::roll($this->dice, $player, false, $events)['allowed']) {
+            return $vyhodnotit($state, null, $events);
         }
 
         return $vyhodnotit($state, $this->dice->rollD6(), $events);
