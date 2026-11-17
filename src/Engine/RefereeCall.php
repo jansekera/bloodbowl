@@ -18,7 +18,8 @@ use App\Enum\TeamSide;
  * - Pořadí (pravidla dovolují obojí): faul napřed úplatek (ruší i turnover), tajná zbraň napřed protest (úspěch =
  *   do rezerv a úplatek zůstane).
  * - P291 (10.11.2026): kouč-člověk volí sám (`$volba`: úplatek ano/ne, protest ano/ne; pořadí výše platí dál). Bez
- *   volby (AI) se použije, co jde.
+ *   volby (AI) se použije, co jde. P294 krok 6: u faulu se kouče zeptá `sendOff` sám (`$kouc`, otázka přehráním akce);
+ *   tajná zbraň na konci drive (mimo akci, nejde přehrát) dál přes frontu `PendingRefereeDTO` a hotovou `$volba`.
  */
 final class RefereeCall
 {
@@ -52,7 +53,9 @@ final class RefereeCall
 
     /**
      * @param list<GameEvent> $events
-     * @param array{bribe: bool, argue: bool}|null $volba volba kouče-člověka; null = AI (použije, co jde)
+     * @param array{bribe: bool, argue: bool}|null $volba hotová volba kouče-člověka (tajná zbraň, P291)
+     * @param Coach|null $kouc zeptá se ho tady, je-li jeho tým kouče-člověka a je co volit (faul, P294 krok 6);
+     *                         jinak AI (použije, co jde)
      * @return array{state: GameState, outcome: string}
      */
     public static function sendOff(
@@ -63,7 +66,12 @@ final class RefereeCall
         DiceRollerInterface $dice,
         array &$events,
         ?array $volba = null,
+        ?Coach $kouc = null,
     ): array {
+        $moznosti = $volba === null && $kouc !== null && $kouc->decides($side) ? self::options($state, $side) : null;
+        if ($moznosti !== null) {
+            $volba = $kouc?->referee($playerId, $moznosti['bribe'], $moznosti['argue'], $state, $events);
+        }
         $bribe = static function () use (&$state, $side, $playerId, $dice, &$events, $volba): bool {
             $team = $state->getTeamState($side);
             if (!self::canBribe($state, $side) || ($volba !== null && !$volba['bribe'])) {

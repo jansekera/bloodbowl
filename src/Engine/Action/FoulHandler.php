@@ -153,14 +153,10 @@ final class FoulHandler implements ActionHandlerInterface
         if (($die1 === $die2 || $dubletNaZraneni) && !$attacker->hasSkill(SkillName::SneakyGit)) {
             // P287 (10.11.2026): úplatek / Argue the call (RefereeCall, parita s C++ refereeSendOff). Úplatek ⇒ zůstává
             //   a bez turnoveru; protest 6 ⇒ do rezerv, turnover zůstává (ř. 1100-1101).
-            // P291: kouče-člověka se rozhodčí zeptá (jen když je co volit); bez odpovědi se akce přeruší
+            // P291: kouče-člověka se rozhodčí zeptá (jen když je co volit; P294 krok 6 přímo v `sendOff`); bez odpovědi
+            //   se akce přeruší
             $strana = $attacker->getTeamSide();
-            $volba = null;
-            $moznosti = $this->coach()->decides($strana) ? RefereeCall::options($state, $strana) : null;
-            if ($moznosti !== null) {
-                $volba = $this->coach()->referee($attackerId, $moznosti['bribe'], $moznosti['argue'], $state, $events);
-            }
-            $vyrok = RefereeCall::sendOff($state, $attackerId, $strana, true, $this->dice, $events, $volba);
+            $vyrok = RefereeCall::sendOff($state, $attackerId, $strana, true, $this->dice, $events, kouc: $this->coach());
             $state = $vyrok['state'];
             $vyloucen = $vyrok['outcome'] !== RefereeCall::CANCELLED;
             $doRezerv = $vyrok['outcome'] === RefereeCall::RESERVES;
