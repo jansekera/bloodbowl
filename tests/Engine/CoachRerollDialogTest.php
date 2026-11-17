@@ -33,7 +33,6 @@ final class CoachRerollDialogTest extends TestCase
     private function interaktivni(FixedDiceRoller $dice): ActionResolver
     {
         $r = new ActionResolver($dice);
-        $r->setInteractiveRerolls(true);
         // P294 krok 5c/5e: Leap i velcí hráči se ptají kouče přehráním (`Coach`)
         $r->setCoachSides([TeamSide::HOME]);
 
@@ -51,8 +50,7 @@ final class CoachRerollDialogTest extends TestCase
         $this->assertSame(2, $pending->getTarget());
         $this->assertTrue($pending->isTeamRerollAvailable());
         $this->assertFalse($r->getNewState()->requirePlayer(1)->isBigGuyStupefied(), 'neúspěch ještě neplatí');
-        // P294 krok 5e: otázka přehráním (ne dialog s ohlášenou akcí) a kouč vidí nepovedený hod
-        $this->assertNotNull($pending->getReplay());
+        // P294 krok 5e: otázka přehráním (od 5f jediný způsob, `getReplay` vždy) a kouč vidí nepovedený hod
         $this->assertSame(['bone_head'], array_map(static fn($e) => $e->getType(), $r->getEvents()));
     }
 

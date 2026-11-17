@@ -274,7 +274,7 @@ final class MatchPlayerDTO
      * Jump Up (ř. 8200-8204): blok z lehu, hráč se před ním nehýbe.
      * OPRAVENO 09.10.2026 (review P186, H1): zákaz stál na `hasMoved`, což znamená "pohyb
      * je ukončen", ne "hráč se pohnul". Po úhybu / GFI úspěšně přehozeném v dialogu
-     * (`RerollHandler::applySuccess`) pohyb ukončen není -- člověk smí táhnout dál --
+     * (tehdy `RerollHandler::applySuccess`, od P294 přehrání akce) pohyb ukončen není -- člověk smí táhnout dál --
      * a hráč proto po pohybu ještě blokoval. Zákaz se odvozuje z `movedThisTurn`.
      */
     public function canTakeBlockAction(): bool
@@ -366,7 +366,7 @@ final class MatchPlayerDTO
 
     /**
      * Hráč se v tomto kole pohnul nebo vstal -- nastavuje KAŽDÝ pohyb od prvního pole
-     * (`MoveHandler::resolve`, `RerollHandler::applySuccess`), maže začátek kola jeho týmu
+     * (`MoveHandler::resolve`), maže začátek kola jeho týmu
      * (`GameState::resetPlayersForNewTurn`). Na rozdíl od `hasMoved` neříká, že pohyb skončil.
      * Stojí na něm zákazy "may not move": akce Block (`rules_bb2016.txt` ř. 674-676)
      * a hod bombou (ř. 7953-7954).

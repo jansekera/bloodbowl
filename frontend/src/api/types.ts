@@ -57,7 +57,7 @@ export interface PendingBlock {
     rerollUsed: boolean;
 }
 
-/** Pending reroll waiting for player choice (dodge/GFI/pickup, P289: Leap and big-guy checks) */
+/** Otázka kouči-člověku na přehoz nepovedeného hodu (pohyb, míč, velcí hráči, hody); P294: vždy přehráním */
 export interface PendingReroll {
     rollType: 'dodge' | 'gfi' | 'pickup' | 'catch' | 'leap' | 'leap_gfi' | 'bone_head' | 'really_stupid' | 'wild_animal'
         | 'pass' | 'bomb' | 'ttm' | 'ttm_landing' | 'always_hungry' | 'jump_up';
@@ -70,8 +70,8 @@ export interface PendingReroll {
     targetY: number;
     /** Pro neprošel: týmový přehoz už jen hodu Pro (ř. 8385-8387) */
     proFailed?: boolean;
-    /** P292: přehoz hodu (přihrávka, bomba, hod spoluhráčem) — stav je stav PŘED akcí, server ji přehraje */
-    replay?: ReplayContext | null;
+    /** P294: stav je okamžik hodu (jen k zobrazení); server po odpovědi akci přehraje */
+    replay: ReplayContext;
 }
 
 /** P206 (b): čekající volba o lékárníkovi */

@@ -4,18 +4,13 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
-use App\Enum\ActionType;
-
 /**
- * Captures a failed roll awaiting player reroll decision (dodge, GFI, pickup).
+ * Otázka kouči-člověku na přehoz nepovedeného hodu: pohyb (`dodge`, `gfi`, `leap`, `leap_gfi`), míč (`pickup`,
+ * `catch`), velcí hráči (`bone_head`, `really_stupid`, `wild_animal`), hody (`pass`, `bomb`, `ttm`, `ttm_landing`,
+ * `always_hungry`, `jump_up`).
  *
- * P289 (10.11.2026): i hody velkých hráčů (`bone_head`, `really_stupid`, `wild_animal`) a Leap (`leap`,
- * `leap_gfi`). U velkého hráče nese ohlášenou akci (`resumeAction`, `resumeParams`), která po povedeném
- * přehozu doběhne. Leap od P294 kroku 5c přehráním (`replay`).
- *
- * P292 (10.11.2026): přehoz hodu přes ThrowReroll (přihrávka `pass`, bomba `bomb`, hod spoluhráčem `ttm`, přistání
- * `ttm_landing`, Always Hungry `always_hungry`). Stav je pak stav PŘED akcí; po odpovědi se akce přehraje
- * (`replay`: akce, zapsané hody a odpovědi + nová; jako Diving Catch).
+ * P294 krok 5f (17.11.2026): jediný způsob je přehrání akce (`replay`: akce, zapsané hody, odpovědi + nová; jako
+ * Diving Catch) — dialog uprostřed akce s ručním pokračováním (`resumeAction`, `gfiRemaining`, `RerollHandler`) smazán.
  */
 final class PendingRerollDTO
 {
@@ -28,13 +23,10 @@ final class PendingRerollDTO
         private readonly bool $teamRerollAvailable,
         private readonly int $targetX,
         private readonly int $targetY,
+        private readonly ReplayContext $replay,
         // ⭐ 18.09.2026: hod Pro padl 1-3 => puvodni vysledek plati a tymovy
         //   prehoz smi prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
         private readonly bool $proFailed = false,
-        private readonly ?ActionType $resumeAction = null,
-        /** @var array<string, mixed> */
-        private readonly array $resumeParams = [],
-        private readonly ?ReplayContext $replay = null,
     ) {}
 
     public function getRollType(): string
@@ -74,39 +66,10 @@ final class PendingRerollDTO
         return $this->proFailed;
     }
 
-    public function getResumeAction(): ?ActionType
-    {
-        return $this->resumeAction;
-    }
-
-    /** @return array<string, mixed> */
-    public function getResumeParams(): array
-    {
-        return $this->resumeParams;
-    }
-
-    /** P294 krok 4: přehrání akce (přehoz přes ThrowReroll, P292); null = dialog uprostřed akce (resume*) */
-    public function getReplay(): ?ReplayContext
+    /** P294 krok 4: přehrání akce (akce, hody, odpovědi) */
+    public function getReplay(): ReplayContext
     {
         return $this->replay;
-    }
-
-    public function withProFailed(): self
-    {
-        return new self(
-            $this->rollType,
-            $this->playerId,
-            $this->target,
-            $this->roll,
-            proAvailable: false,
-            teamRerollAvailable: $this->teamRerollAvailable,
-            targetX: $this->targetX,
-            targetY: $this->targetY,
-            proFailed: true,
-            resumeAction: $this->resumeAction,
-            resumeParams: $this->resumeParams,
-            replay: $this->replay,
-        );
     }
 
     /**
@@ -141,9 +104,7 @@ final class PendingRerollDTO
             'targetX' => $this->targetX,
             'targetY' => $this->targetY,
             'proFailed' => $this->proFailed,
-            'resumeAction' => $this->resumeAction?->value,
-            'resumeParams' => $this->resumeParams,
-            'replay' => $this->replay?->toArray(),
+            'replay' => $this->replay->toArray(),
         ];
     }
 
@@ -161,10 +122,8 @@ final class PendingRerollDTO
             teamRerollAvailable: (bool) ($data['teamRerollAvailable'] ?? false),
             targetX: (int) ($data['targetX'] ?? 0),
             targetY: (int) ($data['targetY'] ?? 0),
+            replay: ReplayContext::fromArray((array) $data['replay']),
             proFailed: (bool) ($data['proFailed'] ?? false),
-            resumeAction: isset($data['resumeAction']) ? ActionType::from((string) $data['resumeAction']) : null,
-            resumeParams: (array) ($data['resumeParams'] ?? []),
-            replay: isset($data['replay']) ? ReplayContext::fromArray((array) $data['replay']) : null,
         );
     }
 }

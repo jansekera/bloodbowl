@@ -7,8 +7,6 @@ namespace App\Engine;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
-use App\DTO\PendingRerollDTO;
-use App\Enum\ActionType;
 use App\ValueObject\Position;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
@@ -25,44 +23,7 @@ use App\Enum\TeamSide;
 final class ThrowReroll
 {
     /**
-     * P289: nabídka přehozu kouči-člověku (dialog uprostřed akce); null = není co nabídnout. Zbývá jen pro velké
-     * hráče (ActionResolver; P294 krok 5e).
-     *
-     * @param array<string, mixed> $resumeParams
-     */
-    public static function offer(
-        GameState $state,
-        MatchPlayerDTO $player,
-        string $rollType,
-        int $target,
-        int $roll,
-        ?Position $at,
-        bool $teamAllowed = true,
-        ?ActionType $resumeAction = null,
-        array $resumeParams = [],
-    ): ?PendingRerollDTO {
-        $smi = self::available($state, $player, $teamAllowed);
-        if (!$smi['pro'] && !$smi['team']) {
-            return null;
-        }
-
-        return new PendingRerollDTO(
-            $rollType,
-            $player->getId(),
-            $target,
-            $roll,
-            $smi['pro'],
-            $smi['team'],
-            $at?->getX() ?? 0,
-            $at?->getY() ?? 0,
-            resumeAction: $resumeAction,
-            resumeParams: $resumeParams,
-        );
-    }
-
-    /**
      * Co hráč smí na nepovedený hod použít: Pro (jednou za kolo, ř. 8381) a týmový přehoz (jednou za kolo, ř. 929-931).
-     * Jediné místo i pro nabídky kouči-člověku (P289: MoveHandler, ActionResolver).
      *
      * @return array{pro: bool, team: bool}
      */
@@ -135,8 +96,7 @@ final class ThrowReroll
     }
 
     /**
-     * Spotřebuje týmový přehoz; s Lonerem napřed 4+ (ř. 8287-8290: na 1-3 přehoz propadne). P294: jediné místo
-     * i pro dialog přehozu (`RerollHandler`).
+     * Spotřebuje týmový přehoz; s Lonerem napřed 4+ (ř. 8287-8290: na 1-3 přehoz propadne).
      *
      * @param list<GameEvent> $events
      * @return array{state: GameState, ok: bool}

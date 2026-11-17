@@ -32,7 +32,7 @@ function mockElement() {
 
 const dodge: PendingReroll = {
     rollType: 'dodge', playerId: 1, target: 4, roll: 2, proAvailable: false, teamRerollAvailable: true,
-    targetX: 6, targetY: 6, replay: null,
+    targetX: 6, targetY: 6, replay: { action: 'move', params: {}, dice: [2], answers: {} as PendingReroll['replay']['answers'] },
 };
 
 describe('RerollModal', () => {

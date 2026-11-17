@@ -21,7 +21,6 @@ use App\Engine\Action\FoulHandler;
 use App\Engine\Action\HandOffHandler;
 use App\Engine\Action\HypnoticGazeHandler;
 use App\Engine\Action\MoveHandler;
-use App\Engine\Action\RerollHandler;
 use App\Engine\Action\SetupHandler;
 use App\Engine\Action\ThrowTeamMateHandler;
 use App\Enum\ActionType;
@@ -33,7 +32,6 @@ use App\ValueObject\Position;
 final class ActionResolver
 {
     private bool $interactiveBlocks = false;
-    private bool $interactiveRerolls = false;
     private readonly InjuryResolver $injuryResolver;
     private readonly MoveHandler $moveHandler;
     private readonly BlockHandler $blockHandler;
@@ -48,7 +46,6 @@ final class ActionResolver
     private readonly BombThrowHandler $bombThrowHandler;
     private readonly HypnoticGazeHandler $hypnoticGazeHandler;
     private readonly BallAndChainHandler $ballAndChainHandler;
-    private readonly RerollHandler $rerollHandler;
     private ?PassResolver $passResolver = null;
     private readonly DiceRollerInterface $dice;
     private readonly ReplayDiceRoller $replayDice;
@@ -98,7 +95,6 @@ final class ActionResolver
         $this->blockHandler->setCoach($this->coach);   // P303 Jump Up
         $this->hypnoticGazeHandler = new HypnoticGazeHandler($dice, $this->tzCalc);
         $this->ballAndChainHandler = new BallAndChainHandler($dice, $injuryResolver, $this->ballResolver, $this->scatterCalc, $this->blockHandler);
-        $this->rerollHandler = new RerollHandler($dice, $this->ballResolver, $this->moveHandler);
         $this->setupHandler = new SetupHandler($kickoffResolver);
         $this->endTurnHandler = new EndTurnHandler();
     }
@@ -142,7 +138,7 @@ final class ActionResolver
     /**
      * Strany kouče-člověka: ptá se jich na všechno, na co se ptá i v tahu soupeře — lékárník, Stand Firm, Diving
      * Catch, kam hodit bombu, rozhodčí, přehoz hodu. (Přehozy uprostřed tahu a volba kostky bloku zvlášť:
-     * `setInteractiveRerolls` / `setInteractiveBlocks` — jen na tahu člověka.)
+     * `setInteractiveBlocks` — jen na tahu člověka.)
      *
      * @param list<TeamSide> $sides
      */
@@ -163,11 +159,6 @@ final class ActionResolver
     public function setCoachSides(array $sides): void
     {
         $this->coach->setSides($sides);
-    }
-
-    public function setInteractiveRerolls(bool $interactive): void
-    {
-        $this->interactiveRerolls = $interactive;
     }
 
     public function getBlockHandler(): Action\BlockHandler
@@ -286,11 +277,12 @@ final class ActionResolver
         }
 
         // P292: přehoz hodu přes ThrowReroll (přihrávka, bomba, hod spoluhráčem) — přehrání jako výše
-        $prehoz = $state->getPendingReroll();
-        $r = $prehoz?->getReplay();
-        if ($action === ActionType::RESOLVE_REROLL && $prehoz !== null && $r !== null) {
+        //   P294 krok 5f: jediný způsob — dialog uprostřed akce (`RerollHandler`, `resume*`) smazán
+        if ($action === ActionType::RESOLVE_REROLL) {
+            $prehoz = $state->getPendingReroll() ?? throw new \InvalidArgumentException('No pending reroll to resolve');
             $volba = (string) ($params['choice'] ?? 'decline');
             $prehoz->assertChoice($volba);
+            $r = $prehoz->getReplay();
 
             return $this->resolveSPrehranim($state->withPendingReroll(null), $r->withAnswers($r->answers->withReroll($volba)));
         }
@@ -456,9 +448,8 @@ final class ActionResolver
 
     /**
      * @param array<string, mixed> $params
-     * @param bool $kontrolaProsla kontrola před akcí už prošla přehozem v dialogu (P289) -- znovu se nehází
      */
-    private function resolveAkce(GameState $state, ActionType $action, array $params, bool $kontrolaProsla = false): ActionResult
+    private function resolveAkce(GameState $state, ActionType $action, array $params): ActionResult
     {
         // ⛔ P301 (11.11.2026): jedna aktivace najednou — „a player must finish his Action before another player can
         //   take one“ (`rules_bb2016.txt` r. 423-429). Akce hrace otevre jeho aktivaci (`GameState::activePlayerId`);
@@ -490,7 +481,7 @@ final class ActionResolver
         //   ani Take Root. Kdyby se sem STAND_PAT pustil, stalo by "nic
         //   nedelat" tolik co akce -- a big guy by se mohl omracit tim, ze
         //   se rozhodl nehrat.
-        if ($action !== ActionType::STAND_PAT && !$isContinuation && !$kontrolaProsla
+        if ($action !== ActionType::STAND_PAT && !$isContinuation
             && $action->requiresPlayer() && isset($params['playerId'])) {
             $player = $state->getPlayer((int) $params['playerId']);
             // Ztracene zony (Hypnotic Gaze, Bone Head, Really Stupid) plati "until the
@@ -587,7 +578,7 @@ final class ActionResolver
             ActionType::AUTO_SETUP => $this->setupHandler->resolveAutoSetup($state, $params),
             ActionType::CHOOSE_BLOCK_DIE => $this->blockHandler->resolveBlockChoice($state, $params),
             ActionType::REROLL_BLOCK => $this->blockHandler->resolveBlockReroll($state, $params),
-            ActionType::RESOLVE_REROLL => $this->resolveReroll($state, $params),
+            ActionType::RESOLVE_REROLL => throw new \LogicException('RESOLVE_REROLL se vyřizuje v resolve()'),
             ActionType::RESOLVE_APOTHECARY => $this->resolveApothecary($state, $params),
             ActionType::RESOLVE_GRAB => $this->resolveGrab($state, $params),
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
@@ -611,19 +602,6 @@ final class ActionResolver
             // P226: čeká-li kouč-člověk na otázku o Stand Firm, blok (pendingBlock) dál čeká na odpověď
             while ($result->getNewState()->getPendingBlock() !== null && $result->getNewState()->getPendingStandFirm() === null) {
                 $autoResult = $this->blockHandler->autoResolvePendingBlock($result->getNewState());
-                $mergedEvents = array_merge($result->getEvents(), $autoResult->getEvents());
-                if ($autoResult->isTurnover()) {
-                    $result = ActionResult::turnover($autoResult->getNewState(), $mergedEvents);
-                    break;
-                }
-                $result = ActionResult::success($autoResult->getNewState(), $mergedEvents);
-            }
-        }
-
-        // Auto-resolve pending rerolls (unless interactive mode for human players)
-        if (!$this->interactiveRerolls) {
-            while ($result->getNewState()->getPendingReroll() !== null) {
-                $autoResult = $this->rerollHandler->autoResolve($result->getNewState());
                 $mergedEvents = array_merge($result->getEvents(), $autoResult->getEvents());
                 if ($autoResult->isTurnover()) {
                     $result = ActionResult::turnover($autoResult->getNewState(), $mergedEvents);
@@ -684,40 +662,6 @@ final class ActionResolver
         }
 
         return ActionResult::success($blockedState, $events);
-    }
-
-    /**
-     * Odpověď na nabídku přehozu. U velkého hráče (P289) se přehozený hod vyhodnotí kontrolou před akcí:
-     * projde-li, ohlášená akce doběhne; jinak (i při odmítnutí) akce propadne.
-     *
-     * @param array<string, mixed> $params
-     */
-    private function resolveReroll(GameState $state, array $params): ActionResult
-    {
-        $pending = $state->getPendingReroll();
-        $akce = $pending?->getResumeAction();
-        if ($pending === null || $akce === null) {
-            return $this->rerollHandler->resolve($state, $params);
-        }
-
-        $vyhodnotit = function (GameState $s, ?int $hod, array $events) use ($pending, $akce): ActionResult {
-            /** @var list<GameEvent> $events */
-            $hrac = $s->requirePlayer($pending->getPlayerId());
-            $kontrola = $this->bigGuyCheckResolver->judgeRerollableCheck($s, $hrac, $akce, $hod ?? $pending->getRoll());
-            if ($kontrola === null || !empty($kontrola['proceed'])) {
-                $r = $this->resolveAkce($kontrola['state'] ?? $s, $akce, $pending->getResumeParams(), true);
-
-                return new ActionResult($r->getNewState(), $r->isSuccess(), $r->isTurnover(), [...$events, ...$r->getEvents()]);
-            }
-            // odmítnutí: událost neúspěchu už zazněla s nabídkou
-            if ($hod !== null) {
-                $events = [...$events, ...$kontrola['events']];
-            }
-
-            return $this->akcePropadla($kontrola, $hrac, $akce, $events);
-        };
-
-        return $this->rerollHandler->resolve($state, $params, $vyhodnotit);
     }
 
     /**

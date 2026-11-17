@@ -96,7 +96,6 @@ final class StepMoveTest extends TestCase
     {
         // Bone Head 4, úhyb 1 (nabídka přehozu), přehoz 6; pak krok bez úhybu — další kostka by výjimkou spadla
         $resolver = new ActionResolver(new FixedDiceRoller([4, 1, 6]));
-        $resolver->setInteractiveRerolls(true);
         $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         // P294 krok 5b: krok plánu jako z webu (`partial`); přehrání dokončí deklarovaný krok a pohyb nechá otevřený
         //   stejně jako úhyb, který vyjde napoprvé (dřív to zařizoval dialog uprostřed akce)

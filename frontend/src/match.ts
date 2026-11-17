@@ -482,9 +482,9 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
     );
 }
 
-/** Čekající přehoz patří kouči-člověku: na jeho tahu, nebo přehoz hodu (P292 replay) i v tahu soupeře (chycená bomba). */
+/** P294 krok 5f: otázku na přehoz server klade jen kouči-člověku (`setHumanSides`), i v tahu soupeře (chycená bomba). */
 function rerollIsForHuman(state: import('./api/types').GameState): boolean {
-    return !!state.pendingReroll && (state.aiTeam !== state.activeTeam || !!state.pendingReroll.replay);
+    return !!state.pendingReroll;
 }
 
 function showRerollModal(state: import('./api/types').GameState): void {

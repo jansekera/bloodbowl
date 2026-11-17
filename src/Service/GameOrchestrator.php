@@ -55,12 +55,11 @@ final class GameOrchestrator
         // Resolve
         $resolver = new ActionResolver($this->dice);
 
-        // Enable interactive blocks and rerolls for human players
+        // Enable interactive blocks for human players (přehozy: `setHumanSides`, P294)
         $aiTeam = $state->getAiTeam();
         $isHumanTurn = $aiTeam === null || $state->getActiveTeam() !== $aiTeam;
         if ($isHumanTurn) {
             $resolver->setInteractiveBlocks(true);
-            $resolver->setInteractiveRerolls(true);
         }
         // P206 (b): o lékárníkovi se ptá kouč-člověk — i když se jeho hráč zranil v tahu soupeře
         $lide = $aiTeam === null ? [TeamSide::HOME, TeamSide::AWAY] : [$aiTeam->opponent()];

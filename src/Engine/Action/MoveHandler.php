@@ -61,7 +61,7 @@ final class MoveHandler implements ActionHandlerInterface
      *   4b -- `RerollHandler` (pad po dialogu prehozu) mel vlastni kopii padu BEZ hodu na
      *         brneni a zraneni (r. 498-499, 1703).
      *   Proto je pad pri pohybu JEDNA funkce: polozi hrace na pole `$pole`, hodi brneni
-     *   a zraneni a pusti mic. Volaji ji vsechny tri pady zde i `RerollHandler`.
+     *   a zraneni a pusti mic. Volaji ji vsechny tri pady zde (dialog `RerollHandler` smazan P294 5f).
      *
      * @param list<GameEvent> $events
      * @return array{0: GameState, 1: list<GameEvent>}

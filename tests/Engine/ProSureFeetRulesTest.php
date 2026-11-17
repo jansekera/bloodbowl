@@ -202,7 +202,6 @@ final class ProSureFeetRulesTest extends TestCase
             ->build();
 
         $resolver = new ActionResolver(new FixedDiceRoller([1, 1, 1, 1]));
-        $resolver->setInteractiveRerolls(true);
         $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 8]);
 
@@ -271,7 +270,6 @@ final class ProSureFeetRulesTest extends TestCase
             ->build();
 
         $resolver = new ActionResolver(new FixedDiceRoller([2, 4, 1, 1, 1]));
-        $resolver->setInteractiveRerolls(true);
         $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $this->assertNotNull($r->getNewState()->getPendingReroll());
@@ -415,7 +413,6 @@ final class ProSureFeetRulesTest extends TestCase
         // uhyb 2 (cil 3+), Pro 3 (plati puvodni). Klient posle 'pro' znovu:
         // s vadou Pro 5 a uhyb 6 = uspech (r. 8381 1x za kolo, r. 926).
         $resolver = new ActionResolver(new FixedDiceRoller([2, 3, 5, 6]));
-        $resolver->setInteractiveRerolls(true);
         $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($this->uhybState([SkillName::Pro]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
@@ -428,7 +425,6 @@ final class ProSureFeetRulesTest extends TestCase
     public function testInteraktivneProBezSkilluNeprojde(): void
     {
         $resolver = new ActionResolver(new FixedDiceRoller([2, 5, 6]));
-        $resolver->setInteractiveRerolls(true);
         $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($this->uhybState([]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $this->assertFalse($r->getNewState()->requirePendingReroll()->isProAvailable(), 'fixtura: hrac nema Pro');
@@ -440,7 +436,6 @@ final class ProSureFeetRulesTest extends TestCase
     public function testInteraktivneTymovyPrehozNenabidnutyNeprojde(): void
     {
         $resolver = new ActionResolver(new FixedDiceRoller([2, 6]));
-        $resolver->setInteractiveRerolls(true);
         $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($this->uhybState([SkillName::Pro], rerolls: 0), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $this->assertFalse($r->getNewState()->requirePendingReroll()->isTeamRerollAvailable(), 'fixtura: zadny tymovy prehoz');
@@ -454,7 +449,6 @@ final class ProSureFeetRulesTest extends TestCase
         // uhyb 2, Pro 2, tymovy prehoz HODU PRO 3 => puvodni plati, turnover.
         // (Kdyby tymovy prehoz sel na uhyb, 3 by na cil 3+ stacila.)
         $resolver = new ActionResolver(new FixedDiceRoller([2, 2, 3, 1, 1]));
-        $resolver->setInteractiveRerolls(true);
         $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($this->uhybState([SkillName::Pro]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
@@ -472,7 +466,6 @@ final class ProSureFeetRulesTest extends TestCase
             ->build();
         // GFI 1, Pro 3, tymovy prehoz hodu Pro 4 => smi, GFI prehoz 2 = uspech
         $resolver = new ActionResolver(new FixedDiceRoller([1, 3, 4, 2]));
-        $resolver->setInteractiveRerolls(true);
         $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 10, 'y' => 7]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
@@ -531,7 +524,7 @@ final class ProSureFeetRulesTest extends TestCase
         $p = $s->requirePlayer(1)->withSureFeetUsedThisTurn(true);
         $this->assertTrue(MatchPlayerDTO::fromArray($p->toArray())->isSureFeetUsedThisTurn());
 
-        $rr = (new PendingRerollDTO('dodge', 1, 3, 2, true, true, 5, 6))->withProFailed();
+        $rr = new PendingRerollDTO('dodge', 1, 3, 2, false, true, 5, 6, new \App\DTO\ReplayContext(\App\Enum\ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6], answers: new \App\DTO\ReplayAnswers()), proFailed: true);
         $this->assertTrue(PendingRerollDTO::fromArray($rr->toArray())->isProFailed());
 
         $pb = (new PendingBlockDTO(1, 2, [BlockDiceFace::PUSHED], true, false, false, true, true))->withProFailed();

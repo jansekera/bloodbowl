@@ -101,7 +101,7 @@ final class LeapRulesTest extends TestCase
 
     public function testSkokJenJednouZaKolo(): void
     {
-        // Hráč skočil na (7,7). Tah smí pokračovat (jako po přehozeném úhybu, kdy RerollHandler hasMoved nenastaví) —
+        // Hráč skočil na (7,7). Tah smí pokračovat (jako po přehozeném úhybu — pohyb zůstává otevřený) —
         // druhý skok v tomtéž kole se ale nabídnout nesmí (ř. 8277 „only use the Leap skill once per turn“).
         $po = $this->skoc($this->obklopeny(), 7, 7, [6])->getNewState();
         $hrac = $po->requirePlayer(1)->withHasMoved(false);

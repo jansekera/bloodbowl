@@ -42,8 +42,8 @@ final class RerollQuestion extends CoachQuestion
             $this->team,
             $hrac?->getX() ?? 0,
             $hrac?->getY() ?? 0,
+            $replay,
             $this->proFailed,
-            replay: $replay,
         ));
     }
 }
