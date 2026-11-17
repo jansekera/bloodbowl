@@ -157,7 +157,6 @@ final class MoveHandler implements ActionHandlerInterface
         $currentState = $state;
         $currentPlayer = $player;
 
-        $teamRerollUsed = false;
 
         foreach ($path->getSteps() as $step) {
             $from = $currentPlayer->getPosition();
@@ -188,7 +187,6 @@ final class MoveHandler implements ActionHandlerInterface
                         $leapTarget,
                         $roll,
                         $to,
-                        $teamRerollUsed,
                         $events,
                         static fn(int $r, bool $ok) => GameEvent::leap($playerId, $leapTarget, $r, $ok),
                     );
@@ -196,7 +194,7 @@ final class MoveHandler implements ActionHandlerInterface
                 if (!$success) {
                     return $this->skokSelhal($currentState, $currentPlayer, $to, $events);
                 }
-                $konec = $this->dokoncitSkok($currentState, $currentPlayer, $from, $to, $gfiSkoku, $teamRerollUsed, $events);
+                $konec = $this->dokoncitSkok($currentState, $currentPlayer, $from, $to, $gfiSkoku, $events);
                 if ($konec !== null) {
                     return $konec;
                 }
@@ -276,7 +274,6 @@ final class MoveHandler implements ActionHandlerInterface
                             $target,
                             $roll,
                             $to,
-                            $teamRerollUsed,
                             $events,
                             static fn(int $r, bool $ok) => GameEvent::dodgeAttempt($playerId, $target, $r, $ok),
                         );
@@ -347,7 +344,6 @@ final class MoveHandler implements ActionHandlerInterface
                         $gfiThreshold,
                         $roll,
                         $to,
-                        $teamRerollUsed,
                         $events,
                         static fn(int $r, bool $ok) => GameEvent::gfiAttempt($playerId, $r, $ok),
                     );
@@ -383,7 +379,7 @@ final class MoveHandler implements ActionHandlerInterface
             }
 
             // Check if player moved onto a loose ball
-            $konec = $this->zvednoutNaPoli($currentState, $currentPlayer, $to, $teamRerollUsed, $events);
+            $konec = $this->zvednoutNaPoli($currentState, $currentPlayer, $to, $events);
             if ($konec !== null) {
                 return $konec;
             }
@@ -457,22 +453,18 @@ final class MoveHandler implements ActionHandlerInterface
      *
      * @param list<GameEvent> $events
      */
-    private function zvednoutNaPoli(GameState &$state, MatchPlayerDTO &$hrac, Position $to, bool &$teamRerollUsed, array &$events): ?ActionResult
+    private function zvednoutNaPoli(GameState &$state, MatchPlayerDTO &$hrac, Position $to, array &$events): ?ActionResult
     {
         $ball = $state->getBall();
         if ($ball->isHeld() || $ball->getPosition() === null || !$ball->getPosition()->equals($to)) {
             return null;
         }
         $playerId = $hrac->getId();
-        $strana = $state->getActiveTeam();
         $hrac = $state->getPlayer($playerId) ?? $hrac;
-        $prehozSmi = !$teamRerollUsed && $state->getTeamState($strana)->canUseReroll();
-        $pickupResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolvePickup($state, $hrac, $prehozSmi));
+        // týmový přehoz jednou za kolo hlídá stav týmu (`canUseReroll`), P294 /simplify
+        $pickupResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolvePickup($state, $hrac, true));
         $events = array_merge($events, $pickupResult['events']);
         $state = $pickupResult['state'];
-        if ($pickupResult['teamRerollUsed']) {
-            $teamRerollUsed = true;   // P294 krok 5d: ve stavu ho už odečetl žebříček (`ThrowReroll`)
-        }
         if (!$pickupResult['success']) {
             $events[] = GameEvent::turnover('Failed pickup');
             $state = $state->withPlayer(($state->getPlayer($playerId) ?? $hrac)->withHasMoved(true)->withHasActed(true));
@@ -504,7 +496,7 @@ final class MoveHandler implements ActionHandlerInterface
      *
      * @param list<GameEvent> $events
      */
-    private function dokoncitSkok(GameState &$state, MatchPlayerDTO &$hrac, ?Position $from, Position $to, int $gfi, bool &$teamRerollUsed, array &$events): ?ActionResult
+    private function dokoncitSkok(GameState &$state, MatchPlayerDTO &$hrac, ?Position $from, Position $to, int $gfi, array &$events): ?ActionResult
     {
         $playerId = $hrac->getId();
         for ($g = 0; $g < $gfi; $g++) {
@@ -527,7 +519,6 @@ final class MoveHandler implements ActionHandlerInterface
                     $gfiCil,
                     $roll,
                     $to,
-                    $teamRerollUsed,
                     $events,
                     static fn(int $r, bool $ok) => GameEvent::gfiAttempt($playerId, $r, $ok),
                 );
@@ -555,7 +546,7 @@ final class MoveHandler implements ActionHandlerInterface
         }
 
         // Check pickup on landing
-        $konec = $this->zvednoutNaPoli($state, $hrac, $to, $teamRerollUsed, $events);
+        $konec = $this->zvednoutNaPoli($state, $hrac, $to, $events);
         if ($konec !== null) {
             return $konec;
         }
@@ -578,27 +569,14 @@ final class MoveHandler implements ActionHandlerInterface
         int $cil,
         int $hod,
         Position $kam,
-        bool &$teamRerollUsed,
         array &$events,
         callable $udalost,
     ): bool {
-        $strana = $hrac->getTeamSide();
-        $state = $state->withPlayer($hrac);
-        $tymPred = $state->getTeamState($strana)->canUseReroll();
-        $res = ThrowReroll::proThenTeam($this->dice, $state, $hrac, $strana, !$teamRerollUsed, $events, $this->coach, $druh, $hod, $cil, $kam);
+        $res = ThrowReroll::prehoditNaCil($this->dice, $state, $hrac, true, $events, $this->coach, $druh, $hod, $cil, $kam, $udalost);
         $state = $res['state'];
         $hrac = $res['thrower'];
-        if ($tymPred && !$state->getTeamState($strana)->canUseReroll()) {
-            $teamRerollUsed = true;
-        }
-        if (!$res['rerolled']) {
-            return false;
-        }
-        $roll = $this->dice->rollD6();
-        $ok = $roll >= $cil;
-        $events[] = $udalost($roll, $ok);
 
-        return $ok;
+        return $res['ok'];
     }
 
     /**

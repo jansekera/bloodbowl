@@ -139,14 +139,13 @@ final class BallResolver
 
     /**
      * Attempt to pick up ball when player moves onto ball square.
-     * `teamRerollUsed` = týmový přehoz padl na tenhle hod (ve vráceném stavu už odečtený, P294 krok 5d).
-     * @return array{state: GameState, events: list<GameEvent>, success: bool, teamRerollUsed: bool}
+     * @return array{state: GameState, events: list<GameEvent>, success: bool}
      */
     public function resolvePickup(GameState $state, MatchPlayerDTO $player, bool $teamRerollAvailable = false): array
     {
         $pos = $player->getPosition();
         if ($pos === null) {
-            return ['state' => $state, 'events' => [], 'success' => false, 'teamRerollUsed' => false];
+            return ['state' => $state, 'events' => [], 'success' => false];
         }
 
         // No Hands: cannot pick up the ball at all
@@ -154,60 +153,54 @@ final class BallResolver
             $events = [GameEvent::noHands($player->getId())];
             $bounceResult = $this->resolveBounce($state, $pos);
             $events = array_merge($events, $bounceResult['events']);
-            return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false, 'teamRerollUsed' => false];
+            return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false];
         }
 
         $target = $this->getPickupTarget($state, $player);
         $roll = $this->dice->rollD6();
         $success = $roll >= $target;
         $events = [GameEvent::ballPickup($player->getId(), $target, $roll, $success)];
-        $skillRerollUsed = false;
-        $teamRerollUsed = false;
 
-        // Sure Hands: reroll failed pickup
-        if (!$success && $player->hasSkill(SkillName::SureHands)) {
-            $skillRerollUsed = true;
-            $roll = $this->dice->rollD6();
-            $success = $roll >= $target;
-            $events[] = GameEvent::rerollUsed($player->getId(), 'Sure Hands');
-            $events[] = GameEvent::ballPickup($player->getId(), $target, $roll, $success);
-        }
-
-        // P294 krok 5d: Pro → týmový přehoz (Loner) jedním žebříčkem (`ThrowReroll`); kouče-člověka se zeptá přehráním.
-        //   OPRAVENO 17.11.2026 — dřív vlastní kopie žebříčku, která přehazovala i za člověka (dialog 'pickup' se
-        //   nikdy nenabídl), `rules_bb2016.txt` ř. 929-931: přehoz je volba kouče. Pro jen na kostku, kterou ještě nic
-        //   nepřehodilo (ř. 926, oprava 18.09.2026: po Sure Hands nic).
-        if (!$success && !$skillRerollUsed) {
-            $strana = $player->getTeamSide();
-            $tymPred = $state->getTeamState($strana)->canUseReroll();
-            $res = ThrowReroll::proThenTeam($this->dice, $state->withPlayer($player), $player, $strana, $teamRerollAvailable, $events, $this->coach, 'pickup', $roll, $target, $pos);
+        // Sure Hands zdarma (ř. 8533), jinak Pro → týmový přehoz (Loner); kouč-člověk přehráním — `ThrowReroll::prehoditNaCil`.
+        //   P294 krok 5d OPRAVENO 17.11.2026 — dřív vlastní kopie žebříčku, která přehazovala i za člověka (dialog 'pickup'
+        //   se nikdy nenabídl), ř. 929-931: přehoz je volba kouče. Po Sure Hands nic (ř. 926, oprava 18.09.2026).
+        if (!$success) {
+            $res = ThrowReroll::prehoditNaCil(
+                $this->dice,
+                $state,
+                $player,
+                $teamRerollAvailable,
+                $events,
+                $this->coach,
+                'pickup',
+                $roll,
+                $target,
+                $pos,
+                static fn(int $r, bool $ok): GameEvent => GameEvent::ballPickup($player->getId(), $target, $r, $ok),
+                SkillName::SureHands,
+            );
             $state = $res['state'];
             $player = $res['thrower'];
-            $teamRerollUsed = $tymPred && !$state->getTeamState($strana)->canUseReroll();
-            if ($res['rerolled']) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= $target;
-                $events[] = GameEvent::ballPickup($player->getId(), $target, $roll, $success);
-            }
+            $success = $res['ok'];
         }
 
         if ($success) {
             $state = $state->withBall(BallState::carried($pos, $player->getId()));
-            return ['state' => $state, 'events' => $events, 'success' => true, 'teamRerollUsed' => $teamRerollUsed];
+            return ['state' => $state, 'events' => $events, 'success' => true];
         }
 
         // Failed: bounce from this square
         $bounceResult = $this->resolveBounce($state, $pos);
         $events = array_merge($events, $bounceResult['events']);
 
-        return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false, 'teamRerollUsed' => $teamRerollUsed];
+        return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false];
     }
 
     /**
      * Hod na chycení: cíl, Catch, Pro, týmový přehoz (Loner). Stav míče nemění. Sdílí resolveCatch a bomba (P264,
      * review 9.11. M5 — bomba se chytá „using the same rules for catching the ball“, r. 7959-7961); C++ catchRoll.
      *
-     * @return array{state: GameState, events: list<GameEvent>, success: bool, teamRerollUsed: bool}
+     * @return array{state: GameState, events: list<GameEvent>, success: bool}
      */
     public function hodNaChyceni(GameState $state, MatchPlayerDTO $catcher, int $modifier, bool $teamRerollAvailable, bool $accuratePass): array
     {
@@ -215,43 +208,37 @@ final class BallResolver
         $roll = $this->dice->rollD6();
         $success = $roll >= $target;
         $events = [GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success)];
-        $skillRerollUsed = false;
-        $teamRerollUsed = false;
 
-        // Catch skill: reroll failed catch
-        if (!$success && $catcher->hasSkill(SkillName::Catch)) {
-            $skillRerollUsed = true;
-            $roll = $this->dice->rollD6();
-            $success = $roll >= $target;
-            $events[] = GameEvent::rerollUsed($catcher->getId(), 'Catch');
-            $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-        }
-
-        // P294 krok 5d: Pro → týmový přehoz (Loner) jedním žebříčkem (`ThrowReroll`, přehoz se ve stavu odečte HNED);
-        //   kouče-člověka se zeptá přehráním. OPRAVENO 17.11.2026 — dřív vlastní kopie žebříčku (třetí ve
-        //   `resolveCatchFromBounce`), přehazovala i za člověka a týmový přehoz jen ohlásila příznakem; volající ho
-        //   odečetl až po odrazu nechyceného míče ⇒ spoluhráč chytal odraz s DRUHÝM týmovým přehozem v tahu
-        //   (`rules_bb2016.txt` ř. 934-935 „may not use more than one Re-roll counter per turn“).
-        if (!$success && !$skillRerollUsed) {
-            $strana = $catcher->getTeamSide();
-            $tymPred = $state->getTeamState($strana)->canUseReroll();
-            $res = ThrowReroll::proThenTeam($this->dice, $state->withPlayer($catcher), $catcher, $strana, $teamRerollAvailable, $events, $this->coach, 'catch', $roll, $target, $catcher->getPosition());
+        // Catch zdarma (ř. 7983), jinak Pro → týmový přehoz (Loner), přehoz se ve stavu odečte HNED; kouč-člověk přehráním.
+        //   P294 krok 5d OPRAVENO 17.11.2026 — dřív vlastní kopie žebříčku (třetí ve `resolveCatchFromBounce`), přehazovala
+        //   i za člověka a týmový přehoz jen ohlásila příznakem; volající ho odečetl až po odrazu nechyceného míče ⇒
+        //   spoluhráč chytal odraz s DRUHÝM týmovým přehozem v tahu (ř. 934-935).
+        if (!$success) {
+            $res = ThrowReroll::prehoditNaCil(
+                $this->dice,
+                $state,
+                $catcher,
+                $teamRerollAvailable,
+                $events,
+                $this->coach,
+                'catch',
+                $roll,
+                $target,
+                $catcher->getPosition(),
+                static fn(int $r, bool $ok): GameEvent => GameEvent::catchAttempt($catcher->getId(), $target, $r, $ok),
+                SkillName::Catch,
+            );
             $state = $res['state'];
             $catcher = $res['thrower'];
-            $teamRerollUsed = $tymPred && !$state->getTeamState($strana)->canUseReroll();
-            if ($res['rerolled']) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= $target;
-                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-            }
+            $success = $res['ok'];
         }
 
-        return ['state' => $state, 'events' => $events, 'success' => $success, 'teamRerollUsed' => $teamRerollUsed];
+        return ['state' => $state, 'events' => $events, 'success' => $success];
     }
 
     /**
      * Attempt to catch ball (from pass, scatter landing, hand-off).
-     * @return array{state: GameState, events: list<GameEvent>, success: bool, teamRerollUsed: bool}
+     * @return array{state: GameState, events: list<GameEvent>, success: bool}
      */
     public function resolveCatch(
         GameState $state,
@@ -264,7 +251,7 @@ final class BallResolver
     ): array {
         $pos = $catcher->getPosition();
         if ($pos === null) {
-            return ['state' => $state, 'events' => [], 'success' => false, 'teamRerollUsed' => false];
+            return ['state' => $state, 'events' => [], 'success' => false];
         }
 
         // ⛔ DOPLNENO 11.09.2026: `rules_bb2016.txt` r. 857-858 --
@@ -286,7 +273,6 @@ final class BallResolver
                 'state' => $bounceResult['state'],
                 'events' => $bounceResult['events'],
                 'success' => false,
-                'teamRerollUsed' => false,
             ];
         }
 
@@ -295,25 +281,24 @@ final class BallResolver
             $events = [GameEvent::noHands($catcher->getId())];
             $bounceResult = $this->resolveBounce($state, $pos, $depth, $kickoffReceiving);
             $events = array_merge($events, $bounceResult['events']);
-            return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false, 'teamRerollUsed' => false];
+            return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false];
         }
 
         $hod = $this->hodNaChyceni($state, $catcher, $modifier, $teamRerollAvailable, $accuratePass);
         $state = $hod['state'];
         $events = $hod['events'];
         $success = $hod['success'];
-        $teamRerollUsed = $hod['teamRerollUsed'];
 
         if ($success) {
             $state = $state->withBall(BallState::carried($pos, $catcher->getId()));
-            return ['state' => $state, 'events' => $events, 'success' => true, 'teamRerollUsed' => $teamRerollUsed];
+            return ['state' => $state, 'events' => $events, 'success' => true];
         }
 
         // Failed: bounce from catcher's square
         $bounceResult = $this->resolveBounce($state, $pos, $depth, $kickoffReceiving);
         $events = array_merge($events, $bounceResult['events']);
 
-        return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false, 'teamRerollUsed' => $teamRerollUsed];
+        return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false];
     }
 
     /**

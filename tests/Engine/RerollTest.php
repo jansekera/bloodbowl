@@ -388,7 +388,8 @@ final class RerollTest extends TestCase
         $result = $resolver->resolvePickup($state, $player, teamRerollAvailable: true);
 
         $this->assertTrue($result['success']);
-        $this->assertTrue($result['teamRerollUsed']);
+        // týmový přehoz se odečte ve stavu hned (P294 /simplify; dřív příznak pro volajícího)
+        $this->assertFalse($result['state']->getHomeTeam()->canUseReroll());
         $this->assertTrue($result['state']->getBall()->isHeld());
     }
 
@@ -408,6 +409,6 @@ final class RerollTest extends TestCase
         $result = $resolver->resolveCatch($state, $player, teamRerollAvailable: true);
 
         $this->assertTrue($result['success']);
-        $this->assertTrue($result['teamRerollUsed']);
+        $this->assertFalse($result['state']->getHomeTeam()->canUseReroll());
     }
 }

@@ -89,6 +89,7 @@ final class ThrowReroll
         int $hod,
         int $cil,
         ?SkillName $skillZdarma = null,
+        ?Position $kam = null,
     ): array {
         if ($skillZdarma !== null && $thrower->hasSkill($skillZdarma)) {
             $events[] = GameEvent::rerollUsed($thrower->getId(), $skillZdarma->value);
@@ -96,7 +97,48 @@ final class ThrowReroll
             return ['state' => $state, 'thrower' => $thrower, 'rerolled' => true];
         }
 
-        return self::proThenTeam($dice, $state, $thrower, $side, $teamAllowed, $events, $kouc, $druh, $hod, $cil);
+        return self::proThenTeam($dice, $state, $thrower, $side, $teamAllowed, $events, $kouc, $druh, $hod, $cil, $kam);
+    }
+
+    /**
+     * P294 /simplify: přehoz nepovedeného hodu „na cíl“ (hod ≥ `$cil`) a nový hod — skill zdarma (Sure Hands, Catch),
+     * jinak Pro → týmový přehoz; kouč-člověk otázkou (`$kam` = pole hodu). Jediné místo pro pohyb, zvednutí, chytání
+     * a přistání (dřív tentýž ocas „přehoz → hod → událost“ ve čtyřech kopiích). Týmový přehoz se odečte ve stavu hned —
+     * kdo ho už použil, pozná `canUseReroll()`. Bez čeho přehodit vrátí hned (AI: bez kopírování stavu).
+     *
+     * @param list<GameEvent> $events
+     * @param (callable(int, bool): GameEvent)|null $udalost událost nového hodu
+     * @return array{state: GameState, thrower: MatchPlayerDTO, ok: bool}
+     */
+    public static function prehoditNaCil(
+        DiceRollerInterface $dice,
+        GameState $state,
+        MatchPlayerDTO $thrower,
+        bool $teamAllowed,
+        array &$events,
+        Coach $kouc,
+        string $druh,
+        int $hod,
+        int $cil,
+        ?Position $kam = null,
+        ?callable $udalost = null,
+        ?SkillName $skillZdarma = null,
+    ): array {
+        $smi = self::available($state, $thrower, $teamAllowed);
+        if (!$smi['pro'] && !$smi['team'] && !($skillZdarma !== null && $thrower->hasSkill($skillZdarma))) {
+            return ['state' => $state, 'thrower' => $thrower, 'ok' => false];
+        }
+        $res = self::reroll($dice, $state->withPlayer($thrower), $thrower, $thrower->getTeamSide(), $teamAllowed, $events, $kouc, $druh, $hod, $cil, $skillZdarma, $kam);
+        if (!$res['rerolled']) {
+            return ['state' => $res['state'], 'thrower' => $res['thrower'], 'ok' => false];
+        }
+        $roll = $dice->rollD6();
+        $ok = $roll >= $cil;
+        if ($udalost !== null) {
+            $events[] = $udalost($roll, $ok);
+        }
+
+        return ['state' => $res['state'], 'thrower' => $res['thrower'], 'ok' => $ok];
     }
 
     /**
