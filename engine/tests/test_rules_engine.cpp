@@ -490,5 +490,3 @@ TEST(RulesEngine, P75ChainsawHolderIsNotOfferedMultipleBlock) {
     EXPECT_GT(countActionsOfType(as, ActionType::BLOCK), 0) << "obycejny blok (pilou) ano";
 }
 
-// JUMP UP: hlídka z 09.10.2026 („blok z lehu nenabízet, dokud chybí hod AG+2“) nahrazena testy hodu
-// `ActionResolver.P303*` (14.11.2026) — nabídka, neúspěšný hod a úspěšný hod s blokem.

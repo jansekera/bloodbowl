@@ -1694,4 +1694,3 @@ TEST(MacroMCTS, P244bNotForTierTwoRisk) {
     ASSERT_EQ(riskTier(macroDirectRisk(s, p244Blitz())), 2);
     EXPECT_FALSE(blitzOpensPathWithBallSafe(s, p244Blitz()));
 }
-

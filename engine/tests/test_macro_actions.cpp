@@ -6072,15 +6072,21 @@ TEST(OpponentPickupChance, P302OutOfReachOrHeldBall) {
 // P302 krok 2 (12.11.2026): obestoupit volný míč na pole, které soupeři zvednutí NEJVÍC ztíží (krok 1 změřil, že
 // obestoupení na nejbližší pole škodí: +0,022 šance soupeře, +2σ). A nabídnout ho jen, když šanci soupeře sníží.
 namespace {
-Position surroundTargetOf(const GameState& s, int playerId, uint64_t off) {
+// Přesuny hráče `playerId` na pole vedle míče s vypnutými rysy `off` (P305: jeden pomocník pro oba testy).
+std::vector<Position> surroundMovesOf(const GameState& s, int playerId, uint64_t off) {
     setExtraFeaturesOff(off);
     std::vector<Macro> m;
     getAvailableMacros(s, m);
     setExtraFeaturesOff(0);
+    std::vector<Position> out;
     for (const auto& x : m)
         if (x.type == MacroType::REPOSITION && x.playerId == playerId && x.targetPos.distanceTo(s.ball.position) == 1)
-            return x.targetPos;
-    return Position{-1, -1};
+            out.push_back(x.targetPos);
+    return out;
+}
+Position surroundTargetOf(const GameState& s, int playerId, uint64_t off) {
+    const auto v = surroundMovesOf(s, playerId, off);
+    return v.empty() ? Position{-1, -1} : v.front();
 }
 }  // namespace
 
@@ -6104,16 +6110,8 @@ TEST(MacroActions, P302NoSurroundWhenItDoesNotLowerTheOpponentsChance) {
     GameState s = makeP302();
     s.getPlayer(13).position = {25, 14};                        // soupeř na míč nedosáhne ⇒ šance 0, nic se nesníží
     p248Put(s, 4, TeamSide::HOME, {7, 7}, {6, 3, 3, 8});
-    auto count = [&](uint64_t off) {   // přesuny hráče 4 na pole u míče (nabízí je i jiný generátor, proto počty)
-        setExtraFeaturesOff(off);
-        std::vector<Macro> m;
-        getAvailableMacros(s, m);
-        setExtraFeaturesOff(0);
-        int n = 0;
-        for (const auto& x : m)
-            if (x.type == MacroType::REPOSITION && x.playerId == 4 && x.targetPos.distanceTo(s.ball.position) == 1) ++n;
-        return n;
-    };
+    // přesuny hráče 4 na pole u míče (nabízí je i jiný generátor, proto počty)
+    auto count = [&](uint64_t off) { return static_cast<int>(surroundMovesOf(s, 4, off).size()); };
     const int noSurround = count(kP250Surround);
     EXPECT_EQ(count(kP302SurroundWorst), noSurround + 1) << "pozitivní kontrola: dřív se obestoupení nabízelo vždy";
     EXPECT_EQ(count(0), noSurround) << "P302: přesun, který soupeři nic neztíží, se nenabízí";
