@@ -34,7 +34,7 @@ final class CoachRerollDialogTest extends TestCase
     {
         $r = new ActionResolver($dice);
         $r->setInteractiveRerolls(true);
-        // P294 krok 5c: Leap se ptá kouče přehráním (`Coach`), velcí hráči zatím dialogem (krok 5e)
+        // P294 krok 5c/5e: Leap i velcí hráči se ptají kouče přehráním (`Coach`)
         $r->setCoachSides([TeamSide::HOME]);
 
         return $r;
@@ -51,6 +51,9 @@ final class CoachRerollDialogTest extends TestCase
         $this->assertSame(2, $pending->getTarget());
         $this->assertTrue($pending->isTeamRerollAvailable());
         $this->assertFalse($r->getNewState()->requirePlayer(1)->isBigGuyStupefied(), 'neúspěch ještě neplatí');
+        // P294 krok 5e: otázka přehráním (ne dialog s ohlášenou akcí) a kouč vidí nepovedený hod
+        $this->assertNotNull($pending->getReplay());
+        $this->assertSame(['bone_head'], array_map(static fn($e) => $e->getType(), $r->getEvents()));
     }
 
     public function testBoneHeadPrehozPovedenyAkcePokracuje(): void
@@ -65,6 +68,9 @@ final class CoachRerollDialogTest extends TestCase
         $this->assertSame(7, $s->requirePlayer(1)->requirePosition()->getX(), 'ohlášený pohyb doběhl');
         $this->assertFalse($s->requirePlayer(1)->isBigGuyStupefied());
         $this->assertFalse($s->getTeamState(TeamSide::HOME)->canUseReroll(), 'týmový přehoz spotřebován');
+        // P294 krok 5e: kouč v logu vidí přehoz a co padlo
+        $this->assertSame(['reroll', 'bone_head'], array_slice(array_map(static fn($e) => $e->getType(), $r->getEvents()), 0, 2));
+        $this->assertTrue($r->getEvents()[1]->getData()['success']);
     }
 
     public function testBoneHeadPrehozNepovedenyAkcePropadne(): void

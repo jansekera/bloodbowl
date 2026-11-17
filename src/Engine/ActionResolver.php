@@ -507,6 +507,31 @@ final class ActionResolver
                     $action,
                     $this->dice,
                 );
+                // P294 krok 5e: neúspěch kontroly kouč-člověk smí přehodit (ř. 929-931; Pro ř. 8381) — otázka přehráním
+                //   (stav před hodem, hráč na svém poli); po přehozu se hod vyhodnotí znovu. Dřív dialog s ohlášenou akcí
+                //   (`resume*`, `kontrolaProsla`, P289). AI hody velkých hráčů nepřehazuje (parita s C++ P130).
+                if (isset($checkResult['reroll']) && $this->coach->decides($player->getTeamSide())) {
+                    $kontrola = $checkResult['reroll'];
+                    $udalosti = $checkResult['events'];
+                    $res = ThrowReroll::proThenTeam($this->dice, $state, $player, $player->getTeamSide(), true, $udalosti, $this->coach, $kontrola['type'], $kontrola['roll'], $kontrola['target'], $player->getPosition());
+                    $hod = $res['rerolled'] ? $this->dice->rollD6() : $kontrola['roll'];
+                    $znovu = $this->bigGuyCheckResolver->judgeRerollableCheck($res['state'], $res['thrower'], $action, $hod);
+                    // bez přehozu je událost neúspěchu už v `$udalosti`; po přehozu přibude nový hod
+                    $udalosti = $res['rerolled'] ? [...$udalosti, ...($znovu['events'] ?? [])] : $udalosti;
+                    // povedená kontrola vlastní událost nemá (AI ji nevidí); po přehozu kouč chce vidět, co padlo
+                    if ($res['rerolled'] && ($znovu === null || !empty($znovu['proceed']))) {
+                        $udalosti[] = match ($kontrola['type']) {
+                            'bone_head' => GameEvent::boneHeadPass($player->getId(), $hod),
+                            'really_stupid' => GameEvent::reallyStupidPass($player->getId(), $hod, $kontrola['target'] === 2),
+                            default => GameEvent::wildAnimalPass($player->getId(), $hod),
+                        };
+                    }
+                    $state = $res['state'];
+                    $checkResult = $znovu === null ? null : ['events' => $udalosti] + $znovu;
+                    if ($znovu === null) {
+                        $preEvents = $udalosti;
+                    }
+                }
                 if ($checkResult !== null) {
                     // ⛔ PHP22: kontrola pred akci umi skoncit i TURNOVEREM --
                     //   Bloodlust, kdyz upir nema koho kousnout (r. 7942-7943),
@@ -523,24 +548,6 @@ final class ActionResolver
                         $state = $checkResult['state'];
                         $preEvents = $checkResult['events'];
                     } else {
-                        // P289 (10.11.2026): kouč-člověk smí neúspěch přehodit (ř. 929-931); ohlášená akce čeká. AI hody
-                        //   velkých hráčů nepřehazuje (parita s C++ P130).
-                        $nabidka = isset($checkResult['reroll']) && $this->interactiveRerolls
-                            ? ThrowReroll::offer(
-                                $state,
-                                $player,
-                                $checkResult['reroll']['type'],
-                                $checkResult['reroll']['target'],
-                                $checkResult['reroll']['roll'],
-                                $player->getPosition(),
-                                resumeAction: $action,
-                                resumeParams: $params,
-                            )
-                            : null;
-                        if ($nabidka !== null) {
-                            return ActionResult::success($state->withPendingReroll($nabidka), $checkResult['events']);
-                        }
-
                         return $this->akcePropadla($checkResult, $player, $action, $checkResult['events']);
                     }
                 }

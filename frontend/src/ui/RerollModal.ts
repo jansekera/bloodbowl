@@ -29,7 +29,18 @@ const BALL_ROLLS: Record<string, string> = {
     catch: 'Accept Failure = the ball bounces.',
 };
 
+/** P294 krok 5e: kontrola velkého hráče před akcí — odmítnutí = akce propadne (ř. 7980-7986, 8398-8401, 8668-8669). */
+const BIG_GUY_ROLLS: Record<string, string> = {
+    bone_head: 'Accept Failure = the player loses the declared action and his tackle zones.',
+    really_stupid: 'Accept Failure = the player loses the declared action and his tackle zones.',
+    wild_animal: 'Accept Failure = the player loses the declared action.',
+};
+
 function situation(pending: PendingReroll, from: Position | null): string {
+    const velky = BIG_GUY_ROLLS[pending.rollType];
+    if (velky !== undefined) {
+        return `<div class="reroll-modal__info">${velky}</div>`;
+    }
     const mic = BALL_ROLLS[pending.rollType];
     if (mic !== undefined) {
         return `<div class="reroll-modal__info">at (${pending.targetX}, ${pending.targetY})</div><div class="reroll-modal__info">${mic}</div>`;

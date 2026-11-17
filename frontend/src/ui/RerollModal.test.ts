@@ -62,6 +62,13 @@ describe('RerollModal', () => {
         expect(modalEl.innerHTML).not.toContain('turn ends');
     });
 
+    it('big guy check: declining loses the declared action (P294 krok 5e)', () => {
+        new RerollModal({ appendChild: vi.fn() } as unknown as HTMLElement).show({ ...dodge, rollType: 'bone_head' }, 'Ogre', { x: 6, y: 6 }, vi.fn());
+        expect(modalEl.innerHTML).toContain('Bone Head Failed!');
+        expect(modalEl.innerHTML).toContain('loses the declared action');
+        expect(modalEl.innerHTML).not.toContain('from (');
+    });
+
     it('pass: no move squares and no fall warning', () => {
         new RerollModal({ appendChild: vi.fn() } as unknown as HTMLElement).show({ ...dodge, rollType: 'pass' }, 'Thrower', { x: 5, y: 6 }, vi.fn());
         expect(modalEl.innerHTML).not.toContain('from (');
