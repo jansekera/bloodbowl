@@ -26,7 +26,7 @@ final class InteractiveRerollTest extends TestCase
         // Dodge target 3+. Roll 2 = fail. No skill reroll available.
         $dice = new FixedDiceRoller([2]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -68,7 +68,7 @@ final class InteractiveRerollTest extends TestCase
         // Step 1: dodge fails → pending reroll
         $dice = new FixedDiceRoller([2, /* reroll: */ 4]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -106,7 +106,7 @@ final class InteractiveRerollTest extends TestCase
         // dřív tu byla jediná kostka, test kódoval pád bez hodu na brnění (audit 08.10., nález 4b).
         $dice = new FixedDiceRoller([2, 1, 1]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -136,7 +136,7 @@ final class InteractiveRerollTest extends TestCase
         // After skill reroll, team reroll is blocked (can't double-reroll).
         $dice = new FixedDiceRoller([2, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -157,7 +157,7 @@ final class InteractiveRerollTest extends TestCase
         // Dodge target 3+. Roll 2=fail. Pro is available.
         $dice = new FixedDiceRoller([2]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -181,7 +181,7 @@ final class InteractiveRerollTest extends TestCase
         // GFI target 2+. Roll 1=fail. No Sure Feet.
         $dice = new FixedDiceRoller([1]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 12, // 7 squares = 1 GFI
@@ -202,7 +202,7 @@ final class InteractiveRerollTest extends TestCase
         // GFI fail, then team reroll succeeds
         $dice = new FixedDiceRoller([1, /* reroll: */ 5]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 12,
@@ -234,7 +234,7 @@ final class InteractiveRerollTest extends TestCase
         // Dodge fail, team reroll succeeds
         $dice = new FixedDiceRoller([2, 4]);
         $resolver = new ActionResolver($dice);
-        // AI (bez `setCoachSides`) přehazuje sama — otázka jen kouči-člověku (P294)
+        // AI (bez `setHumanSides`) přehazuje sama — otázka jen kouči-člověku (P294)
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -260,7 +260,7 @@ final class InteractiveRerollTest extends TestCase
 
         $dice = new FixedDiceRoller([2]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -295,7 +295,7 @@ final class InteractiveRerollTest extends TestCase
 
         $dice = new FixedDiceRoller([2]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,
@@ -330,7 +330,7 @@ final class InteractiveRerollTest extends TestCase
         //   Team re-roll." => tymovy prehoz jde na HOD PRO, pak teprve uhyb.
         $dice = new FixedDiceRoller([2, /* pro check: */ 2, /* team reroll of Pro roll: */ 5, /* dodge reroll: */ 5]);
         $resolver = new ActionResolver($dice);
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1, 'x' => 5, 'y' => 6,

@@ -21,7 +21,7 @@ final class UkazaneUdalostiTest extends TestCase
     private function kouc(array $kostky): ActionResolver
     {
         $r = new ActionResolver(new FixedDiceRoller($kostky));
-        $r->setCoachSides([TeamSide::HOME]);
+        $r->setHumanSides([TeamSide::HOME]);
 
         return $r;
     }

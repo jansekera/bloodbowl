@@ -150,7 +150,7 @@ final class NoBlockAfterMoveTest extends TestCase
     private function pohybPrehozenyVDialogu(GameState $state, array $cil, string $typHodu): GameState
     {
         $resolver = new ActionResolver(new FixedDiceRoller([1, 6]));
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1] + $cil);
         $this->assertSame($typHodu, $r->getNewState()->getPendingReroll()?->getRollType(), 'fixtura: čeká dialog přehozu');
 

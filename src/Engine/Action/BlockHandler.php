@@ -112,8 +112,6 @@ final class BlockHandler implements ActionHandlerInterface
         $this->ptatSeNaGrab = $ptatSe;
     }
 
-    /** @var list<TeamSide> P226: strany kouče-člověka -- jejich hráčů se Stand Firm se ptá */
-    private array $ptatSeNaStandFirm = [];
 
     /**
      * @var array<int, bool>|null P226: odpovědi kouče v právě vyhodnocovaném bloku (id => použije
@@ -130,12 +128,6 @@ final class BlockHandler implements ActionHandlerInterface
      */
     private array $neodpovezeni = [];
 
-    /** @param list<TeamSide> $strany */
-    public function setAskStandFirm(array $strany): void
-    {
-        $this->ptatSeNaStandFirm = $strany;
-    }
-
     /**
      * P226: odpověď kouče-člověka na Stand Firm hráče `$hrac`; null = rozhoduje AI (kouč se neptá).
      * Bez odpovědi přeruší vyhodnocení bloku otázkou (`StandFirmQuestion`, chytá `resolveBlockChoice`);
@@ -143,7 +135,8 @@ final class BlockHandler implements ActionHandlerInterface
      */
     private function odpovedKouce(MatchPlayerDTO $hrac): ?bool
     {
-        if ($this->standFirmOdpovedi === null || !in_array($hrac->getTeamSide(), $this->ptatSeNaStandFirm, true)) {
+        // P306 R7: strany kouče-člověka jen v `Coach` (dřív vlastní kopie `ptatSeNaStandFirm`)
+        if ($this->standFirmOdpovedi === null || !$this->coach->decides($hrac->getTeamSide())) {
             return null;
         }
 

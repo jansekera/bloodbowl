@@ -106,48 +106,16 @@ final class ActionResolver
         $this->blockHandler->setAskGrab($interactive);
     }
 
-    /** @var list<TeamSide> P206 (b): strany kouče-člověka — o lékárníkovi se jich ptá po akci */
-    private array $interactiveApothecary = [];
-
-    /** @param list<TeamSide> $sides */
-    public function setInteractiveApothecary(array $sides): void
-    {
-        $this->interactiveApothecary = $sides;
-    }
-
     /**
-     * P226: strany kouče-člověka -- jeho hráče se Stand Firm se při odtlačení ptá (i v tahu soupeře);
-     * hráče AI rozhoduje engine (P225).
-     *
-     * @param list<TeamSide> $sides
-     */
-    public function setInteractiveStandFirm(array $sides): void
-    {
-        $this->blockHandler->setAskStandFirm($sides);
-    }
-
-    /**
-     * Strany kouče-člověka: ptá se jich na všechno, na co se ptá i v tahu soupeře — lékárník, Stand Firm, Diving
-     * Catch, kam hodit bombu, rozhodčí, přehoz hodu. (Přehozy uprostřed tahu a volba kostky bloku zvlášť:
-     * `setInteractiveBlocks` — jen na tahu člověka.)
+     * Strany kouče-člověka: ptá se jich na všechno, na co se ptá i v tahu soupeře — lékárník (P206 b), Stand Firm (P226),
+     * Diving Catch, kam hodit bombu, rozhodčí, přehoz hodu (P294). (Volba kostky bloku a Grab zvlášť:
+     * `setInteractiveBlocks` — jen na tahu člověka.) P306 R7 (18.11.2026): strany drží jen `Coach` — dřív ještě
+     * kopie pro lékárníka (`setInteractiveApothecary`) a Stand Firm (`setInteractiveStandFirm`) a třetí setter
+     * `setCoachSides`; testy, které zapínaly jen část, tím dostaly realitu produkce.
      *
      * @param list<TeamSide> $sides
      */
     public function setHumanSides(array $sides): void
-    {
-        $this->setInteractiveApothecary($sides);
-        $this->setInteractiveStandFirm($sides);
-        $this->setCoachSides($sides);
-    }
-
-    /**
-     * P294 krok 3: strany kouče-člověka pro otázky uprostřed akce, i v tahu soupeře — Diving Catch (30.10.), kam hodit
-     * chycenou bombu (P272), rozhodčí u faulu i tajné zbraně (P291), přehoz hodu (P292: přihrávka, bomba, hod
-     * spoluhráčem, Jump Up). Dřív zvlášť setter pro každý druh.
-     *
-     * @param list<TeamSide> $sides
-     */
-    public function setCoachSides(array $sides): void
     {
         $this->coach->setSides($sides);
     }
@@ -361,10 +329,10 @@ final class ActionResolver
         //   (KO i Casualty) se zapíše jako nabídka; akce doběhne celá a pak se kouč zeptá (PendingApothecary).
         /** @var list<array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool, stakes: bool}> $nabidky */
         $nabidky = [];
-        $lide = $this->interactiveApothecary;
-        $this->injuryResolver->setOdlozitLekarnika($lide === [] ? null : function (MatchPlayerDTO $hrac, string $druh, ?CasualtyResult $vysledek, bool $stakes = false) use ($state, $lide, &$nabidky): bool {
+        $kouc = $this->coach;
+        $this->injuryResolver->setOdlozitLekarnika(function (MatchPlayerDTO $hrac, string $druh, ?CasualtyResult $vysledek, bool $stakes = false) use ($state, $kouc, &$nabidky): bool {
             $strana = $hrac->getTeamSide();
-            if (!in_array($strana, $lide, true) || !$state->getTeamState($strana)->canUseApothecary()) {
+            if (!$kouc->decides($strana) || !$state->getTeamState($strana)->canUseApothecary()) {
                 return false;
             }
             $pos = $hrac->getPosition();

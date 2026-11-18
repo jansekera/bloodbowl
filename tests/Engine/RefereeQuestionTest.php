@@ -42,7 +42,7 @@ final class RefereeQuestionTest extends TestCase
     private function resolver(FixedDiceRoller $dice): ActionResolver
     {
         $r = new ActionResolver($dice);
-        $r->setCoachSides([TeamSide::HOME]);
+        $r->setHumanSides([TeamSide::HOME]);
 
         return $r;
     }

@@ -115,7 +115,7 @@ final class FallSquareAndInjuryOnFailedMoveTest extends TestCase
     /** První hod ($dice[0]) selže a vznikne dialog přehozu; vrací resolver a stav s dialogem. */
     private function sDialogem(GameState $state, ActionResolver $resolver, int $x, int $y): GameState
     {
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => $x, 'y' => $y]);
         $this->assertNotNull($r->getNewState()->getPendingReroll(), 'fixtura: vznikl dialog přehozu');
 

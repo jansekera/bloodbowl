@@ -216,7 +216,7 @@ final class BombThrowTest extends TestCase
 
         // Úhyb ze zóny AWAY 2: 1 = neúspěch ⇒ dialog, týmový přehoz 6 = úspěch.
         $resolver = new ActionResolver(new FixedDiceRoller([1, 6]));
-        $resolver->setCoachSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
+        $resolver->setHumanSides([TeamSide::HOME]);   // P294 krok 5b: přehoz úhybu / GFI přehráním
         $r = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 6, 'y' => 7]);
         $r = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
         $this->assertSame(6, $r->getNewState()->requirePlayer(1)->requirePosition()->getX(), 'fixtura: hráč se přesunul');

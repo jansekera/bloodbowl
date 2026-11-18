@@ -27,8 +27,8 @@ final class ThrowRerollCoachTest extends TestCase
     private function resolver(array $kostky): ActionResolver
     {
         $r = new ActionResolver(new FixedDiceRoller($kostky));
-        $r->setCoachSides([TeamSide::HOME]);
-        $r->setCoachSides([TeamSide::HOME]);
+        $r->setHumanSides([TeamSide::HOME]);
+        $r->setHumanSides([TeamSide::HOME]);
 
         return $r;
     }

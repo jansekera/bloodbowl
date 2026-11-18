@@ -79,12 +79,12 @@ final class DivingCatchKandidatiTest extends TestCase
     private function prihraj(GameState $s, array $lide, array $odpovedi = []): ActionResult
     {
         $r = new ActionResolver(new FixedDiceRoller(array_merge(self::HODY_PRIHRAVKY, [4])));
-        $r->setCoachSides($lide);
+        $r->setHumanSides($lide);
         $vysledek = self::sPrehozem($r, $r->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]));
         foreach ($odpovedi as $ano) {
             $this->assertNotNull($vysledek->getNewState()->getPendingDivingCatch(), 'čeká se otázka');
             $r = new ActionResolver(new FixedDiceRoller([4]));
-            $r->setCoachSides($lide);
+            $r->setHumanSides($lide);
             $vysledek = $r->resolve($vysledek->getNewState(), ActionType::RESOLVE_DIVING_CATCH, ['use' => $ano]);
         }
 

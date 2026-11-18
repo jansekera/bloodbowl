@@ -52,7 +52,7 @@ final class DivingCatchKoucTest extends TestCase
     private function resolver(array $kostky, array $lide): ActionResolver
     {
         $r = new ActionResolver(new FixedDiceRoller($kostky));
-        $r->setCoachSides($lide);
+        $r->setHumanSides($lide);
 
         return $r;
     }
@@ -356,7 +356,7 @@ final class DivingCatchKoucTest extends TestCase
         ServiceProvider::register($c);
         $c->set(DiceRollerInterface::class, fn() => new FixedDiceRoller(array_merge(self::HODY_PRIHRAVKY, [4], array_fill(0, 20, 3))));
         $r = $c->get(ActionResolver::class);
-        $r->setCoachSides([TeamSide::HOME]);
+        $r->setHumanSides([TeamSide::HOME]);
 
         $q = self::sPrehozem($r, $r->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]))->getNewState();
         $this->assertSame(2, $q->getPendingDivingCatch()?->getPlayerId());

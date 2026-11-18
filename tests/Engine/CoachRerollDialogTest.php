@@ -34,7 +34,7 @@ final class CoachRerollDialogTest extends TestCase
     {
         $r = new ActionResolver($dice);
         // P294 krok 5c/5e: Leap i velcí hráči se ptají kouče přehráním (`Coach`)
-        $r->setCoachSides([TeamSide::HOME]);
+        $r->setHumanSides([TeamSide::HOME]);
 
         return $r;
     }

@@ -34,7 +34,7 @@ final class ApothecaryCoachChoiceTest extends TestCase
     private function resolver(array $dice): ActionResolver
     {
         $r = new ActionResolver(new FixedDiceRoller($dice));
-        $r->setInteractiveApothecary([TeamSide::HOME]);
+        $r->setHumanSides([TeamSide::HOME]);
         return $r;
     }
 

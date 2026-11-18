@@ -36,7 +36,7 @@ final class StandFirmKoucTest extends TestCase
     {
         $r = new ActionResolver(new FixedDiceRoller($kostky));
         $r->setInteractiveBlocks(true);
-        $r->setInteractiveStandFirm($lide);
+        $r->setHumanSides($lide);
 
         return $r;
     }
@@ -550,7 +550,7 @@ final class StandFirmKoucTest extends TestCase
             ->build();
         $ai = function (): ActionResolver {
             $r = new ActionResolver(new FixedDiceRoller(array_fill(0, 20, 3)));
-            $r->setInteractiveStandFirm([TeamSide::AWAY]);   // tah AI: na Grab se neptá
+            $r->setHumanSides([TeamSide::AWAY]);   // tah AI: na Grab se neptá
 
             return $r;
         };
