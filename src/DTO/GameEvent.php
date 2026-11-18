@@ -9,6 +9,14 @@ use App\Enum\GameEventType;
 final class GameEvent
 {
     /**
+     * P306 A1 (18.11.2026): log akce = události v pořadí, jak vznikají (zapíná `ActionResolver` jen po dobu akce).
+     * Otázka kouči uprostřed akce vezme log, jak stojí — i události volající akce, které otázka položená hlouběji
+     * (chytání odrazu v `BallResolver`) nezná; dřív je ručně přidával obal `CoachQuestion::sPredchozimi` na 8 místech.
+     *
+     * @var list<self>|null
+     */
+    private static ?array $log = null;
+    /**
      * @param array<string, mixed> $data
      */
     public function __construct(
@@ -22,6 +30,52 @@ final class GameEvent
         //    jen zalogovala. Konstruktor bere dál `string`, aby se nemuselo
         //    sáhnout na 86 továrních metod; typ se tím ale nestává volným.
         GameEventType::from($type);
+        if (self::$log !== null) {
+            self::$log[] = $this;
+        }
+    }
+
+    /** P306 A1: začne log akce (akce se nevnořují — vnoření je chyba). */
+    public static function zacitLog(): void
+    {
+        if (self::$log !== null) {
+            throw new \LogicException('Log událostí akce už běží');
+        }
+        self::$log = [];
+    }
+
+    /**
+     * P306 A1: události akce dosud vzniklé, v pořadí vzniku.
+     *
+     * @return list<self>
+     */
+    public static function log(): array
+    {
+        return self::$log ?? throw new \LogicException('Log událostí akce neběží');
+    }
+
+    public static function ukoncitLog(): void
+    {
+        self::$log = null;
+    }
+
+    /**
+     * P306 A1: výpočet nanečisto (odtlačení k vyhodnocení pasti, opakované vyhodnocení kontroly) — jeho události se
+     * zahodí, do logu akce nepatří (kouč by je u otázky viděl, i když se nestaly).
+     *
+     * @template T
+     * @param \Closure(): T $fn
+     * @return T
+     */
+    public static function bezLogu(\Closure $fn): mixed
+    {
+        $log = self::$log;
+        self::$log = null;
+        try {
+            return $fn();
+        } finally {
+            self::$log = $log;
+        }
     }
 
     public static function playerMove(int $playerId, string $from, string $to): self

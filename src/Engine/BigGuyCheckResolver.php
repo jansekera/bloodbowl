@@ -93,21 +93,22 @@ final class BigGuyCheckResolver
      */
     public function judgeRerollableCheck(GameState $state, MatchPlayerDTO $player, ActionType $action, int $roll, bool $zapsatUspech = false): ?array
     {
+        // P306 A1: událost úspěchu vzniká, jen když se zapíše — log akce bere události podle vzniku (dřív vznikla vždy)
         if ($player->hasSkill(SkillName::BoneHead)) {
             $r = $this->resolveBoneHead($state, $player, $roll);
-            $uspech = GameEvent::boneHeadPass($player->getId(), $roll);
+            $uspech = static fn(): GameEvent => GameEvent::boneHeadPass($player->getId(), $roll);
         } elseif ($player->hasSkill(SkillName::ReallyStupid)) {
             $r = $this->resolveReallyStupid($state, $player, $roll);
-            $uspech = GameEvent::reallyStupidPass($player->getId(), $roll, $this->hasReallyStupidSupport($state, $player));
+            $uspech = fn(): GameEvent => GameEvent::reallyStupidPass($player->getId(), $roll, $this->hasReallyStupidSupport($state, $player));
         } else {
             $r = $this->resolveWildAnimal($state, $player, $action, $roll);
-            $uspech = GameEvent::wildAnimalPass($player->getId(), $roll);
+            $uspech = static fn(): GameEvent => GameEvent::wildAnimalPass($player->getId(), $roll);
         }
         if (!$zapsatUspech || isset($r['reroll'])) {
             return $r;
         }
 
-        return ['state' => $r['state'] ?? $state, 'events' => [...($r['events'] ?? []), $uspech], 'proceed' => true];
+        return ['state' => $r['state'] ?? $state, 'events' => [...($r['events'] ?? []), $uspech()], 'proceed' => true];
     }
 
     /**
@@ -126,8 +127,9 @@ final class BigGuyCheckResolver
         $udalosti = $neuspech['events'];
         $res = ThrowReroll::proThenTeam($dice, $state, $player, $player->getTeamSide(), true, $udalosti, $kouc, $kontrola['type'], $kontrola['roll'], $kontrola['target'], $player->getPosition());
         if (!$res['rerolled']) {
-            // platí původní hod; událost neúspěchu už je v `$udalosti` (u otázky)
-            $znovu = $this->judgeRerollableCheck($res['state'], $res['thrower'], $action, $kontrola['roll']) ?? [];
+            // platí původní hod; událost neúspěchu už je v `$udalosti` (u otázky) ⇒ události druhého vyhodnocení se
+            //   zahodí, mimo log akce (P306 A1)
+            $znovu = GameEvent::bezLogu(fn(): ?array => $this->judgeRerollableCheck($res['state'], $res['thrower'], $action, $kontrola['roll'])) ?? [];
 
             return ['events' => $udalosti] + $znovu + ['state' => $res['state']];
         }

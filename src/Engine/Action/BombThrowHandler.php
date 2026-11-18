@@ -12,7 +12,6 @@ use App\DTO\MatchPlayerDTO;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
-use App\Engine\CoachQuestion;
 use App\Engine\BallResolver;
 use App\Engine\BombTarget;
 use App\Engine\DiceRollerInterface;
@@ -191,13 +190,13 @@ final class BombThrowHandler implements ActionHandlerInterface
         $chytajici = $state->getPlayerAtPosition($landingPos);
         if ($chytajici !== null && BombTarget::mozeChytit($chytajici)) {
             $strana = $chytajici->getTeamSide();
-            $hod = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->hodNaChyceni(
+            $hod = $this->ballResolver->hodNaChyceni(
                 $state,
                 $chytajici,
                 $accurate ? 1 : 0,
                 $strana === $activeSide && $state->getTeamState($strana)->canUseReroll(),
                 $accurate,
-            ));
+            );
             $state = $hod['state'];
             $events = array_merge($events, $hod['events']);
             if ($hod['success']) {
@@ -233,7 +232,6 @@ final class BombThrowHandler implements ActionHandlerInterface
                 ThrowTarget::cile($state, $drzi, true),
                 ['x' => $cil->getX(), 'y' => $cil->getY()],
                 $state,
-                $events,
             );
             $cil = new Position($odpoved['x'], $odpoved['y']);
         }

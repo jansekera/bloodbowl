@@ -319,7 +319,8 @@ final class BlockHandler implements ActionHandlerInterface
         $puvodni = $this->standFirmOdpovedi;
         $this->standFirmOdpovedi = $odpovedi;
         try {
-            [$po] = $this->resolvePushback($state, $attacker, $defender, $defender->requirePosition(), [], odlozitPoFollowUp: true, grabNeplati: $grabNeplati, grabVolba: $grabVolba);
+            // P306 A1: události nanečisto se zahodí ⇒ mimo log akce
+            [$po] = GameEvent::bezLogu(fn(): array => $this->resolvePushback($state, $attacker, $defender, $defender->requirePosition(), [], odlozitPoFollowUp: true, grabNeplati: $grabNeplati, grabVolba: $grabVolba));
         } finally {
             $this->nanecisto = false;
             $this->standFirmOdpovedi = $puvodni;

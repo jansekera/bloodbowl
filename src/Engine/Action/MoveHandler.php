@@ -13,7 +13,6 @@ use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\Weather;
 use App\ValueObject\Position;
-use App\Engine\CoachQuestion;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\Coach;
@@ -462,7 +461,7 @@ final class MoveHandler implements ActionHandlerInterface
         $playerId = $hrac->getId();
         $hrac = $state->getPlayer($playerId) ?? $hrac;
         // týmový přehoz jednou za kolo hlídá stav týmu (`canUseReroll`), P294 /simplify
-        $pickupResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolvePickup($state, $hrac, true));
+        $pickupResult = $this->ballResolver->resolvePickup($state, $hrac, true);
         $events = array_merge($events, $pickupResult['events']);
         $state = $pickupResult['state'];
         if (!$pickupResult['success']) {

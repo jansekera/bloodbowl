@@ -12,14 +12,14 @@ use App\Enum\ActionType;
  * v každé čekající otázce (Diving Catch, kam hodit bombu, rozhodčí, přehoz hodu).
  *
  * P294 krok 5a: zobrazený stav může být okamžik otázky (kde hráč stojí, co padlo) ⇒ přehrává se z `base` (stav před
- * akcí); `shown` = události, které kouč už viděl — po odpovědi se v logu znovu neukážou.
+ * akcí); `shown` = kolik událostí akce (v pořadí vzniku) kouč už viděl — po odpovědi se v logu znovu neukážou
+ * (P306 A1: počet, dřív obsah událostí).
  */
 final class ReplayContext
 {
     /**
      * @param array<string, mixed> $params
      * @param list<int> $dice
-     * @param list<array<string, mixed>> $shown události už ukázané kouči (GameEvent::toArray)
      */
     public function __construct(
         public readonly ActionType $action,
@@ -27,7 +27,7 @@ final class ReplayContext
         public readonly array $dice = [],
         public readonly ReplayAnswers $answers = new ReplayAnswers(),
         public readonly ?GameState $base = null,
-        public readonly array $shown = [],
+        public readonly int $shown = 0,
     ) {}
 
     /** Totéž přehrání s další odpovědí kouče. */
@@ -58,7 +58,7 @@ final class ReplayContext
             array_values(array_map('intval', (array) ($data['dice'] ?? []))),
             ReplayAnswers::fromArray((array) ($data['answers'] ?? [])),
             isset($data['base']) ? GameState::fromArray((array) $data['base']) : null,
-            array_values(array_map(static fn(mixed $e): array => (array) $e, (array) ($data['shown'] ?? []))),
+            (int) ($data['shown'] ?? 0),
         );
     }
 }

@@ -9,7 +9,6 @@ use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
-use App\Engine\CoachQuestion;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Enum\SkillName;
@@ -124,7 +123,7 @@ final class HandOffHandler implements ActionHandlerInterface
         // Receiver attempts catch with +1 modifier
         $activeSide = $state->getActiveTeam();
         $teamRerollAvailable = $state->getTeamState($activeSide)->canUseReroll();
-        $catchResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolveCatch($state, $receiver, modifier: 1, teamRerollAvailable: $teamRerollAvailable));
+        $catchResult = $this->ballResolver->resolveCatch($state, $receiver, modifier: 1, teamRerollAvailable: $teamRerollAvailable);
         $events = array_merge($events, $catchResult['events']);
         $state = $catchResult['state'];   // P294 krok 5d: týmový přehoz už odečetl `hodNaChyceni`
 

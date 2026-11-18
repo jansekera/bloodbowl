@@ -292,75 +292,42 @@ final class ActionResolver
         $zaklad = $replay->base ?? $state;
         $this->replayDice->begin($replay->dice);
         $this->coach->begin($replay->answers);
+        GameEvent::zacitLog();
         try {
             $r = $this->resolveJednou($zaklad, $replay->action, $replay->params);
 
             return new ActionResult($r->getNewState(), $r->isSuccess(), $r->isTurnover(), self::bezUkazanych($r->getEvents(), $replay->shown));
         } catch (CoachQuestion $q) {
-            // ukázat jen nové; `shown` = vše, co kouč v této akci viděl (u všech dosavadních otázek), review P294 nález 1
-            $nove = self::bezUkazanych($q->events, $replay->shown);
-            $kontext = new ReplayContext(
-                $replay->action,
-                $replay->params,
-                $this->replayDice->getLog(),
-                $replay->answers,
-                $zaklad,
-                [...$replay->shown, ...array_map(static fn(GameEvent $e): array => $e->toArray(), $nove)],
-            );
+            // P306 A1: kouč vidí log akce, jak stojí (i události volající akce), bez toho, co už viděl u dřívějších otázek
+            $log = GameEvent::log();
+            $kontext = new ReplayContext($replay->action, $replay->params, $this->replayDice->getLog(), $replay->answers, $zaklad, count($log));
 
-            return ActionResult::success($q->pending($q->snapshot ?? $zaklad, $kontext), $nove);
+            return ActionResult::success($q->pending($q->snapshot ?? $zaklad, $kontext), array_slice($log, $replay->shown));
         } finally {
+            GameEvent::ukoncitLog();
             $this->coach->end();
         }
     }
 
     /**
-     * Pole se seřazenými klíči asociativních polí (do hloubky), ať se dvě kopie téže události porovnají bez ohledu na
-     * pořadí klíčů.
-     *
-     * @param array<mixed> $a
-     * @return array<mixed>
-     */
-    private static function serazeneKlice(array $a): array
-    {
-        if (!array_is_list($a)) {
-            ksort($a);
-        }
-
-        return array_map(static fn(mixed $v): mixed => is_array($v) ? self::serazeneKlice($v) : $v, $a);
-    }
-
-    /**
-     * Události bez těch, které kouč už viděl u dřívější otázky téže akce (první souvislý výskyt; když tam nejsou,
-     * nechá všechny).
+     * Události akce bez těch, které kouč už viděl u otázek: prvních `$ukazano` vzniklých (přehrání je deterministické
+     * ⇒ vzniknou tytéž události v témže pořadí). P306 A1: podle vzniku, ne podle pořadí ve výsledku — to se může lišit
+     * (Throw a Rock dává hlavičku před zranění vzniklá dřív) — a bez porovnání obsahu v JSON (dřív `shown` = obsah).
      *
      * @param list<GameEvent> $udalosti
-     * @param list<array<string, mixed>> $ukazane
      * @return list<GameEvent>
      */
-    private static function bezUkazanych(array $udalosti, array $ukazane): array
+    private static function bezUkazanych(array $udalosti, int $ukazano): array
     {
-        if ($ukazane === []) {
+        if ($ukazano === 0) {
             return $udalosti;
         }
-        // porovnání v kanonickém JSON: `shown` prošlo uložením stavu do DB a `jsonb` přeřadí klíče objektů (P294 5b,
-        //   našel Playwright — `===` na polích pak neshodlo nic a kouč viděl hod v logu dvakrát)
-        // OPRAVENO 17.11.2026 (review P294, nález 1) — dřív se `shown` odebíralo jen jako jeden souvislý úsek; kouč ale
-        //   průběh vidí po kouscích (u každé otázky jen to, co znala) ⇒ úsek se v přehrané akci nenašel a události se
-        //   opakovaly. Teď se odebere každá ukázaná událost zvlášť (první dosud neodebraný výskyt).
-        $json = static fn(array $a): string => (string) json_encode(self::serazeneKlice($a));
-        $zbyva = array_count_values(array_map($json, $ukazane));
-        $vysledek = [];
-        foreach ($udalosti as $e) {
-            $klic = $json($e->toArray());
-            if (($zbyva[$klic] ?? 0) > 0) {
-                $zbyva[$klic]--;
-                continue;
-            }
-            $vysledek[] = $e;
+        $videl = [];
+        foreach (array_slice(GameEvent::log(), 0, $ukazano) as $e) {
+            $videl[spl_object_id($e)] = true;
         }
 
-        return $vysledek;
+        return array_values(array_filter($udalosti, static fn(GameEvent $e): bool => !isset($videl[spl_object_id($e)])));
     }
 
     /**
@@ -536,8 +503,8 @@ final class ActionResolver
             }
         }
 
-        // review P294 nález 1: otázka položená v handleru nese i události kontroly před akcí (Bone Head …, Bloodlust)
-        $result = CoachQuestion::sPredchozimi($preEvents, fn(): ActionResult => match ($action) {
+        // otázka položená v handleru ukáže i události kontroly před akcí (Bone Head …, Bloodlust) — log akce (P306 A1)
+        $result = match ($action) {
             ActionType::MOVE => $this->moveHandler->resolve($state, $params),
             ActionType::BLOCK => $this->blockHandler->resolve($state, $params),
             ActionType::BLITZ => $this->blitzHandler->resolve($state, $params),
@@ -562,7 +529,7 @@ final class ActionResolver
             // odpovědi na otázky kouče se přehrávají v `resolve()` (P294)
             ActionType::RESOLVE_REROLL, ActionType::RESOLVE_DIVING_CATCH, ActionType::RESOLVE_BOMB_RETHROW,
             ActionType::RESOLVE_REFEREE => throw new \LogicException("{$action->value} se vyřizuje v resolve()"),
-        });
+        };
 
         // Prepend pre-action events (e.g. Bloodlust bite)
         if ($preEvents !== []) {

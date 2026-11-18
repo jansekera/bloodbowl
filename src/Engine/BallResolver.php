@@ -351,7 +351,7 @@ final class BallResolver
         }
         $side = $catcher->getTeamSide();
         // review P294 nález 1: otázka na přehoz chytání nese i událost skoku (Diving Catch)
-        $catchResult = CoachQuestion::sPredchozimi($events, fn(): array => $this->resolveCatch(
+        $catchResult = $this->resolveCatch(
             $state,
             $catcher,
             modifier: $accuratePass ? 1 : 0,
@@ -361,7 +361,7 @@ final class BallResolver
             // OPRAVENO 30. 10. 2026 (P223 review LOW) — hloubka se tu ztrácela (odraz po neúspěchu
             //   začínal od 0) ⇒ řetěz „vhazování → nechytí → odraz ven“ obcházel pojistku MAX_BOUNCES.
             depth: $depth,
-        ));
+        );
         $state = $catchResult['state'];   // P294 krok 5d: týmový přehoz už odečetl `hodNaChyceni`
 
         return ['state' => $state, 'events' => array_merge($events, $catchResult['events'])];
