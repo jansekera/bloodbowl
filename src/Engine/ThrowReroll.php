@@ -56,15 +56,10 @@ final class ThrowReroll
         ?Position $kam = null,
     ): array {
         // P292: hráče kouče-člověka se zeptá (druh / hod / cíl jen pro dialog). P294: AI je „kouč“, který vždy bere
-        //   Pro (bez Pro týmový přehoz) a po neúspěšném hodu Pro týmový přehoz — jeden žebříček pro oba.
-        $volba = $kouc->decides($side)
-            ? static function (bool $pro, bool $team, bool $proFailed, GameState $stav) use ($kouc, $thrower, $druh, $hod, $cil, $kam): string {
-                // P294 krok 5a: otázka nese stav (co padlo, ukáže log akce, P306 A1); `$kam` = cílové pole hodu (5b).
-                //   OPRAVENO 17.11. (review P294 nález 3): stav v okamžiku TÉTO otázky (po hodu Pro je Pro použité), dřív
-                //   stav zachycený před žebříčkem
-                return $kouc->reroll($thrower->getId(), $druh, $hod, $cil, $pro, $team, $proFailed, $stav, $kam);
-            }
-        : static fn(bool $pro, bool $team, bool $proFailed, GameState $stav): string => ($pro && !$proFailed) ? 'pro' : 'team_reroll';
+        //   Pro (bez Pro týmový přehoz) a po neúspěšném hodu Pro týmový přehoz — jeden žebříček pro oba; P306 A5: odpověď
+        //   AI dává `Coach::reroll` sám. Stav v okamžiku TÉTO otázky (review P294 nález 3); `$kam` = cílové pole hodu (5b).
+        $volba = static fn(bool $pro, bool $team, bool $proFailed, GameState $stav): string
+            => $kouc->reroll($side, $thrower->getId(), $druh, $hod, $cil, $pro, $team, $proFailed, $stav, $kam);
 
         return self::zebricek($dice, $state, $thrower, $side, $teamAllowed, $events, $volba);
     }

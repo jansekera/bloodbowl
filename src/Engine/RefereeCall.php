@@ -69,8 +69,8 @@ final class RefereeCall
         ?Coach $kouc = null,
     ): array {
         $moznosti = self::options($state, $side);
-        if ($volba === null && $kouc !== null && $kouc->decides($side) && $moznosti !== null) {
-            $volba = $kouc->referee($playerId, $moznosti['bribe'], $moznosti['argue'], $state);
+        if ($volba === null && $kouc !== null && $moznosti !== null) {
+            $volba = $kouc->referee($side, $playerId, $moznosti['bribe'], $moznosti['argue'], $state);
         }
         $bribe = static function () use (&$state, $side, $playerId, $dice, &$events, $volba): bool {
             $team = $state->getTeamState($side);

@@ -226,15 +226,14 @@ final class BombThrowHandler implements ActionHandlerInterface
         if ($cil === null) {
             return $this->vybuch($state, $drzi->requirePosition(), $events);
         }
-        if ($this->coach->decides($drzi->getTeamSide())) {
-            $odpoved = $this->coach->bombTarget(
-                $drziId,
-                ThrowTarget::cile($state, $drzi, true),
-                ['x' => $cil->getX(), 'y' => $cil->getY()],
-                $state,
-            );
-            $cil = new Position($odpoved['x'], $odpoved['y']);
-        }
+        $odpoved = $this->coach->bombTarget(
+            $drzi->getTeamSide(),
+            $drziId,
+            static fn(): array => ThrowTarget::cile($state, $drzi, true),
+            ['x' => $cil->getX(), 'y' => $cil->getY()],
+            $state,
+        );
+        $cil = new Position($odpoved['x'], $odpoved['y']);
         return $this->letBomby($state, $drziId, $cil, $events, $skok);
     }
 

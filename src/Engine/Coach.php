@@ -69,13 +69,17 @@ final class Coach
     /**
      * Kam hodit chycenou bombu (P272).
      *
-     * @param list<array{x: int, y: int, range: string}> $targets
-     * @param array{x: int, y: int}|null $suggested
+     * @param \Closure(): list<array{x: int, y: int, range: string}> $targets legální pole (počítají se jen pro otázku)
+     * @param array{x: int, y: int} $suggested volba enginu (AI ji vezme, kouči se doporučí)
      * @return array{x: int, y: int}
      */
-    public function bombTarget(int $playerId, array $targets, ?array $suggested, GameState $stav): array
+    public function bombTarget(TeamSide $strana, int $playerId, \Closure $targets, array $suggested, GameState $stav): array
     {
-        return array_shift($this->bombTargets) ?? throw (new BombRethrowQuestion($playerId, $targets, $suggested))->naStavu($stav);
+        if (!$this->decides($strana)) {
+            return $suggested;   // P306 A5: AI hodí, kam radí engine
+        }
+
+        return array_shift($this->bombTargets) ?? throw (new BombRethrowQuestion($playerId, $targets(), $suggested))->naStavu($stav);
     }
 
     /**
@@ -83,8 +87,12 @@ final class Coach
      *
      * @return array{bribe: bool, argue: bool}
      */
-    public function referee(int $playerId, bool $canBribe, bool $canArgue, GameState $stav): array
+    public function referee(TeamSide $strana, int $playerId, bool $canBribe, bool $canArgue, GameState $stav): array
     {
+        if (!$this->decides($strana)) {
+            return ['bribe' => true, 'argue' => true];   // P306 A5: AI použije, co jde
+        }
+
         return array_shift($this->referee) ?? throw (new RefereeQuestion($playerId, $canBribe, $canArgue))->naStavu($stav);
     }
 
@@ -94,6 +102,7 @@ final class Coach
      * @return 'pro'|'team_reroll'|'decline'
      */
     public function reroll(
+        TeamSide $strana,
         int $playerId,
         string $rollType,
         int $roll,
@@ -104,6 +113,10 @@ final class Coach
         GameState $stav,
         ?Position $kam = null,
     ): string {
+        if (!$this->decides($strana)) {
+            // P306 A5: AI vždy přehazuje — Pro (dokud nepadl), jinak týmový přehoz (dřív druhá uzávěra v ThrowReroll)
+            return ($pro && !$proFailed) ? 'pro' : 'team_reroll';
+        }
         $a = array_shift($this->rerolls)
             ?? throw (new RerollQuestion($playerId, $rollType, $roll, $target, $pro, $team, $proFailed, $kam))->naStavu($stav);
 
