@@ -55,16 +55,23 @@ final class PendingDivingCatchDTO
         return $this->attemptingId;
     }
 
-    /** @return array<string, mixed> */
-    public function toArray(): array
+    /**
+     * @param bool $sPrehranim false = pro klienta (P306 E1: přehrání potřebuje jen server)
+     * @return array<string, mixed>
+     */
+    public function toArray(bool $sPrehranim = true): array
     {
-        return [
+        $a = [
             'playerId' => $this->playerId,
             'landing' => ['x' => $this->landing->getX(), 'y' => $this->landing->getY()],
-            'replay' => $this->replay->toArray(),
             'otherCandidates' => $this->otherCandidates,
             'attemptingId' => $this->attemptingId,
         ];
+        if ($sPrehranim) {
+            $a['replay'] = $this->replay->toArray();
+        }
+
+        return $a;
     }
 
     /** @param array<string, mixed> $data */

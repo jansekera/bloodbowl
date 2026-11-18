@@ -573,20 +573,14 @@ final class GameState
      */
     public function toClientArray(): array
     {
-        $a = $this->toArray();
-        foreach (['pendingReroll', 'pendingDivingCatch', 'pendingBombRethrow', 'pendingReferee'] as $k) {
-            if (is_array($a[$k] ?? null)) {
-                unset($a[$k]['replay']);
-            }
-        }
-
-        return $a;
+        return $this->toArray(sPrehranim: false);   // review P306: bez serializace `replay` (a v něm celého stavu)
     }
 
     /**
+     * @param bool $sPrehranim false = stav pro klienta (`toClientArray`)
      * @return array<string, mixed>
      */
-    public function toArray(): array
+    public function toArray(bool $sPrehranim = true): array
     {
         $playersArray = [];
         foreach ($this->players as $player) {
@@ -607,16 +601,16 @@ final class GameState
             'aiTeam' => $this->aiTeam?->value,
             'weather' => $this->weather->value,
             'pendingBlock' => $this->pendingBlock?->toArray(),
-            'pendingReroll' => $this->pendingReroll?->toArray(),
+            'pendingReroll' => $this->pendingReroll?->toArray($sPrehranim),
             'activePlayerId' => $this->activePlayerId,
             'openMovePlayerId' => $this->openMovePlayerId(),   // jen pro web (odvozené, `fromArray` ho nečte)
             'declaredBlitzerId' => $this->getDeclaredBlitzerId(),
             'pendingApothecary' => $this->pendingApothecary?->toArray(),
             'pendingGrab' => $this->pendingGrab?->toArray(),
             'pendingStandFirm' => $this->pendingStandFirm?->toArray(),
-            'pendingDivingCatch' => $this->pendingDivingCatch?->toArray(),
-            'pendingBombRethrow' => $this->pendingBombRethrow?->toArray(),
-            'pendingReferee' => $this->pendingReferee?->toArray(),
+            'pendingDivingCatch' => $this->pendingDivingCatch?->toArray($sPrehranim),
+            'pendingBombRethrow' => $this->pendingBombRethrow?->toArray($sPrehranim),
+            'pendingReferee' => $this->pendingReferee?->toArray($sPrehranim),
         ];
     }
 

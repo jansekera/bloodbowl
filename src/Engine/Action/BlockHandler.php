@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine\Action;
 
+use App\Enum\RollType;
 use App\DTO\ActionResult;
 use App\DTO\BallState;
 use App\DTO\GameEvent;
@@ -70,7 +71,7 @@ final class BlockHandler implements ActionHandlerInterface
         $cil = max(2, min(6, 7 - $attacker->getStats()->getAgility() - 2));
         $hod = $this->dice->rollD6();
         if ($hod < $cil) {
-            $prehoz = ThrowReroll::proThenTeam($this->dice, $state, $attacker, $attacker->getTeamSide(), true, $events, $this->coach, 'jump_up', $hod, $cil);
+            $prehoz = ThrowReroll::proThenTeam($this->dice, $state, $attacker, $attacker->getTeamSide(), true, $events, $this->coach, RollType::JUMP_UP, $hod, $cil);
             $state = $prehoz['state'];
             $attacker = $prehoz['thrower'];
             if ($prehoz['rerolled']) {
@@ -343,9 +344,12 @@ final class BlockHandler implements ActionHandlerInterface
         //   blok i B&C na ležícího volají tuhle metodu každý zvlášť).
         $puvodni = $this->standFirmOdpovedi;
         $this->standFirmOdpovedi = $odpovedi;
+        $znacka = GameEvent::znacka();
         try {
             return [$fn(), null];
         } catch (StandFirmQuestion $otazka) {
+            GameEvent::zahoditOd($znacka);   // review P306: rozpracovaný blok se zahodí i z logu akce
+
             return [null, $otazka->playerId];
         } finally {
             $this->standFirmOdpovedi = $puvodni;
@@ -523,7 +527,7 @@ final class BlockHandler implements ActionHandlerInterface
                 true,
                 $events,
                 $this->coach,
-                'gfi',
+                RollType::GFI,
                 $roll,
                 $threshold,
                 $attacker->getPosition(),

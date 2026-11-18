@@ -59,6 +59,23 @@ final class GameEvent
         self::$log = null;
     }
 
+    /** Kolik událostí log akce zatím má (0 mimo akci) — značka pro `zahoditOd`. */
+    public static function znacka(): int
+    {
+        return self::$log === null ? 0 : count(self::$log);
+    }
+
+    /**
+     * Review P306: výpočet přerušený otázkou s vlastním mechanismem (Stand Firm) zahodí své události — z logu akce
+     * pryč i ony, jinak by je kouč u další otázky viděl, i když se nestaly.
+     */
+    public static function zahoditOd(int $znacka): void
+    {
+        if (self::$log !== null) {
+            self::$log = array_slice(self::$log, 0, $znacka);
+        }
+    }
+
     /**
      * P306 A1: výpočet nanečisto (odtlačení k vyhodnocení pasti, opakované vyhodnocení kontroly) — jeho události se
      * zahodí, do logu akce nepatří (kouč by je u otázky viděl, i když se nestaly).

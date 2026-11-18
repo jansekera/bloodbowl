@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\Enum\RollType;
 use App\DTO\ActionResult;
 use App\DTO\BallState;
 use App\DTO\GameEvent;
@@ -123,7 +124,7 @@ final class PassResolver
         if (!$accurate && !$this->safeThrowKeeps($thrower, $roll, $fumble)) {
             // Pass skill zdarma, jinak Pro -> týmový přehoz: ThrowReroll::reroll (společné s bombou a hodem hráčem;
             //   ⛔ OPRAVA 18.09.2026, r. 8381-8387, 926: Pro jen na nepřehozenou kostku, po Pro týmový přehoz jen hodu Pro).
-            $res = ThrowReroll::reroll($this->dice, $state, $thrower, $activeSide, true, $events, $this->coach, 'pass', $roll, $accuracyTarget, SkillName::Pass);
+            $res = ThrowReroll::reroll($this->dice, $state, $thrower, $activeSide, true, $events, $this->coach, RollType::PASS, $roll, $accuracyTarget, SkillName::Pass);
             $state = $res['state'];
             $thrower = $res['thrower'];
             if ($res['rerolled']) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\Enum\RollType;
 use App\DTO\PendingRerollDTO;
 use App\DTO\GameState;
 use App\DTO\ReplayContext;
@@ -18,7 +19,7 @@ final class RerollQuestion extends CoachQuestion
 {
     public function __construct(
         public readonly int $playerId,
-        public readonly string $rollType,
+        public readonly RollType $rollType,
         public readonly int $roll,
         public readonly int $target,
         public readonly bool $pro,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\Enum\RollType;
 use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
@@ -172,7 +173,7 @@ final class BallResolver
                 $teamRerollAvailable,
                 $events,
                 $this->coach,
-                'pickup',
+                RollType::PICKUP,
                 $roll,
                 $target,
                 $pos,
@@ -221,7 +222,7 @@ final class BallResolver
                 $teamRerollAvailable,
                 $events,
                 $this->coach,
-                'catch',
+                RollType::CATCH,
                 $roll,
                 $target,
                 $catcher->getPosition(),

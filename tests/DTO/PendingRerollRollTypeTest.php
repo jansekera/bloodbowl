@@ -17,14 +17,14 @@ use PHPUnit\Framework\TestCase;
  */
 final class PendingRerollRollTypeTest extends TestCase
 {
-    private static function otazka(string $druh): PendingRerollDTO
+    private static function otazka(RollType $druh): PendingRerollDTO
     {
         return new PendingRerollDTO($druh, 1, 4, 2, false, true, 6, 6, new ReplayContext(ActionType::MOVE, []));
     }
 
     public function testKlientDostanePopisekKategoriiANasledek(): void
     {
-        $a = self::otazka('dodge')->toArray();
+        $a = self::otazka(RollType::DODGE)->toArray();
 
         $this->assertSame(['Dodge', 'move'], [$a['label'], $a['category']]);
         $this->assertStringContainsString('falls', (string) $a['consequence']);
@@ -41,9 +41,12 @@ final class PendingRerollRollTypeTest extends TestCase
         $this->assertSame('move', RollType::LEAP_GFI->category());
     }
 
-    public function testNeznamyDruhHoduSpadneHned(): void
+    public function testNeznamyDruhHoduVUlozenemStavuSpadneHned(): void
     {
+        $data = self::otazka(RollType::DODGE)->toArray();
+        $data['rollType'] = 'neexistuje';
+
         $this->expectException(\ValueError::class);
-        self::otazka('neexistuje');
+        PendingRerollDTO::fromArray($data);
     }
 }

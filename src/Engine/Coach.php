@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\Enum\RollType;
 use App\DTO\GameState;
 use App\DTO\ReplayAnswers;
 use App\Enum\TeamSide;
@@ -104,7 +105,7 @@ final class Coach
     public function reroll(
         TeamSide $strana,
         int $playerId,
-        string $rollType,
+        RollType $rollType,
         int $roll,
         int $target,
         bool $pro,
@@ -114,7 +115,13 @@ final class Coach
         ?Position $kam = null,
     ): string {
         if (!$this->decides($strana)) {
-            // P306 A5: AI vždy přehazuje — Pro (dokud nepadl), jinak týmový přehoz (dřív druhá uzávěra v ThrowReroll)
+            // P306 A5: odpověď AI na jednom místě — Pro (dokud nepadl), jinak týmový přehoz (dřív druhá uzávěra
+            //   v ThrowReroll); kontroly velkých hráčů AI nepřehazuje (parita s C++ P130; review P306: dřív větev
+            //   v BigGuyCheckResolver)
+            if ($rollType->category() === 'big_guy') {
+                return 'decline';
+            }
+
             return ($pro && !$proFailed) ? 'pro' : 'team_reroll';
         }
         $a = array_shift($this->rerolls)

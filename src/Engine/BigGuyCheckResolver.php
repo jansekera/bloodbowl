@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\Enum\RollType;
 use App\DTO\ActionResult;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
@@ -50,8 +51,8 @@ final class BigGuyCheckResolver
      *   to nemela -- CTVRTY drift teze tridy.
      *
      * P294 krok 5e: neúspěch Bone Head / Really Stupid / Wild Animal kouč-člověk smí přehodit (ř. 929-931; Pro ř. 8381)
-     *   — otázka přehráním (`prehozKouce`); AI hody velkých hráčů nepřehazuje (parita s C++ P130). P306 A4 (18.11.2026):
-     *   rozhoduje se tady, dřív větev v `ActionResolver` nad klíčem `reroll` ve výsledku.
+     *   — otázka přehráním (`prehoz`); AI hody velkých hráčů nepřehazuje (parita s C++ P130) — odpověď AI dává
+     *   `Coach::reroll` (review P306). P306 A4: dřív větev v `ActionResolver` nad klíčem `reroll` ve výsledku.
      *
      * @return array{state: GameState, events: list<\App\DTO\GameEvent>, proceed?: bool, turnover?: bool, wastesTeamAction?: bool}|null
      */
@@ -66,12 +67,8 @@ final class BigGuyCheckResolver
             if (!isset($r['reroll'])) {
                 return $r;
             }
-            if ($this->coach->decides($player->getTeamSide())) {
-                return $this->prehozKouce($state, $player, $action, $r, $dice);
-            }
-            unset($r['reroll']);
 
-            return $r;
+            return $this->prehoz($state, $player, $action, $r, $dice);
         }
 
         // ⛔ OPRAVA 11.09.2026 (PHP15d): hod se hazel JEN NA `MOVE`.
@@ -103,7 +100,7 @@ final class BigGuyCheckResolver
      * `$zapsatUspech` (přehoz kouče, P294 5e): i povedený hod se zapíše do událostí (kouč chce vidět, co padlo);
      * AI povedenou kontrolu nezapisuje.
      *
-     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: RollType, target: int, roll: int}}|null
      */
     private function judgeRerollableCheck(GameState $state, MatchPlayerDTO $player, ActionType $action, int $roll, bool $zapsatUspech = false): ?array
     {
@@ -128,14 +125,14 @@ final class BigGuyCheckResolver
     /**
      * P294 krok 5e (přesunuto z `ActionResolver`, review P294 nález 4): neúspěch kontroly kouč-člověk smí přehodit
      * (ř. 929-931; Pro ř. 8381) — otázka přehráním (`Coach`, stav před hodem, hráč na svém poli); po přehozu se hod
-     * vyhodnotí znovu. Volá se jen pro kouče-člověka (`resolvePreActionCheck`).
+     * vyhodnotí znovu. Pro AI i člověka stejně — AI odmítne v `Coach::reroll` (review P306).
      * Vrací výsledek kontroly jako `judgeRerollableCheck` (vždy pole: povedený přehoz = `proceed`), s událostmi
      * neúspěchu, přehozu a nového hodu.
      *
-     * @param array{state: GameState, events: list<GameEvent>, reroll: array{type: string, target: int, roll: int}} $neuspech
-     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}
+     * @param array{state: GameState, events: list<GameEvent>, reroll: array{type: RollType, target: int, roll: int}} $neuspech
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: RollType, target: int, roll: int}}
      */
-    private function prehozKouce(GameState $state, MatchPlayerDTO $player, ActionType $action, array $neuspech, DiceRollerInterface $dice): array
+    private function prehoz(GameState $state, MatchPlayerDTO $player, ActionType $action, array $neuspech, DiceRollerInterface $dice): array
     {
         $kontrola = $neuspech['reroll'];
         $udalosti = $neuspech['events'];
@@ -144,6 +141,7 @@ final class BigGuyCheckResolver
             // platí původní hod; událost neúspěchu už je v `$udalosti` (u otázky) ⇒ události druhého vyhodnocení se
             //   zahodí, mimo log akce (P306 A1)
             $znovu = GameEvent::bezLogu(fn(): ?array => $this->judgeRerollableCheck($res['state'], $res['thrower'], $action, $kontrola['roll'])) ?? [];
+            unset($znovu['reroll']);
 
             return ['events' => $udalosti] + $znovu + ['state' => $res['state']];
         }
@@ -155,7 +153,7 @@ final class BigGuyCheckResolver
     /**
      * Bone-head: Roll D6, on 1 = lose action + lose tacklezones.
      *
-     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: RollType, target: int, roll: int}}|null
      */
     private function resolveBoneHead(
         GameState $state,
@@ -189,7 +187,7 @@ final class BigGuyCheckResolver
             'events' => [GameEvent::boneHeadFail($player->getId(), $roll)],
             // ⭐ viz `wastesTeamAction` niz
             'wastesTeamAction' => true,
-            'reroll' => ['type' => 'bone_head', 'target' => 2, 'roll' => $roll],
+            'reroll' => ['type' => RollType::BONE_HEAD, 'target' => 2, 'roll' => $roll],
         ];
     }
 
@@ -197,7 +195,7 @@ final class BigGuyCheckResolver
      * Really Stupid: Roll D6, need 2+ (adjacent ally) or 4+ (no ally).
      * On fail = lose action + lose tacklezones.
      *
-     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: RollType, target: int, roll: int}}|null
      */
     private function resolveReallyStupid(
         GameState $state,
@@ -229,7 +227,7 @@ final class BigGuyCheckResolver
                 'state' => $state,
                 'events' => [GameEvent::reallyStupidFail($player->getId(), $roll, $hasAdjacentAlly)],
                 'wastesTeamAction' => true,
-                'reroll' => ['type' => 'really_stupid', 'target' => $threshold, 'roll' => $roll],
+                'reroll' => ['type' => RollType::REALLY_STUPID, 'target' => $threshold, 'roll' => $roll],
             ];
         }
 
@@ -240,7 +238,7 @@ final class BigGuyCheckResolver
      * Wild Animal: Roll D6, on 1-2 = lose action (keeps tacklezones).
      * Block/Blitz = automatic success.
      *
-     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: RollType, target: int, roll: int}}|null
      */
     private function resolveWildAnimal(
         GameState $state,
@@ -286,7 +284,7 @@ final class BigGuyCheckResolver
                 'state' => $state,
                 'events' => [GameEvent::wildAnimalFail($player->getId(), $roll)],
                 'wastesTeamAction' => true,
-                'reroll' => ['type' => 'wild_animal', 'target' => $target, 'roll' => $roll],
+                'reroll' => ['type' => RollType::WILD_ANIMAL, 'target' => $target, 'roll' => $roll],
             ];
         }
 

@@ -70,7 +70,6 @@ export interface PendingReroll {
     targetY: number;
     /** Pro neprošel: týmový přehoz už jen hodu Pro (ř. 8385-8387) */
     proFailed?: boolean;
-    /** P294: stav je okamžik hodu (jen k zobrazení); server po odpovědi akci přehraje (P306 E1: přehrání klient nedostává) */
     /** P306 A7: popisek, kategorie a následek odmítnutí posílá server (`App\Enum\RollType`) */
     label: string;
     category: 'move' | 'ball' | 'big_guy' | 'throw';

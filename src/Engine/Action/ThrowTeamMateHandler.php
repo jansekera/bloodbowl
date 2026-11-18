@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine\Action;
 
+use App\Enum\RollType;
 use App\Engine\ThrowTarget;
 use App\DTO\ActionResult;
 use App\DTO\BallState;
@@ -100,7 +101,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             // P259 (review dávky 7.11.2026): napřed Pro, teprve pak týmový přehoz s Lonerem — jako C++ (attemptRoll);
             //   společný žebříček ThrowReroll (jeden hod = jeden přehoz, r. 925-927).
             if ($eaten) {
-                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events, $this->coach, 'always_hungry', $hungryRoll, 2);
+                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events, $this->coach, RollType::ALWAYS_HUNGRY, $hungryRoll, 2);
                 $state = $res['state'];
                 $thrower = $res['thrower'];
                 if ($res['rerolled']) {
@@ -161,7 +162,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         //   nepřesný (ř. 8609-8612), takže přehazuje se jen fumble — Pass, jinak Pro → týmový (Loner). Parita
         //   s C++ ttm_handler.cpp (rerollThrow).
         if ($fumble) {
-            $res = ThrowReroll::reroll($this->dice, $state, $thrower, $activeSide, true, $events, $this->coach, 'ttm', $roll, max(2, 2 - $modifikator), SkillName::Pass);
+            $res = ThrowReroll::reroll($this->dice, $state, $thrower, $activeSide, true, $events, $this->coach, RollType::TTM, $roll, max(2, 2 - $modifikator), SkillName::Pass);
             $state = $res['state'];
             $thrower = $res['thrower'];
             $prehozeno = $res['rerolled'];
@@ -324,7 +325,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, $landingSuccess);
             if (!$landingSuccess) {
                 $id = $projectile->getId();
-                $res = ThrowReroll::prehoditNaCil($this->dice, $state, $projectile, true, $events, $this->coach, 'ttm_landing', $landingRoll, $landingTarget, udalost: static fn(int $r, bool $ok): GameEvent => GameEvent::ttmLanding($id, $r, $ok));
+                $res = ThrowReroll::prehoditNaCil($this->dice, $state, $projectile, true, $events, $this->coach, RollType::TTM_LANDING, $landingRoll, $landingTarget, udalost: static fn(int $r, bool $ok): GameEvent => GameEvent::ttmLanding($id, $r, $ok));
                 $state = $res['state'];
                 $projectile = $res['thrower'];
                 $landingSuccess = $res['ok'];

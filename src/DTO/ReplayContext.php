@@ -58,7 +58,7 @@ final class ReplayContext
             array_values(array_map('intval', (array) ($data['dice'] ?? []))),
             ReplayAnswers::fromArray((array) ($data['answers'] ?? [])),
             isset($data['base']) ? GameState::fromArray((array) $data['base']) : null,
-            (int) ($data['shown'] ?? 0),
+            is_int($data['shown'] ?? 0) ? ($data['shown'] ?? 0) : throw new \InvalidArgumentException('replay.shown: čeká se počet (P306 A2)'),
         );
     }
 }

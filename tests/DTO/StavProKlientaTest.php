@@ -8,6 +8,7 @@ use App\DTO\GameState;
 use App\DTO\PendingRerollDTO;
 use App\DTO\ReplayContext;
 use App\Enum\ActionType;
+use App\Enum\RollType;
 use App\Tests\Engine\GameStateBuilder;
 use PHPUnit\Framework\TestCase;
 
@@ -21,7 +22,7 @@ final class StavProKlientaTest extends TestCase
     {
         $s = (new GameStateBuilder())->build();
 
-        return $s->withPendingReroll(new PendingRerollDTO('dodge', 1, 4, 2, false, true, 6, 6, new ReplayContext(ActionType::MOVE, ['playerId' => 1], [2], base: $s)));
+        return $s->withPendingReroll(new PendingRerollDTO(RollType::DODGE, 1, 4, 2, false, true, 6, 6, new ReplayContext(ActionType::MOVE, ['playerId' => 1], [2], base: $s)));
     }
 
     public function testKlientPrehraniNedostane(): void

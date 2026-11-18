@@ -7,8 +7,7 @@ import { escapeHtml } from './escapeHtml';
  */
 function situation(pending: PendingReroll, from: Position | null): string {
     const nasledek = pending.consequence !== null ? `<div class="reroll-modal__info">${escapeHtml(pending.consequence)}</div>` : '';
-    if (pending.category === 'big_guy') return nasledek;
-    if (pending.category === 'throw') return '';
+    if (pending.category === 'big_guy' || pending.category === 'throw') return nasledek;   // bez pole na hřišti
     // pohyb: odkud kam; míč a GFI, kterým se v blitzu platí rána (hráč se nehýbe), jen pole (P294 /simplify dávka 3)
     const naMiste = pending.category === 'ball' || (from !== null && from.x === pending.targetX && from.y === pending.targetY);
     const pole = naMiste ? `at (${pending.targetX}, ${pending.targetY})`

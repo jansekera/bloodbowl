@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine\Action;
 
+use App\Enum\RollType;
 use App\DTO\ActionResult;
 use App\DTO\BallState;
 use App\DTO\GameEvent;
@@ -182,7 +183,7 @@ final class MoveHandler implements ActionHandlerInterface
                     $success = $this->prehoz(
                         $currentState,
                         $currentPlayer,
-                        'leap',
+                        RollType::LEAP,
                         $leapTarget,
                         $roll,
                         $to,
@@ -269,7 +270,7 @@ final class MoveHandler implements ActionHandlerInterface
                         $success = $this->prehoz(
                             $currentState,
                             $currentPlayer,
-                            'dodge',
+                            RollType::DODGE,
                             $target,
                             $roll,
                             $to,
@@ -339,7 +340,7 @@ final class MoveHandler implements ActionHandlerInterface
                     $success = $this->prehoz(
                         $currentState,
                         $currentPlayer,
-                        'gfi',
+                        RollType::GFI,
                         $gfiThreshold,
                         $roll,
                         $to,
@@ -514,7 +515,7 @@ final class MoveHandler implements ActionHandlerInterface
                 $success = $this->prehoz(
                     $state,
                     $hrac,
-                    'leap_gfi',
+                    RollType::LEAP_GFI,
                     $gfiCil,
                     $roll,
                     $to,
@@ -564,7 +565,7 @@ final class MoveHandler implements ActionHandlerInterface
     private function prehoz(
         GameState &$state,
         MatchPlayerDTO &$hrac,
-        string $druh,
+        RollType $druh,
         int $cil,
         int $hod,
         Position $kam,

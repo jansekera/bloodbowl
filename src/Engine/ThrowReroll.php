@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\Enum\RollType;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
@@ -50,7 +51,7 @@ final class ThrowReroll
         bool $teamAllowed,
         array &$events,
         Coach $kouc,
-        string $druh,
+        RollType $druh,
         int $hod,
         int $cil,
         ?Position $kam = null,
@@ -80,7 +81,7 @@ final class ThrowReroll
         bool $teamAllowed,
         array &$events,
         Coach $kouc,
-        string $druh,
+        RollType $druh,
         int $hod,
         int $cil,
         ?SkillName $skillZdarma = null,
@@ -112,7 +113,7 @@ final class ThrowReroll
         bool $teamAllowed,
         array &$events,
         Coach $kouc,
-        string $druh,
+        RollType $druh,
         int $hod,
         int $cil,
         ?Position $kam = null,

@@ -258,11 +258,12 @@ final class ActionResolver
     {
         // P294 krok 5a: zobrazený stav může být okamžik otázky ⇒ přehrává se z výchozího stavu akce
         $zaklad = $replay->base ?? $state;
+        GameEvent::zacitLog();   // napřed: když selže (vnoření), kouč ani kostky ještě nejsou v režimu přehrání (review P306)
         $this->replayDice->begin($replay->dice);
         $this->coach->begin($replay->answers);
-        GameEvent::zacitLog();
         try {
             $r = $this->resolveJednou($zaklad, $replay->action, $replay->params);
+            $this->zahozene = self::zahozene(GameEvent::log(), $r->getEvents());
 
             return new ActionResult($r->getNewState(), $r->isSuccess(), $r->isTurnover(), self::bezUkazanych($r->getEvents(), $replay->shown));
         } catch (CoachQuestion $q) {
@@ -275,6 +276,37 @@ final class ActionResolver
             GameEvent::ukoncitLog();
             $this->coach->end();
         }
+    }
+
+    /** @var list<GameEvent> review P306: události poslední akce, které vznikly, ale ve výsledku nejsou */
+    private array $zahozene = [];
+
+    /**
+     * Review P306 — pojistka logu akce: otázka kouči ukazuje log podle vzniku, takže výpočet nanečisto mimo
+     * `GameEvent::bezLogu` (nebo přerušený bez `zahoditOd`) by kouči ukázal událost, která se nestala. Testy tím
+     * hlídají místa, kde se počítá nanečisto (`LogAkceTest`).
+     *
+     * @internal jen pro testy
+     * @return list<GameEvent>
+     */
+    public function zahozeneUdalostiPosledniAkce(): array
+    {
+        return $this->zahozene;
+    }
+
+    /**
+     * @param list<GameEvent> $log
+     * @param list<GameEvent> $vysledek
+     * @return list<GameEvent>
+     */
+    private static function zahozene(array $log, array $vysledek): array
+    {
+        $ve = [];
+        foreach ($vysledek as $e) {
+            $ve[spl_object_id($e)] = true;
+        }
+
+        return array_values(array_filter($log, static fn(GameEvent $e): bool => !isset($ve[spl_object_id($e)])));
     }
 
     /**

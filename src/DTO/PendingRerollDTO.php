@@ -17,7 +17,7 @@ use App\Enum\RollType;
 final class PendingRerollDTO
 {
     public function __construct(
-        private readonly string $rollType,
+        private readonly RollType $rollType,
         private readonly int $playerId,
         private readonly int $target,
         private readonly int $roll,
@@ -29,13 +29,11 @@ final class PendingRerollDTO
         // ⭐ 18.09.2026: hod Pro padl 1-3 => puvodni vysledek plati a tymovy
         //   prehoz smi prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
         private readonly bool $proFailed = false,
-    ) {
-        RollType::from($rollType);   // P306 A7: neznámý druh hodu spadne tady, ne až ve webu
-    }
+    ) {}
 
     public function getRollType(): string
     {
-        return $this->rollType;
+        return $this->rollType->value;
     }
     public function getPlayerId(): int
     {
@@ -94,14 +92,15 @@ final class PendingRerollDTO
     }
 
     /**
+     * @param bool $sPrehranim false = pro klienta (P306 E1: přehrání potřebuje jen server)
      * @return array<string, mixed>
      */
-    public function toArray(): array
+    public function toArray(bool $sPrehranim = true): array
     {
-        $druh = RollType::from($this->rollType);
+        $druh = $this->rollType;
 
-        return [
-            'rollType' => $this->rollType,
+        $a = [
+            'rollType' => $this->rollType->value,
             // P306 A7: popisek, kategorie a následek odmítnutí z jednoho místa (`RollType`), web je jen vykreslí
             'label' => $druh->label(),
             'category' => $druh->category(),
@@ -114,8 +113,12 @@ final class PendingRerollDTO
             'targetX' => $this->targetX,
             'targetY' => $this->targetY,
             'proFailed' => $this->proFailed,
-            'replay' => $this->replay->toArray(),
         ];
+        if ($sPrehranim) {
+            $a['replay'] = $this->replay->toArray();
+        }
+
+        return $a;
     }
 
     /**
@@ -124,7 +127,7 @@ final class PendingRerollDTO
     public static function fromArray(array $data): self
     {
         return new self(
-            rollType: (string) $data['rollType'],
+            rollType: RollType::from((string) $data['rollType']),   // neznámý druh hodu spadne tady (P306 A7)
             playerId: (int) $data['playerId'],
             target: (int) $data['target'],
             roll: (int) $data['roll'],

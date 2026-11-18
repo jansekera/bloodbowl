@@ -59,17 +59,24 @@ final class PendingRefereeDTO
         return $this->queue;
     }
 
-    /** @return array<string, mixed> */
-    public function toArray(): array
+    /**
+     * @param bool $sPrehranim false = pro klienta (P306 E1: přehrání potřebuje jen server)
+     * @return array<string, mixed>
+     */
+    public function toArray(bool $sPrehranim = true): array
     {
-        return [
+        $a = [
             'playerId' => $this->playerId,
             'foul' => $this->foul,
             'canBribe' => $this->canBribe,
             'canArgue' => $this->canArgue,
-            'replay' => $this->replay?->toArray(),
             'queue' => $this->queue,
         ];
+        if ($sPrehranim) {
+            $a['replay'] = $this->replay?->toArray();
+        }
+
+        return $a;
     }
 
     /** @param array<string, mixed> $data */

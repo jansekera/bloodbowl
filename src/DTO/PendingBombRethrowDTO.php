@@ -59,15 +59,22 @@ final class PendingBombRethrowDTO
         return false;
     }
 
-    /** @return array<string, mixed> */
-    public function toArray(): array
+    /**
+     * @param bool $sPrehranim false = pro klienta (P306 E1: přehrání potřebuje jen server)
+     * @return array<string, mixed>
+     */
+    public function toArray(bool $sPrehranim = true): array
     {
-        return [
+        $a = [
             'playerId' => $this->playerId,
             'targets' => $this->targets,
             'suggested' => $this->suggested,
-            'replay' => $this->replay->toArray(),
         ];
+        if ($sPrehranim) {
+            $a['replay'] = $this->replay->toArray();
+        }
+
+        return $a;
     }
 
     /** @param array<string, mixed> $data */

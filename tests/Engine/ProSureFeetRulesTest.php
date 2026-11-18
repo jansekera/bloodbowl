@@ -524,7 +524,7 @@ final class ProSureFeetRulesTest extends TestCase
         $p = $s->requirePlayer(1)->withSureFeetUsedThisTurn(true);
         $this->assertTrue(MatchPlayerDTO::fromArray($p->toArray())->isSureFeetUsedThisTurn());
 
-        $rr = new PendingRerollDTO('dodge', 1, 3, 2, false, true, 5, 6, new \App\DTO\ReplayContext(\App\Enum\ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6], answers: new \App\DTO\ReplayAnswers()), proFailed: true);
+        $rr = new PendingRerollDTO(\App\Enum\RollType::DODGE, 1, 3, 2, false, true, 5, 6, new \App\DTO\ReplayContext(\App\Enum\ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6], answers: new \App\DTO\ReplayAnswers()), proFailed: true);
         $this->assertTrue(PendingRerollDTO::fromArray($rr->toArray())->isProFailed());
 
         $pb = (new PendingBlockDTO(1, 2, [BlockDiceFace::PUSHED], true, false, false, true, true))->withProFailed();

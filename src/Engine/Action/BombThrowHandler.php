@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine\Action;
 
+use App\Enum\RollType;
 use App\DTO\ActionResult;
 use App\DTO\BallState;
 use App\DTO\GameEvent;
@@ -149,7 +150,7 @@ final class BombThrowHandler implements ActionHandlerInterface
                 !$thrower->hasSkill(SkillName::Loner) && $thrower->getTeamSide() === $activeSide,
                 $events,
                 $this->coach,
-                'bomb',
+                RollType::BOMB,
                 $roll,
                 max(2, 2 - $modifier),
                 SkillName::Pass,

@@ -8,6 +8,7 @@ use App\DTO\GameEvent;
 use App\Engine\ActionResolver;
 use App\Engine\FixedDiceRoller;
 use App\Enum\ActionType;
+use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use PHPUnit\Framework\TestCase;
 
@@ -92,5 +93,55 @@ final class LogAkceTest extends TestCase
         } finally {
             GameEvent::ukoncitLog();
         }
+    }
+
+    /**
+     * Review P306 — pojistka: nic, co vzniklo nanečisto nebo v rozpracovaném výpočtu přerušeném vlastní otázkou,
+     * nezůstane v logu akce (kouč by to u další otázky viděl). Místa, kde se dnes počítá nanečisto: otázka na
+     * Stand Firm (zahoditOd), past na Frenzy (odtlačení nanečisto, bezLogu), Bone Head po odmítnutém přehozu (bezLogu).
+     */
+    public function testOtazkaNaStandFirmNenechaVLoguRozpracovanyBlok(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $r = new ActionResolver(new FixedDiceRoller([3, 3, 3]));
+        $r->setInteractiveBlocks(true);
+        $r->setHumanSides([TeamSide::HOME, TeamSide::AWAY]);
+        $hod = $r->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
+        $v = $r->resolve($hod, ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);
+
+        $this->assertNotNull($v->getNewState()->getPendingStandFirm(), 'fixtura: otázka na Stand Firm');
+        $this->assertSame([], $r->zahozeneUdalostiPosledniAkce());
+    }
+
+    public function testPastNaFrenzyNanecistoNeniVLogu(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::Frenzy], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, skills: [SkillName::StandFirm, SkillName::Fend], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $r = new ActionResolver(new FixedDiceRoller([3, 3, 3, 3, 3, 3]));
+        $r->setInteractiveBlocks(true);
+        $hod = $r->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
+        $r->resolve($hod, ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);
+
+        $this->assertSame([], $r->zahozeneUdalostiPosledniAkce());
+    }
+
+    public function testBoneHeadPoOdmitnutemPrehozuNeniVLoguDvakrat(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::BoneHead], id: 1)
+            ->withBallOffPitch()
+            ->build();
+        $q = $this->kouc([1])->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
+        $r = $this->kouc([1]);
+        $r->resolve($q->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'decline']);
+
+        $this->assertSame([], $r->zahozeneUdalostiPosledniAkce());
     }
 }
