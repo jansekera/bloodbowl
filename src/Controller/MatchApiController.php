@@ -34,7 +34,7 @@ final class MatchApiController
             );
 
             $this->json([
-                'data' => $gameState->toArray(),
+                'data' => $gameState->toClientArray(),
                 '_links' => [
                     'self' => ['href' => "/api/v1/matches/{$gameState->getMatchId()}"],
                     'state' => ['href' => "/api/v1/matches/{$gameState->getMatchId()}/state"],
@@ -56,7 +56,7 @@ final class MatchApiController
             $state = $this->matchService->getGameState($matchId);
 
             $this->json([
-                'data' => $state->toArray(),
+                'data' => $state->toClientArray(),
                 '_links' => [
                     'self' => ['href' => "/api/v1/matches/{$matchId}/state"],
                     'actions' => ['href' => "/api/v1/matches/{$matchId}/actions", 'method' => 'POST'],
@@ -87,7 +87,7 @@ final class MatchApiController
 
             $this->json([
                 'data' => $result->toArray(),
-                'state' => $result->getNewState()->toArray(),
+                'state' => $result->getNewState()->toClientArray(),
                 '_links' => [
                     'state' => ['href' => "/api/v1/matches/{$matchId}/state"],
                     'actions' => ['href' => "/api/v1/matches/{$matchId}/actions", 'method' => 'POST'],

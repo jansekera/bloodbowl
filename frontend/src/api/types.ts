@@ -70,8 +70,7 @@ export interface PendingReroll {
     targetY: number;
     /** Pro neprošel: týmový přehoz už jen hodu Pro (ř. 8385-8387) */
     proFailed?: boolean;
-    /** P294: stav je okamžik hodu (jen k zobrazení); server po odpovědi akci přehraje */
-    replay: ReplayContext;
+    /** P294: stav je okamžik hodu (jen k zobrazení); server po odpovědi akci přehraje (P306 E1: přehrání klient nedostává) */
     /** P306 A7: popisek, kategorie a následek odmítnutí posílá server (`App\Enum\RollType`) */
     label: string;
     category: 'move' | 'ball' | 'big_guy' | 'throw';
@@ -118,45 +117,26 @@ export interface PendingStandFirm {
     pushToDependsOn?: number[];
 }
 
-/** P292: odpovědi kouče z dřívějších přerušení téže akce (všechny druhy otázek) */
-export interface ReplayAnswers {
-    divingCatch: boolean[];
-    bombTargets: { x: number; y: number }[];
-    referee: Array<{ bribe: boolean; argue: boolean }>;
-    rerolls: string[];
-}
-
-/** P294 krok 4: přehrání přerušené akce (akce, parametry, dosud padlé hody, odpovědi kouče) */
-export interface ReplayContext {
-    action: string;
-    params: Record<string, unknown>;
-    dice: number[];
-    answers: ReplayAnswers;
-}
-
 /**
  * P291: rozhodčí vylučuje hráče kouče-člověka — úplatek / protest? U faulu (`foul`) je stav okamžik otázky (jen
- * k zobrazení) a server akci po odpovědi přehraje; u tajné zbraně na konci drive (`replay` null) čekají další hráči ve frontě `queue`.
+ * k zobrazení) a server akci po odpovědi přehraje; u tajné zbraně na konci drive čekají další hráči ve frontě `queue`.
  */
 export interface PendingReferee {
     playerId: number;
     foul: boolean;
     canBribe: boolean;
     canArgue: boolean;
-    /** null = tajná zbraň na konci drive (odpověď hned) */
-    replay: ReplayContext | null;
     queue: number[];
 }
 
 /**
  * 30.10.2026: kouč-člověk volí, jestli jeho hráč použije Diving Catch (`rules_bb2016.txt` ř. 8065-8071).
- * Stav je okamžik otázky (rozpracovaná akce, jen k zobrazení); po odpovědi ji server přehraje (`replay`).
+ * Stav je okamžik otázky (rozpracovaná akce, jen k zobrazení); po odpovědi ji server přehraje.
  */
 export interface PendingDivingCatch {
     playerId: number;
     /** prázdné pole v jeho tackle zóně, kam míč dopadá */
     landing: { x: number; y: number };
-    replay: ReplayContext;
     /** varianta B (30.10.2026): počet DALŠÍCH hráčů s Diving Catch v dosahu dopadu */
     otherCandidates: number;
     /** hráč, který už se pokouší (null = nikdo); dva pokusy se ruší (ř. 8069-8071) */
@@ -173,7 +153,6 @@ export interface PendingBombRethrow {
     targets: PassTarget[];
     /** pole, které by zvolil engine */
     suggested: { x: number; y: number } | null;
-    replay: ReplayContext;
 }
 
 /** Full game state sent from the server */

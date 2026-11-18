@@ -32,7 +32,7 @@ function mockElement() {
 
 const dodge: PendingReroll = {
     rollType: 'dodge', playerId: 1, target: 4, roll: 2, proAvailable: false, teamRerollAvailable: true,
-    targetX: 6, targetY: 6, replay: { action: 'move', params: {}, dice: [2], answers: {} as PendingReroll['replay']['answers'] },
+    targetX: 6, targetY: 6,
     // P306 A7: popisek, kategorii a následek posílá server (`App\Enum\RollType`)
     label: 'Dodge', category: 'move', consequence: 'Accept Failure = the player falls (armour roll) and the turn ends.',
 };

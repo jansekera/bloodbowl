@@ -565,6 +565,25 @@ final class GameState
     }
 
     /**
+     * P306 E1 (18.11.2026): stav pro klienta — bez `replay` u čekajících otázek. Přehrání (stav před akcí, padlé hody,
+     * odpovědi) potřebuje jen server a drží ho uložený stav (`toArray`); klient z něj nic nečte a s `base` šel celý
+     * stav hry podruhé.
+     *
+     * @return array<string, mixed>
+     */
+    public function toClientArray(): array
+    {
+        $a = $this->toArray();
+        foreach (['pendingReroll', 'pendingDivingCatch', 'pendingBombRethrow', 'pendingReferee'] as $k) {
+            if (is_array($a[$k] ?? null)) {
+                unset($a[$k]['replay']);
+            }
+        }
+
+        return $a;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array
