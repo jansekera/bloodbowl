@@ -137,8 +137,14 @@ final class BigGuyCheckResolver
         $kontrola = $neuspech['reroll'];
         $udalosti = $neuspech['events'];
         $res = ThrowReroll::proThenTeam($dice, $state, $player, $player->getTeamSide(), true, $udalosti, $this->coach, $kontrola['type'], $kontrola['roll'], $kontrola['target'], $player->getPosition());
+        if (!$res['rerolled'] && $res['state'] === $state) {
+            // nic se neutratilo (AI, kouč odmítl, není čím) ⇒ platí původní vyhodnocení beze změny (/simplify P306)
+            unset($neuspech['reroll']);
+
+            return $neuspech;
+        }
         if (!$res['rerolled']) {
-            // platí původní hod; událost neúspěchu už je v `$udalosti` (u otázky) ⇒ události druhého vyhodnocení se
+            // Pro nevyšel (stav se změnil): platí původní hod; událost neúspěchu už je v `$udalosti` (u otázky) ⇒ události druhého vyhodnocení se
             //   zahodí, mimo log akce (P306 A1)
             $znovu = GameEvent::bezLogu(fn(): ?array => $this->judgeRerollableCheck($res['state'], $res['thrower'], $action, $kontrola['roll'])) ?? [];
             unset($znovu['reroll']);

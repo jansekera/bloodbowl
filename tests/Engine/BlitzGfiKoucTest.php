@@ -43,7 +43,7 @@ final class BlitzGfiKoucTest extends TestCase
 
         $q = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($q, 'kouč dostane otázku');
-        $this->assertSame('gfi', $q->getRollType());
+        $this->assertSame('gfi', $q->getRollType()->value);
         $this->assertSame([5, 5], [$q->getTargetX(), $q->getTargetY()]);
         $this->assertFalse($r->isTurnover(), 'pád ještě neplatí');
     }

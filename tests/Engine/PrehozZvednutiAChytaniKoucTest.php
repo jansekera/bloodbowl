@@ -40,7 +40,7 @@ final class PrehozZvednutiAChytaniKoucTest extends TestCase
 
         $q = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($q, 'kouč dostane otázku');
-        $this->assertSame('pickup', $q->getRollType());
+        $this->assertSame('pickup', $q->getRollType()->value);
         $this->assertSame([6, 5], [$q->getTargetX(), $q->getTargetY()]);
         $this->assertSame(6, $r->getNewState()->requirePlayer(1)->requirePosition()->getX(), 'u otázky stojí na míči');
         $this->assertFalse($r->isTurnover(), 'neúspěch ještě neplatí');
@@ -89,7 +89,7 @@ final class PrehozZvednutiAChytaniKoucTest extends TestCase
 
         $q = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($q);
-        $this->assertSame('catch', $q->getRollType());
+        $this->assertSame('catch', $q->getRollType()->value);
         $this->assertSame([6, 5], [$q->getTargetX(), $q->getTargetY()]);
 
         $r2 = $this->kouc([6])->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);

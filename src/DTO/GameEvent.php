@@ -13,6 +13,10 @@ final class GameEvent
      * Otázka kouči uprostřed akce vezme log, jak stojí — i události volající akce, které otázka položená hlouběji
      * (chytání odrazu v `BallResolver`) nezná; dřív je ručně přidával obal `CoachQuestion::sPredchozimi` na 8 místech.
      *
+     * ⛔ Kontrakt (/simplify P306): vytvořit událost = stalo se to. Událost, která se možná nezapíše, vytvářet líně
+     * (uzávěrou), výpočet nanečisto obalit `bezLogu`, výpočet přerušený vlastní otázkou `zahoditPri`. Testy to hlídají
+     * u každé akce (`ActionResolver::hlidatLog`).
+     *
      * @var list<self>|null
      */
     private static ?array $log = null;
@@ -59,20 +63,26 @@ final class GameEvent
         self::$log = null;
     }
 
-    /** Kolik událostí log akce zatím má (0 mimo akci) — značka pro `zahoditOd`. */
-    public static function znacka(): int
-    {
-        return self::$log === null ? 0 : count(self::$log);
-    }
-
     /**
-     * Review P306: výpočet přerušený otázkou s vlastním mechanismem (Stand Firm) zahodí své události — z logu akce
-     * pryč i ony, jinak by je kouč u další otázky viděl, i když se nestaly.
+     * Review P306: výpočet přerušený otázkou s vlastním mechanismem (Stand Firm, výjimka `$preruseni`) zahodí své
+     * události — z logu akce pryč i ony, jinak by je kouč u další otázky viděl, i když se nestaly. Jiné výjimky
+     * (otázka kouči přehráním) log nechají: kouč u ní má vidět průběh.
+     *
+     * @template T
+     * @param class-string<\Throwable> $preruseni
+     * @param \Closure(): T $fn
+     * @return T
      */
-    public static function zahoditOd(int $znacka): void
+    public static function zahoditPri(string $preruseni, \Closure $fn): mixed
     {
-        if (self::$log !== null) {
-            self::$log = array_slice(self::$log, 0, $znacka);
+        $znacka = self::$log === null ? 0 : count(self::$log);
+        try {
+            return $fn();
+        } catch (\Throwable $e) {
+            if ($e instanceof $preruseni && self::$log !== null) {
+                self::$log = array_slice(self::$log, 0, $znacka);
+            }
+            throw $e;
         }
     }
 

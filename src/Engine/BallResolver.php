@@ -351,7 +351,7 @@ final class BallResolver
             $events[] = GameEvent::divingCatch($catcher->getId());
         }
         $side = $catcher->getTeamSide();
-        // review P294 nález 1: otázka na přehoz chytání nese i událost skoku (Diving Catch)
+        // Diving Catch (výše) je v logu akce dřív než hod na chycení ⇒ otázka na přehoz chytání ho ukáže (P306 A1)
         $catchResult = $this->resolveCatch(
             $state,
             $catcher,

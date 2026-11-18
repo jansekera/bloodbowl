@@ -32,6 +32,7 @@ final class StavProKlientaTest extends TestCase
         $this->assertIsArray($klient['pendingReroll']);
         $this->assertArrayNotHasKey('replay', $klient['pendingReroll']);
         $this->assertSame('dodge', $klient['pendingReroll']['rollType'], 'otázku samotnou klient dostane');
+        $this->assertSame('move', $klient['pendingReroll']['category'], 'i s popisem pro dialog');
     }
 
     public function testUlozenyStavPrehraniDrziAOtazkaJdePrehrat(): void
@@ -39,5 +40,6 @@ final class StavProKlientaTest extends TestCase
         $ulozeny = GameState::fromArray(json_decode((string) json_encode(self::sOtazkou()->toArray()), true));
 
         $this->assertSame([2], $ulozeny->getPendingReroll()?->getReplay()->dice);
+        $this->assertArrayNotHasKey('label', self::sOtazkou()->toArray()['pendingReroll'], 'texty pro dialog se neukládají');
     }
 }

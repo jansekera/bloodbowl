@@ -7,9 +7,7 @@ namespace App\DTO;
 use App\Enum\RollType;
 
 /**
- * Otázka kouči-člověku na přehoz nepovedeného hodu: pohyb (`dodge`, `gfi`, `leap`, `leap_gfi`), míč (`pickup`,
- * `catch`), velcí hráči (`bone_head`, `really_stupid`, `wild_animal`), hody (`pass`, `bomb`, `ttm`, `ttm_landing`,
- * `always_hungry`, `jump_up`).
+ * Otázka kouči-člověku na přehoz nepovedeného hodu (druhy a jejich kategorie: `RollType`).
  *
  * P294 krok 5f (17.11.2026): jediný způsob je přehrání akce (`replay`: akce, zapsané hody, odpovědi + nová; jako
  * Diving Catch) — dialog uprostřed akce s ručním pokračováním (`resumeAction`, `gfiRemaining`, `RerollHandler`) smazán.
@@ -31,9 +29,9 @@ final class PendingRerollDTO
         private readonly bool $proFailed = false,
     ) {}
 
-    public function getRollType(): string
+    public function getRollType(): RollType
     {
-        return $this->rollType->value;
+        return $this->rollType;
     }
     public function getPlayerId(): int
     {
@@ -97,14 +95,8 @@ final class PendingRerollDTO
      */
     public function toArray(bool $sPrehranim = true): array
     {
-        $druh = $this->rollType;
-
-        $a = [
+        return [
             'rollType' => $this->rollType->value,
-            // P306 A7: popisek, kategorie a následek odmítnutí z jednoho místa (`RollType`), web je jen vykreslí
-            'label' => $druh->label(),
-            'category' => $druh->category(),
-            'consequence' => $druh->consequence(),
             'playerId' => $this->playerId,
             'target' => $this->target,
             'roll' => $this->roll,
@@ -113,12 +105,13 @@ final class PendingRerollDTO
             'targetX' => $this->targetX,
             'targetY' => $this->targetY,
             'proFailed' => $this->proFailed,
-        ];
-        if ($sPrehranim) {
-            $a['replay'] = $this->replay->toArray();
-        }
-
-        return $a;
+        ] + ($sPrehranim ? ['replay' => $this->replay->toArray()] : [
+            // P306 A7: popisek, kategorie a následek odmítnutí z jednoho místa (`RollType`), web je jen vykreslí;
+            //   do uloženého stavu nejdou (/simplify P306)
+            'label' => $this->rollType->label(),
+            'category' => $this->rollType->category()->value,
+            'consequence' => $this->rollType->consequence(),
+        ]);
     }
 
     /**

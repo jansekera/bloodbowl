@@ -54,8 +54,8 @@ final class RefereeCall
     /**
      * @param list<GameEvent> $events
      * @param array{bribe: bool, argue: bool}|null $volba hotová volba kouče-člověka (tajná zbraň, P291)
-     * @param Coach|null $kouc zeptá se ho tady, je-li jeho tým kouče-člověka a je co volit (faul, P294 krok 6);
-     *                         jinak AI (použije, co jde)
+     * @param Coach|null $kouc rozhodne, je-li co volit (faul, P294 krok 6): kouče-člověka se zeptá, za AI použije, co
+     *                         jde (`Coach::referee`); bez kouče také použije, co jde
      * @return array{state: GameState, outcome: string}
      */
     public static function sendOff(

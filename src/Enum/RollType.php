@@ -48,15 +48,14 @@ enum RollType: string
         };
     }
 
-    /** Co web ukáže na hřišti: pohyb = odkud kam, míč = pole hodu, velký hráč a hod = nic navíc. */
-    public function category(): string
+    public function category(): RollCategory
     {
         return match ($this) {
-            self::DODGE, self::GFI, self::LEAP, self::LEAP_GFI => 'move',
-            self::PICKUP, self::CATCH => 'ball',
-            self::BONE_HEAD, self::REALLY_STUPID, self::WILD_ANIMAL => 'big_guy',
+            self::DODGE, self::GFI, self::LEAP, self::LEAP_GFI => RollCategory::MOVE,
+            self::PICKUP, self::CATCH => RollCategory::BALL,
+            self::BONE_HEAD, self::REALLY_STUPID, self::WILD_ANIMAL => RollCategory::BIG_GUY,
             // bez `default` (review P306): nový druh hodu musí dostat kategorii vědomě
-            self::PASS, self::BOMB, self::TTM, self::TTM_LANDING, self::ALWAYS_HUNGRY, self::JUMP_UP => 'throw',
+            self::PASS, self::BOMB, self::TTM, self::TTM_LANDING, self::ALWAYS_HUNGRY, self::JUMP_UP => RollCategory::THROW,
         };
     }
 

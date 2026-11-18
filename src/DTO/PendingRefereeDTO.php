@@ -65,18 +65,13 @@ final class PendingRefereeDTO
      */
     public function toArray(bool $sPrehranim = true): array
     {
-        $a = [
+        return [
             'playerId' => $this->playerId,
             'foul' => $this->foul,
             'canBribe' => $this->canBribe,
             'canArgue' => $this->canArgue,
             'queue' => $this->queue,
-        ];
-        if ($sPrehranim) {
-            $a['replay'] = $this->replay?->toArray();
-        }
-
-        return $a;
+        ] + ($sPrehranim ? ['replay' => $this->replay?->toArray()] : []);
     }
 
     /** @param array<string, mixed> $data */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\Enum\RollCategory;
 use App\Enum\RollType;
 use App\DTO\GameState;
 use App\DTO\ReplayAnswers;
@@ -118,7 +119,7 @@ final class Coach
             // P306 A5: odpověď AI na jednom místě — Pro (dokud nepadl), jinak týmový přehoz (dřív druhá uzávěra
             //   v ThrowReroll); kontroly velkých hráčů AI nepřehazuje (parita s C++ P130; review P306: dřív větev
             //   v BigGuyCheckResolver)
-            if ($rollType->category() === 'big_guy') {
+            if ($rollType->category() === RollCategory::BIG_GUY) {
                 return 'decline';
             }
 

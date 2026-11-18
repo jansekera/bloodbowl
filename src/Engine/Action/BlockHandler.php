@@ -113,7 +113,6 @@ final class BlockHandler implements ActionHandlerInterface
         $this->ptatSeNaGrab = $ptatSe;
     }
 
-
     /**
      * @var array<int, bool>|null P226: odpovědi kouče v právě vyhodnocovaném bloku (id => použije
      *   Stand Firm). null = neptat se (Ball & Chain, Multiple Block, odtlačení nanečisto).
@@ -344,12 +343,10 @@ final class BlockHandler implements ActionHandlerInterface
         //   blok i B&C na ležícího volají tuhle metodu každý zvlášť).
         $puvodni = $this->standFirmOdpovedi;
         $this->standFirmOdpovedi = $odpovedi;
-        $znacka = GameEvent::znacka();
         try {
-            return [$fn(), null];
+            // review P306: rozpracovaný blok se zahodí i z logu akce
+            return [GameEvent::zahoditPri(StandFirmQuestion::class, \Closure::fromCallable($fn)), null];
         } catch (StandFirmQuestion $otazka) {
-            GameEvent::zahoditOd($znacka);   // review P306: rozpracovaný blok se zahodí i z logu akce
-
             return [null, $otazka->playerId];
         } finally {
             $this->standFirmOdpovedi = $puvodni;

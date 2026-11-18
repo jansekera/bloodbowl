@@ -50,7 +50,7 @@ final class ThrowRerollCoachTest extends TestCase
 
         $q = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($q);
-        $this->assertSame('pass', $q->getRollType());
+        $this->assertSame('pass', $q->getRollType()->value);
         $this->assertSame(2, $q->getRoll());
         $this->assertTrue($q->isTeamRerollAvailable());
         $this->assertFalse($q->isProAvailable());
@@ -159,7 +159,7 @@ final class ThrowRerollCoachTest extends TestCase
             ->build();
         $r = $this->resolver([1])->resolve($s, ActionType::THROW_TEAM_MATE, ['playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5]);
 
-        $this->assertSame('ttm', $r->getNewState()->getPendingReroll()?->getRollType());
+        $this->assertSame('ttm', $r->getNewState()->getPendingReroll()?->getRollType()?->value);
     }
 
     public function testBezPrehozuSeNepta(): void

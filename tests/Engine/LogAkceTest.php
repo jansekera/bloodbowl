@@ -54,7 +54,7 @@ final class LogAkceTest extends TestCase
         // POW, brnění 1+1 drží, odraz na východ (8,4), chytání 1
         $q = $this->kouc([6, 1, 1, 3, 1])->resolve($this->blokNaNosice(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $this->assertSame('catch', $q->getNewState()->getPendingReroll()?->getRollType(), 'fixtura: otázka na chytání');
+        $this->assertSame('catch', $q->getNewState()->getPendingReroll()?->getRollType()?->value, 'fixtura: otázka na chytání');
         $this->assertSame(
             ['block', 'push', 'follow_up', 'player_fell', 'armour_roll', 'ball_bounce', 'catch'],
             self::typy($q->getEvents()),
@@ -97,8 +97,9 @@ final class LogAkceTest extends TestCase
 
     /**
      * Review P306 — pojistka: nic, co vzniklo nanečisto nebo v rozpracovaném výpočtu přerušeném vlastní otázkou,
-     * nezůstane v logu akce (kouč by to u další otázky viděl). Místa, kde se dnes počítá nanečisto: otázka na
-     * Stand Firm (zahoditOd), past na Frenzy (odtlačení nanečisto, bezLogu), Bone Head po odmítnutém přehozu (bezLogu).
+     * nezůstane v logu akce (kouč by to u další otázky viděl). Hlídá `ActionResolver::hlidatLog` (zapnuto pro celou
+     * sadu v `tests/bootstrap.php`); tyto testy jen sestaví situace, kde se dnes počítá nanečisto. Místa, kde se dnes počítá nanečisto: otázka na
+     * Stand Firm (zahoditPri), past na Frenzy (odtlačení nanečisto, bezLogu), Bone Head po odmítnutém přehozu (bezLogu).
      */
     public function testOtazkaNaStandFirmNenechaVLoguRozpracovanyBlok(): void
     {
@@ -111,10 +112,9 @@ final class LogAkceTest extends TestCase
         $r->setInteractiveBlocks(true);
         $r->setHumanSides([TeamSide::HOME, TeamSide::AWAY]);
         $hod = $r->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
-        $v = $r->resolve($hod, ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);
+        $v = $r->resolve($hod, ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);   // zahozená událost ⇒ LogicException
 
         $this->assertNotNull($v->getNewState()->getPendingStandFirm(), 'fixtura: otázka na Stand Firm');
-        $this->assertSame([], $r->zahozeneUdalostiPosledniAkce());
     }
 
     public function testPastNaFrenzyNanecistoNeniVLogu(): void
@@ -127,9 +127,9 @@ final class LogAkceTest extends TestCase
         $r = new ActionResolver(new FixedDiceRoller([3, 3, 3, 3, 3, 3]));
         $r->setInteractiveBlocks(true);
         $hod = $r->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
-        $r->resolve($hod, ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);
+        $v = $r->resolve($hod, ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);   // zahozená událost ⇒ LogicException
 
-        $this->assertSame([], $r->zahozeneUdalostiPosledniAkce());
+        $this->assertContains('push', self::typy($v->getEvents()), 'fixtura: blok doběhl s odtlačením');
     }
 
     public function testBoneHeadPoOdmitnutemPrehozuNeniVLoguDvakrat(): void
@@ -140,8 +140,8 @@ final class LogAkceTest extends TestCase
             ->build();
         $q = $this->kouc([1])->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $r = $this->kouc([1]);
-        $r->resolve($q->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'decline']);
+        $v = $r->resolve($q->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'decline']);   // zahozená událost ⇒ LogicException
 
-        $this->assertSame([], $r->zahozeneUdalostiPosledniAkce());
+        $this->assertSame([], self::typy($v->getEvents()), 'neúspěch kouč viděl u otázky; po odmítnutí se nic neopakuje');
     }
 }

@@ -7,6 +7,7 @@ namespace App\Tests\DTO;
 use App\DTO\PendingRerollDTO;
 use App\DTO\ReplayContext;
 use App\Enum\ActionType;
+use App\Enum\RollCategory;
 use App\Enum\RollType;
 use PHPUnit\Framework\TestCase;
 
@@ -24,7 +25,7 @@ final class PendingRerollRollTypeTest extends TestCase
 
     public function testKlientDostanePopisekKategoriiANasledek(): void
     {
-        $a = self::otazka(RollType::DODGE)->toArray();
+        $a = self::otazka(RollType::DODGE)->toArray(sPrehranim: false);
 
         $this->assertSame(['Dodge', 'move'], [$a['label'], $a['category']]);
         $this->assertStringContainsString('falls', (string) $a['consequence']);
@@ -36,9 +37,9 @@ final class PendingRerollRollTypeTest extends TestCase
         $this->assertStringNotContainsString('turn ends', (string) RollType::CATCH->consequence());
         $this->assertStringContainsString('loses the declared action', (string) RollType::WILD_ANIMAL->consequence());
         $this->assertNull(RollType::PASS->consequence());
-        $this->assertSame('big_guy', RollType::REALLY_STUPID->category());
-        $this->assertSame('ball', RollType::CATCH->category());
-        $this->assertSame('move', RollType::LEAP_GFI->category());
+        $this->assertSame(RollCategory::BIG_GUY, RollType::REALLY_STUPID->category());
+        $this->assertSame(RollCategory::BALL, RollType::CATCH->category());
+        $this->assertSame(RollCategory::MOVE, RollType::LEAP_GFI->category());
     }
 
     public function testNeznamyDruhHoduVUlozenemStavuSpadneHned(): void

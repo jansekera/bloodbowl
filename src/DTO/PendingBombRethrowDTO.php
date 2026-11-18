@@ -65,16 +65,11 @@ final class PendingBombRethrowDTO
      */
     public function toArray(bool $sPrehranim = true): array
     {
-        $a = [
+        return [
             'playerId' => $this->playerId,
             'targets' => $this->targets,
             'suggested' => $this->suggested,
-        ];
-        if ($sPrehranim) {
-            $a['replay'] = $this->replay->toArray();
-        }
-
-        return $a;
+        ] + ($sPrehranim ? ['replay' => $this->replay->toArray()] : []);
     }
 
     /** @param array<string, mixed> $data */

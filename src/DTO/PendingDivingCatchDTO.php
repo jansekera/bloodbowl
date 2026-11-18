@@ -61,17 +61,12 @@ final class PendingDivingCatchDTO
      */
     public function toArray(bool $sPrehranim = true): array
     {
-        $a = [
+        return [
             'playerId' => $this->playerId,
             'landing' => ['x' => $this->landing->getX(), 'y' => $this->landing->getY()],
             'otherCandidates' => $this->otherCandidates,
             'attemptingId' => $this->attemptingId,
-        ];
-        if ($sPrehranim) {
-            $a['replay'] = $this->replay->toArray();
-        }
-
-        return $a;
+        ] + ($sPrehranim ? ['replay' => $this->replay->toArray()] : []);
     }
 
     /** @param array<string, mixed> $data */

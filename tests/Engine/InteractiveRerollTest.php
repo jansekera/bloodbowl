@@ -38,7 +38,7 @@ final class InteractiveRerollTest extends TestCase
 
         $pending = $result->getNewState()->getPendingReroll();
         $this->assertNotNull($pending);
-        $this->assertEquals('dodge', $pending->getRollType());
+        $this->assertEquals('dodge', $pending->getRollType()->value);
         $this->assertEquals(1, $pending->getPlayerId());
         // ⛔ OPRAVENO 14.09.2026: cil je 3+, jak rika i komentar vys.
         //   Souper stoji na (5,4), cilove pole je (5,6) -- NENI sousedni,
@@ -189,7 +189,7 @@ final class InteractiveRerollTest extends TestCase
 
         $pending = $result->getNewState()->getPendingReroll();
         $this->assertNotNull($pending);
-        $this->assertEquals('gfi', $pending->getRollType());
+        $this->assertEquals('gfi', $pending->getRollType()->value);
         $this->assertEquals(2, $pending->getTarget());
     }
 
@@ -277,7 +277,7 @@ final class InteractiveRerollTest extends TestCase
         $restored = \App\DTO\GameState::fromArray($array);
         $restoredPending = $restored->getPendingReroll();
         $this->assertNotNull($restoredPending);
-        $this->assertEquals('dodge', $restoredPending->getRollType());
+        $this->assertEquals('dodge', $restoredPending->getRollType()->value);
         $this->assertEquals(1, $restoredPending->getPlayerId());
         // ⛔ OPRAVENO 14.09.2026 -- tentyz duvod jako vys (nulova TZ => 3+).
         $this->assertEquals(3, $restoredPending->getTarget());

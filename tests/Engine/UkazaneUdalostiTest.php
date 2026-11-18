@@ -40,7 +40,7 @@ final class UkazaneUdalostiTest extends TestCase
         $vse = [...$vse, ...$r->getEvents()];
         // týmový přehoz 4 projde; úhyb z (5,5) na (5,6) 1 ⇒ otázka 2 (Pro)
         $r = $this->kouc([4, 1])->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
-        $this->assertSame('dodge', $r->getNewState()->getPendingReroll()?->getRollType());
+        $this->assertSame('dodge', $r->getNewState()->getPendingReroll()?->getRollType()?->value);
         $vse = [...$vse, ...$r->getEvents()];
         // Pro 4 projde, úhyb 6
         $r = $this->kouc([4, 6])->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);

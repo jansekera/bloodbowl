@@ -449,7 +449,7 @@ final class SkillModifiersTest extends TestCase
 
         $q = $s->getPendingReroll();
         $this->assertNotNull($q, 'kouče-člověka se zeptá');
-        $this->assertSame('jump_up', $q->getRollType());
+        $this->assertSame('jump_up', $q->getRollType()->value);
         $this->assertSame(3, $q->getTarget());
         $this->assertSame(PlayerState::PRONE, $s->requirePlayer(1)->getState(), 'stav před akcí');
 

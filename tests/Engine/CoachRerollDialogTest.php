@@ -46,7 +46,7 @@ final class CoachRerollDialogTest extends TestCase
 
         $pending = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($pending);
-        $this->assertSame('bone_head', $pending->getRollType());
+        $this->assertSame('bone_head', $pending->getRollType()->value);
         $this->assertSame(2, $pending->getTarget());
         $this->assertTrue($pending->isTeamRerollAvailable());
         $this->assertFalse($r->getNewState()->requirePlayer(1)->isBigGuyStupefied(), 'neúspěch ještě neplatí');
@@ -104,7 +104,7 @@ final class CoachRerollDialogTest extends TestCase
 
         $pending = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($pending);
-        $this->assertSame('really_stupid', $pending->getRollType());
+        $this->assertSame('really_stupid', $pending->getRollType()->value);
         $this->assertSame(4, $pending->getTarget());
     }
 
@@ -120,7 +120,7 @@ final class CoachRerollDialogTest extends TestCase
         $r = $resolver->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
         $pending = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($pending);
-        $this->assertSame('wild_animal', $pending->getRollType());
+        $this->assertSame('wild_animal', $pending->getRollType()->value);
         $this->assertSame(2, $pending->getTarget());
 
         $r = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
@@ -167,7 +167,7 @@ final class CoachRerollDialogTest extends TestCase
 
         $pending = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($pending);
-        $this->assertSame('leap', $pending->getRollType());
+        $this->assertSame('leap', $pending->getRollType()->value);
         $this->assertSame(4, $pending->getTarget());
         $this->assertSame(7, $pending->getTargetX());
         $this->assertFalse($r->isTurnover());
@@ -211,7 +211,7 @@ final class CoachRerollDialogTest extends TestCase
         $r = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 5]);
         $pending = $r->getNewState()->getPendingReroll();
         $this->assertNotNull($pending);
-        $this->assertSame('leap_gfi', $pending->getRollType());
+        $this->assertSame('leap_gfi', $pending->getRollType()->value);
         $this->assertSame(7, $pending->getTargetX(), 'otázka ukazuje cíl skoku');
         $this->assertSame(5, $r->getNewState()->requirePlayer(1)->requirePosition()->getX(), 'u otázky stojí na výchozím poli');
 

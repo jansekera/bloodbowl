@@ -263,9 +263,15 @@ final class ActionResolver
         $this->coach->begin($replay->answers);
         try {
             $r = $this->resolveJednou($zaklad, $replay->action, $replay->params);
-            $this->zahozene = self::zahozene(GameEvent::log(), $r->getEvents());
+            if (self::$hlidatLog && ($zahozene = self::bez(GameEvent::log(), $r->getEvents())) !== []) {
+                throw new \LogicException('Log akce obsahuje události, které ve výsledku nejsou (výpočet nanečisto mimo GameEvent::bezLogu?): '
+                    . implode(', ', array_map(static fn(GameEvent $e): string => $e->getType(), $zahozene)));
+            }
+            // P306 A1: kouč už viděl prvních `shown` vzniklých (přehrání je deterministické ⇒ tytéž události v témže
+            // pořadí); podle vzniku, ne podle pořadí ve výsledku (Throw a Rock dává hlavičku před dřívější zranění)
+            $videl = array_slice(GameEvent::log(), 0, $replay->shown);
 
-            return new ActionResult($r->getNewState(), $r->isSuccess(), $r->isTurnover(), self::bezUkazanych($r->getEvents(), $replay->shown));
+            return new ActionResult($r->getNewState(), $r->isSuccess(), $r->isTurnover(), self::bez($r->getEvents(), $videl));
         } catch (CoachQuestion $q) {
             // P306 A1: kouč vidí log akce, jak stojí (i události volající akce), bez toho, co už viděl u dřívějších otázek
             $log = GameEvent::log();
@@ -278,56 +284,37 @@ final class ActionResolver
         }
     }
 
-    /** @var list<GameEvent> review P306: události poslední akce, které vznikly, ale ve výsledku nejsou */
-    private array $zahozene = [];
-
     /**
      * Review P306 — pojistka logu akce: otázka kouči ukazuje log podle vzniku, takže výpočet nanečisto mimo
-     * `GameEvent::bezLogu` (nebo přerušený bez `zahoditOd`) by kouči ukázal událost, která se nestala. Testy tím
-     * hlídají místa, kde se počítá nanečisto (`LogAkceTest`).
-     *
-     * @internal jen pro testy
-     * @return list<GameEvent>
+     * `GameEvent::bezLogu` (nebo přerušený vlastní otázkou mimo `zahoditPri`) by kouči ukázal událost, která se nestala. Testy ji
+     * zapínají pro každou akci celé sady (`tests/bootstrap.php`); ve hře a simulacích se nepočítá.
      */
-    public function zahozeneUdalostiPosledniAkce(): array
+    private static bool $hlidatLog = false;
+
+    /** @internal jen pro testy */
+    public static function hlidatLog(bool $zapnout): void
     {
-        return $this->zahozene;
+        self::$hlidatLog = $zapnout;
     }
 
     /**
-     * @param list<GameEvent> $log
-     * @param list<GameEvent> $vysledek
-     * @return list<GameEvent>
-     */
-    private static function zahozene(array $log, array $vysledek): array
-    {
-        $ve = [];
-        foreach ($vysledek as $e) {
-            $ve[spl_object_id($e)] = true;
-        }
-
-        return array_values(array_filter($log, static fn(GameEvent $e): bool => !isset($ve[spl_object_id($e)])));
-    }
-
-    /**
-     * Události akce bez těch, které kouč už viděl u otázek: prvních `$ukazano` vzniklých (přehrání je deterministické
-     * ⇒ vzniknou tytéž události v témže pořadí). P306 A1: podle vzniku, ne podle pořadí ve výsledku — to se může lišit
-     * (Throw a Rock dává hlavičku před zranění vzniklá dřív) — a bez porovnání obsahu v JSON (dřív `shown` = obsah).
+     * Události z `$udalosti` bez těch v `$odebrat` (podle identity objektu).
      *
      * @param list<GameEvent> $udalosti
+     * @param list<GameEvent> $odebrat
      * @return list<GameEvent>
      */
-    private static function bezUkazanych(array $udalosti, int $ukazano): array
+    private static function bez(array $udalosti, array $odebrat): array
     {
-        if ($ukazano === 0) {
+        if ($odebrat === []) {
             return $udalosti;
         }
-        $videl = [];
-        foreach (array_slice(GameEvent::log(), 0, $ukazano) as $e) {
-            $videl[spl_object_id($e)] = true;
+        $pryc = [];
+        foreach ($odebrat as $e) {
+            $pryc[spl_object_id($e)] = true;
         }
 
-        return array_values(array_filter($udalosti, static fn(GameEvent $e): bool => !isset($videl[spl_object_id($e)])));
+        return array_values(array_filter($udalosti, static fn(GameEvent $e): bool => !isset($pryc[spl_object_id($e)])));
     }
 
     /**
