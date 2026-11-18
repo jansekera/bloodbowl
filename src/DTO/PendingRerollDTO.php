@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
+use App\Enum\RollType;
+
 /**
  * Otázka kouči-člověku na přehoz nepovedeného hodu: pohyb (`dodge`, `gfi`, `leap`, `leap_gfi`), míč (`pickup`,
  * `catch`), velcí hráči (`bone_head`, `really_stupid`, `wild_animal`), hody (`pass`, `bomb`, `ttm`, `ttm_landing`,
@@ -27,7 +29,9 @@ final class PendingRerollDTO
         // ⭐ 18.09.2026: hod Pro padl 1-3 => puvodni vysledek plati a tymovy
         //   prehoz smi prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
         private readonly bool $proFailed = false,
-    ) {}
+    ) {
+        RollType::from($rollType);   // P306 A7: neznámý druh hodu spadne tady, ne až ve webu
+    }
 
     public function getRollType(): string
     {
@@ -94,8 +98,14 @@ final class PendingRerollDTO
      */
     public function toArray(): array
     {
+        $druh = RollType::from($this->rollType);
+
         return [
             'rollType' => $this->rollType,
+            // P306 A7: popisek, kategorie a následek odmítnutí z jednoho místa (`RollType`), web je jen vykreslí
+            'label' => $druh->label(),
+            'category' => $druh->category(),
+            'consequence' => $druh->consequence(),
             'playerId' => $this->playerId,
             'target' => $this->target,
             'roll' => $this->roll,

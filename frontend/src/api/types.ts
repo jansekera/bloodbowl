@@ -72,6 +72,10 @@ export interface PendingReroll {
     proFailed?: boolean;
     /** P294: stav je okamžik hodu (jen k zobrazení); server po odpovědi akci přehraje */
     replay: ReplayContext;
+    /** P306 A7: popisek, kategorie a následek odmítnutí posílá server (`App\Enum\RollType`) */
+    label: string;
+    category: 'move' | 'ball' | 'big_guy' | 'throw';
+    consequence: string | null;
 }
 
 /** P206 (b): čekající volba o lékárníkovi */

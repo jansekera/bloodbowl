@@ -16,7 +16,7 @@ import { LevelUpModal } from './ui/LevelUpModal';
 import { DugoutPanel } from './ui/DugoutPanel';
 import { PlayerCard } from './ui/PlayerCard';
 import { BlockDiceModal } from './ui/BlockDiceModal';
-import { RerollModal, MOVE_ROLLS } from './ui/RerollModal';
+import { RerollModal } from './ui/RerollModal';
 import { ApothecaryModal } from './ui/ApothecaryModal';
 import { GrabModal } from './ui/GrabModal';
 import { StandFirmModal } from './ui/StandFirmModal';
@@ -136,11 +136,11 @@ function drawBombSuggestion(state: import('./api/types').GameState): void {
  *  šipka z pole hráče na pole, kam hází (úhyb, GFI, skok), a zvýraznění toho pole. */
 function drawRerollSituation(state: import('./api/types').GameState): void {
     const pending = state.pendingReroll;
-    if (pending && (pending.rollType === 'pickup' || pending.rollType === 'catch')) {
+    if (pending?.category === 'ball') {
         renderer.drawSelectedTarget({ x: pending.targetX, y: pending.targetY });   // P294 krok 5d: pole s míčem
         return;
     }
-    if (!pending || !MOVE_ROLLS.has(pending.rollType)) return;
+    if (pending?.category !== 'move') return;
     const player = state.players.find(p => p.id === pending.playerId);
     const to = { x: pending.targetX, y: pending.targetY };
     if (player?.position && (player.position.x !== to.x || player.position.y !== to.y)) {
