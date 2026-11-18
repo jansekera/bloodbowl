@@ -75,7 +75,7 @@ final class ActionResolver
         $this->gameFlowResolver = new GameFlowResolver($dice, coach: $this->coach);
         // ⭐ 11.09.2026 (PHP22): Bloodlust potrebuje hod na zraneni a odraz
         //   mice, takze uz to neni bezzavisla trida.
-        $this->bigGuyCheckResolver = new BigGuyCheckResolver($injuryResolver, $this->ballResolver);
+        $this->bigGuyCheckResolver = new BigGuyCheckResolver($injuryResolver, $this->ballResolver, $this->coach);
 
         $this->moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $this->ballResolver, $injuryResolver, coach: $this->coach);
         $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver, $this->moveHandler, $this->getPassResolver(), coach: $this->coach);
@@ -461,12 +461,6 @@ final class ActionResolver
                     $action,
                     $this->dice,
                 );
-                // P294 krok 5e: neúspěch kontroly kouč-člověk smí přehodit (ř. 929-931; Pro ř. 8381) — otázka přehráním
-                //   (stav před hodem, hráč na svém poli); po přehozu se hod vyhodnotí znovu. Dřív dialog s ohlášenou akcí
-                //   (`resume*`, `kontrolaProsla`, P289). AI hody velkých hráčů nepřehazuje (parita s C++ P130).
-                if (isset($checkResult['reroll']) && $this->coach->decides($player->getTeamSide())) {
-                    $checkResult = $this->bigGuyCheckResolver->prehozKouce($state, $player, $action, $checkResult, $this->coach, $this->dice);
-                }
                 if ($checkResult !== null) {
                     // ⛔ PHP22: kontrola pred akci umi skoncit i TURNOVEREM --
                     //   Bloodlust, kdyz upir nema koho kousnout (r. 7942-7943),

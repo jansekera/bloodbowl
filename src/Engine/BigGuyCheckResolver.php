@@ -27,6 +27,7 @@ final class BigGuyCheckResolver
     public function __construct(
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
+        private readonly Coach $coach = new Coach(),
     ) {}
 
     /**
@@ -48,7 +49,11 @@ final class BigGuyCheckResolver
      *   do switche, kde se limit jinak nastavuje, uz se nedostane. PHP kopie
      *   to nemela -- CTVRTY drift teze tridy.
      *
-     * @return array{state: GameState, events: list<\App\DTO\GameEvent>, proceed?: bool, turnover?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
+     * P294 krok 5e: neúspěch Bone Head / Really Stupid / Wild Animal kouč-člověk smí přehodit (ř. 929-931; Pro ř. 8381)
+     *   — otázka přehráním (`prehozKouce`); AI hody velkých hráčů nepřehazuje (parita s C++ P130). P306 A4 (18.11.2026):
+     *   rozhoduje se tady, dřív větev v `ActionResolver` nad klíčem `reroll` ve výsledku.
+     *
+     * @return array{state: GameState, events: list<\App\DTO\GameEvent>, proceed?: bool, turnover?: bool, wastesTeamAction?: bool}|null
      */
     public function resolvePreActionCheck(
         GameState $state,
@@ -57,7 +62,16 @@ final class BigGuyCheckResolver
         DiceRollerInterface $dice,
     ): ?array {
         if (self::hasRerollableCheck($player)) {
-            return $this->judgeRerollableCheck($state, $player, $action, $dice->rollD6());
+            $r = $this->judgeRerollableCheck($state, $player, $action, $dice->rollD6());
+            if (!isset($r['reroll'])) {
+                return $r;
+            }
+            if ($this->coach->decides($player->getTeamSide())) {
+                return $this->prehozKouce($state, $player, $action, $r, $dice);
+            }
+            unset($r['reroll']);
+
+            return $r;
         }
 
         // ⛔ OPRAVA 11.09.2026 (PHP15d): hod se hazel JEN NA `MOVE`.
@@ -77,7 +91,7 @@ final class BigGuyCheckResolver
     }
 
     /** Má hráč kontrolu před akcí, kterou kouč smí přehodit (Bone Head, Really Stupid, Wild Animal)? */
-    public static function hasRerollableCheck(MatchPlayerDTO $player): bool
+    private static function hasRerollableCheck(MatchPlayerDTO $player): bool
     {
         return $player->hasSkill(SkillName::BoneHead) || $player->hasSkill(SkillName::ReallyStupid)
             || $player->hasSkill(SkillName::WildAnimal);
@@ -91,7 +105,7 @@ final class BigGuyCheckResolver
      *
      * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
      */
-    public function judgeRerollableCheck(GameState $state, MatchPlayerDTO $player, ActionType $action, int $roll, bool $zapsatUspech = false): ?array
+    private function judgeRerollableCheck(GameState $state, MatchPlayerDTO $player, ActionType $action, int $roll, bool $zapsatUspech = false): ?array
     {
         // P306 A1: událost úspěchu vzniká, jen když se zapíše — log akce bere události podle vzniku (dřív vznikla vždy)
         if ($player->hasSkill(SkillName::BoneHead)) {
@@ -114,18 +128,18 @@ final class BigGuyCheckResolver
     /**
      * P294 krok 5e (přesunuto z `ActionResolver`, review P294 nález 4): neúspěch kontroly kouč-člověk smí přehodit
      * (ř. 929-931; Pro ř. 8381) — otázka přehráním (`Coach`, stav před hodem, hráč na svém poli); po přehozu se hod
-     * vyhodnotí znovu. AI hody velkých hráčů nepřehazuje (parita s C++ P130) — volá se jen pro kouče-člověka.
+     * vyhodnotí znovu. Volá se jen pro kouče-člověka (`resolvePreActionCheck`).
      * Vrací výsledek kontroly jako `judgeRerollableCheck` (vždy pole: povedený přehoz = `proceed`), s událostmi
      * neúspěchu, přehozu a nového hodu.
      *
      * @param array{state: GameState, events: list<GameEvent>, reroll: array{type: string, target: int, roll: int}} $neuspech
      * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}
      */
-    public function prehozKouce(GameState $state, MatchPlayerDTO $player, ActionType $action, array $neuspech, Coach $kouc, DiceRollerInterface $dice): array
+    private function prehozKouce(GameState $state, MatchPlayerDTO $player, ActionType $action, array $neuspech, DiceRollerInterface $dice): array
     {
         $kontrola = $neuspech['reroll'];
         $udalosti = $neuspech['events'];
-        $res = ThrowReroll::proThenTeam($dice, $state, $player, $player->getTeamSide(), true, $udalosti, $kouc, $kontrola['type'], $kontrola['roll'], $kontrola['target'], $player->getPosition());
+        $res = ThrowReroll::proThenTeam($dice, $state, $player, $player->getTeamSide(), true, $udalosti, $this->coach, $kontrola['type'], $kontrola['roll'], $kontrola['target'], $player->getPosition());
         if (!$res['rerolled']) {
             // platí původní hod; událost neúspěchu už je v `$udalosti` (u otázky) ⇒ události druhého vyhodnocení se
             //   zahodí, mimo log akce (P306 A1)
