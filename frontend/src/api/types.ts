@@ -60,7 +60,7 @@ export interface PendingBlock {
 /** Otázka kouči-člověku na přehoz nepovedeného hodu (pohyb, míč, velcí hráči, hody); P294: vždy přehráním */
 export interface PendingReroll {
     rollType: 'dodge' | 'gfi' | 'pickup' | 'catch' | 'leap' | 'leap_gfi' | 'bone_head' | 'really_stupid' | 'wild_animal'
-        | 'pass' | 'bomb' | 'ttm' | 'ttm_landing' | 'always_hungry' | 'jump_up';
+        | 'pass' | 'bomb' | 'ttm' | 'ttm_landing' | 'always_hungry' | 'jump_up' | 'stand_up';
     playerId: number;
     target: number;
     roll: number;

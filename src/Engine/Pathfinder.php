@@ -50,7 +50,10 @@ final class Pathfinder
             if ($player->hasSkill(SkillName::JumpUp)) {
                 // Free stand-up, no MA cost
             } elseif ($ma < 3) {
-                return []; // Must roll to stand; can only stand in place (handled by RulesEngine)
+                // OPRAVENO 19.11.2026 (audit parity 08.10., nález 16; C++ `movementAfterStandUp`) -- tady bylo
+                //   `return []`: pod 3 MA jen vstát na místě. Ř. 690-695: po úspěšném hodu 4+ „may not move further
+                //   squares UNLESS HE GOES FOR IT“ ⇒ dál jen přes GFI.
+                $ma = 0;
             } else {
                 $ma -= 3;
             }

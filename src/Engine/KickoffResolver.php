@@ -469,7 +469,11 @@ final class KickoffResolver
     }
 
     /**
-     * Pitch Invasion! (12): D6 for each opponent player; on 6, stunned.
+     * Pitch Invasion! (12), ř. 1351-1356: D6 (+ FAME, engine nevede = 0) za každého soupeřova hráče NA HŘIŠTI;
+     * 6+ ⇒ Stunned, Ball & Chain ⇒ KO; 1 nikdy. Omráčený při výkopu se otočí na konci prvního kola svého týmu
+     * (příznak `stunnedThisTurn` se nenastavuje, jako u Throw a Rock).
+     * OPRAVENO 19.11.2026 (review P186; parita s C++ `kickoff_handler.cpp`, tam 02.10.) -- házelo se jen za
+     *   stojící a Ball & Chain byl omráčen jako ostatní.
      * @return array{state: GameState, events: list<GameEvent>}
      */
     private function resolvePitchInvasion(GameState $state, int $roll, TeamSide $kickingTeam): array
@@ -479,13 +483,11 @@ final class KickoffResolver
         // Both teams are affected
         foreach ([TeamSide::HOME, TeamSide::AWAY] as $side) {
             foreach ($state->getPlayersOnPitch($side) as $player) {
-                if ($player->getState() !== PlayerState::STANDING) {
-                    continue;
-                }
-
                 $invasionRoll = $this->dice->rollD6();
                 if ($invasionRoll === 6) {
-                    $state = $state->withPlayer($player->withState(PlayerState::STUNNED));
+                    $state = $state->withPlayer($player->hasSkill(SkillName::BallAndChain)
+                        ? $player->withState(PlayerState::KO)->withPosition(null)
+                        : $player->withState(PlayerState::STUNNED));
                     $stunnedCount++;
                 }
             }

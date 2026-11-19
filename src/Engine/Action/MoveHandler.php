@@ -143,8 +143,9 @@ final class MoveHandler implements ActionHandlerInterface
                 throw new \InvalidArgumentException("Player {$playerId} not found after stand-up");
             }
 
-            // Stand in place only
-            if ($player->getPosition() !== null && $player->getPosition()->equals($destination)) {
+            // Stand in place only. Zakořeněný (Take Root při ohlášení pohybu) jen vstane a zůstane: MA 0 a „may not
+            //   Go For It“ (ř. 8575-8584). Dřív hledal cestu a akce spadla na „No valid path“.
+            if ($player->isRooted() || ($player->getPosition() !== null && $player->getPosition()->equals($destination))) {
                 return ActionResult::success($this->ukoncitKrok($state, $player, $partial), $events);
             }
         }
@@ -599,10 +600,24 @@ final class MoveHandler implements ActionHandlerInterface
         }
 
         if ($player->getStats()->getMovement() < 3) {
-            // Low MA: roll 4+ to stand
+            // Low MA: roll 4+ to stand (ř. 690-695)
+            // OPRAVENO 19.11.2026 (audit parity 08.10., nález 16; C++ `move_handler.cpp` attemptRoll) -- holý hod
+            //   bez přehozu. Týmový přehoz smí na kterýkoli hod hráče (ř. 929-931), Pro taky.
             $roll = $this->dice->rollD6();
             $success = $roll >= 4;
             $events = [GameEvent::standUp($playerId, $roll, $success)];
+            if (!$success) {
+                $success = $this->prehoz(
+                    $state,
+                    $player,
+                    RollType::STAND_UP,
+                    4,
+                    $roll,
+                    $player->requirePosition(),
+                    $events,
+                    static fn(int $r, bool $ok) => GameEvent::standUp($playerId, $r, $ok),
+                );
+            }
 
             if (!$success) {
                 // Failed: player stays prone, action done

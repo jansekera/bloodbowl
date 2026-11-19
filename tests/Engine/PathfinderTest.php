@@ -217,9 +217,13 @@ final class PathfinderTest extends TestCase
         }
     }
 
-    public function testPronePlayerLowMACantMove(): void
+    /**
+     * PŘEPSÁNO 19.11.2026 (audit parity 08.10., nález 16): dřív `testPronePlayerLowMACantMove` chtěl prázdnou
+     * nabídku — kódoval vadu. Ř. 690-695: pod 3 MA hod 4+ na vstání, pak „may not move further squares unless he
+     * Goes For It“ ⇒ jen pole na dva GFI (C++ `movementAfterStandUp`).
+     */
+    public function testPronePlayerLowMAMovesOnlyByGfi(): void
     {
-        // Prone player with MA=2 (< 3): pathfinder returns empty
         $state = (new GameStateBuilder())
             ->addPronePlayer(TeamSide::HOME, 5, 5, movement: 2, id: 1)
             ->build();
@@ -227,6 +231,8 @@ final class PathfinderTest extends TestCase
         $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
-        $this->assertEmpty($moves);
+        $this->assertArrayHasKey('6,5', $moves, 'jeden krok GFI');
+        $this->assertArrayHasKey('7,5', $moves, 'dva kroky GFI');
+        $this->assertArrayNotHasKey('8,5', $moves, 'víc GFI ne');
     }
 }

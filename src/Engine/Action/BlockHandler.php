@@ -271,14 +271,15 @@ final class BlockHandler implements ActionHandlerInterface
         // `frenzyTrapReady`): past jen, když je nové pole horší aspoň v jedné a v žádné lepší.
         // OPRAVENO 26.10.2026 (parita s C++, review P226 MEDIUM) -- dřív se srovnávalo jen bez Dauntless.
         $silaNavic = [0];
-        $rozdil = $defender->getStats()->getStrength() - $attacker->getStats()->getStrength();
+        // Dauntless se porovnává po Horns (ř. 8034-8035 „after all other modifiers“)
+        $rozdil = $defender->getStats()->getStrength() - $attacker->getStats()->getStrength() - $this->hornsBonus($attacker, $isBlitz);
         if ($attacker->hasSkill(SkillName::Dauntless) && $rozdil > 0) {
             $silaNavic[] = $rozdil;
         }
         $horsi = false;
         foreach ($silaNavic as $navic) {
-            $nove = $this->kostkyDruheRany($po, $utocnikPo, $obrancePo, $navic);
-            $stejne = $this->kostkyDruheRany($state, $attacker, $defender, $navic);
+            $nove = $this->kostkyDruheRany($po, $utocnikPo, $obrancePo, $isBlitz, $navic);
+            $stejne = $this->kostkyDruheRany($state, $attacker, $defender, $isBlitz, $navic);
             if ($nove > $stejne) {
                 return false;
             }
@@ -394,16 +395,28 @@ final class BlockHandler implements ActionHandlerInterface
 
     /**
      * P225: podepsaný počet kostek druhé rány (+ volí útočník, − obránce) se skutečnými asistencemi
-     * z polí, kde hráči stojí -- tytéž síly jako skutečná rána (`blockStrengths`). Horns na druhou
-     * ránu neplatí. Dauntless se tu nehází: `$silaNavic` je větev, kterou volající zkouší (0 = bez
+     * z polí, kde hráči stojí -- tytéž síly jako skutečná rána (`blockStrengths`), s Horns v blitzu
+     * (ř. 8173-8175). Dauntless se tu nehází: `$silaNavic` je větev, kterou volající zkouší (0 = bez
      * Dauntless, rozdíl sil = Dauntless uspěl), viz `pastNaFrenzy`.
      */
-    private function kostkyDruheRany(GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, int $silaNavic = 0): int
+    private function kostkyDruheRany(GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz, int $silaNavic = 0): int
     {
-        [$att, $def] = $this->blockStrengths($state, $attacker, $defender, $silaNavic, 0, dauntless: false);
+        [$att, $def] = $this->blockStrengths($state, $attacker, $defender, $this->hornsBonus($attacker, $isBlitz) + $silaNavic, 0, dauntless: false);
         $info = $this->strCalc->getBlockDiceInfo($att, $def);
 
         return $info['attackerChooses'] ? $info['count'] : -$info['count'];
+    }
+
+    /** Strip Ball útočníka vyrazí nosiči míč, nemá-li Sure Hands (ř. 8517-8521, 8545-8546). */
+    private function stripBallVyrazi(MatchPlayerDTO $utocnik, MatchPlayerDTO $nosic): bool
+    {
+        return $utocnik->hasSkill(SkillName::StripBall) && !$nosic->hasSkill(SkillName::SureHands);
+    }
+
+    /** Horns: +1 k síle pro každou ránu v blitzu (ř. 8173-8175), i druhou ránu Frenzy. */
+    private function hornsBonus(MatchPlayerDTO $attacker, bool $isBlitz): int
+    {
+        return $isBlitz && $attacker->hasSkill(SkillName::Horns) ? 1 : 0;
     }
 
     /** Grab používá hráč se skillem Grab bez Frenzy (stejně jako dřív v `odtlacit`). */
@@ -879,7 +892,9 @@ final class BlockHandler implements ActionHandlerInterface
 
                 // Sily znovu na novych polich -- vcetne Dauntless (pred 08.10.2026 se u druhe
                 //   rany nehazel; r. 8026-8027: plati, kdykoli hrac blokuje silnejsiho)
-                [$attStr2, $defStr2] = $this->blockStrengths($frenzyState, $frenzyAttacker, $frenzyDefender, 0, 0);
+                // OPRAVENO 19.11.2026 (audit parity 08.10., nález 18; C++ totéž) -- druhá rána v blitzu byla bez
+                //   Horns. Ř. 8173-8175: „adds 1 to the player's Strength for ANY BLOCK(S) he makes during a Blitz“.
+                [$attStr2, $defStr2] = $this->blockStrengths($frenzyState, $frenzyAttacker, $frenzyDefender, $this->hornsBonus($frenzyAttacker, $isBlitz), 0);
                 $diceInfo2 = $this->strCalc->getBlockDiceInfo($attStr2, $defStr2);
 
                 $faces2 = [];
@@ -1614,6 +1629,7 @@ final class BlockHandler implements ActionHandlerInterface
         }
 
         $currentState = $state;
+        $odtlaceniPadlo = $defenderPushed;
 
         // Stand Firm prevents pushback (but not knockdown); Juggernaut on blitz ignores Stand Firm.
         // Zakoreneny se neodtlaci nikdy, ani Juggernautem (r. 8578-8579 "for any reason").
@@ -1646,6 +1662,20 @@ final class BlockHandler implements ActionHandlerInterface
             if ($defender->getPosition()?->equals($defenderPos) === true) {
                 $defenderPushed = false;
             }
+        }
+
+        // OPRAVENO 19.11.2026 (Stand Firm × Strip Ball, rozhodl uživatel 10.10.2026, kniha P194 (7); parita s C++
+        //   `block_handler.cpp`) -- obránce, který zůstal stát na svém poli (Stand Firm, zakořenění, zaseknutý
+        //   řetěz), míč nepouštěl: odtlačení se zrušilo celé i se Strip Ballem. Uživatel: „stand firm řeší jen
+        //   místo — neovlivňuje ani strip ball“; ř. 8517-8521 „drop the ball in the square that they are pushed
+        //   to“ = pole, kde stojí. Odraz až po follow-upu (P198), jako u odtlačeného.
+        if ($odtlaceniPadlo && !$defenderPushed && !$defenderDown
+            && $currentState->getBall()->getCarrierId() === $defender->getId()
+            && $this->stripBallVyrazi($attacker, $defender)
+        ) {
+            $events[] = GameEvent::ballStripped($defender->getId());
+            $currentState = $currentState->withBall(BallState::onGround($defenderPos));
+            $this->odlozenyStrip = $defenderPos;
         }
 
         // Follow-up: attacker moves to defender's old position
@@ -2024,7 +2054,7 @@ final class BlockHandler implements ActionHandlerInterface
         //   Pravidla ř. 8545-8546: "the Strip Ball skill will not work against a player
         //   with this skill" (totéž ř. 973-976).
         if ($state->getBall()->getCarrierId() === $kdo->getId()) {
-            if ($utocnik !== null && $utocnik->hasSkill(SkillName::StripBall) && !$kdo->hasSkill(SkillName::SureHands)) {
+            if ($utocnik !== null && $this->stripBallVyrazi($utocnik, $kdo)) {
                 $events[] = GameEvent::ballStripped($kdo->getId());
                 $state = $state->withBall(BallState::onGround($pushTo));
                 if ($this->odlozitPoFollowUp || $this->nanecisto) {

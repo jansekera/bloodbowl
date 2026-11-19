@@ -136,7 +136,8 @@ final class StandUpTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $dice = new FixedDiceRoller([3]); // roll 3 = fail
+        // 19.11.2026: nepovedené vstání se přehazuje týmovým přehozem (ř. 929-931, audit parity nález 16) ⇒ dvě kostky
+        $dice = new FixedDiceRoller([3, 2]); // roll 3 = fail, přehoz 2 = fail
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -152,11 +153,10 @@ final class StandUpTest extends TestCase
         $this->assertTrue($player->hasMoved()); // Action done
         $this->assertTrue($player->hasActed()); // Can't do anything else
 
-        // Check event
-        $events = $result->getEvents();
-        $this->assertCount(1, $events);
-        $this->assertEquals('stand_up', $events[0]->getType());
-        $this->assertFalse($events[0]->getData()['success']);
+        // Check event: první hod, přehoz, druhý hod
+        $standUps = array_values(array_filter($result->getEvents(), fn($e) => $e->getType() === 'stand_up'));
+        $this->assertCount(2, $standUps);
+        $this->assertFalse($standUps[1]->getData()['success']);
     }
 
     public function testPronePlayerAppearsInAvailableActions(): void
@@ -174,22 +174,9 @@ final class StandUpTest extends TestCase
         $this->assertNotEmpty($moveActions, 'Prone player should have MOVE available');
     }
 
-    public function testPronePlayerLowMAOnlyStandInPlace(): void
-    {
-        // MA=2 player can only stand in place (pathfinder returns empty)
-        $state = (new GameStateBuilder())
-            ->addPronePlayer(TeamSide::HOME, 5, 7, movement: 2, id: 1)
-            ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
-            ->build();
-
-        $rules = new RulesEngine();
-        $targets = $rules->getValidMoveTargets($state, 1);
-
-        // Should only have current position
-        $this->assertCount(1, $targets);
-        $this->assertEquals(5, $targets[0]['x']);
-        $this->assertEquals(7, $targets[0]['y']);
-    }
+    // PŘEPSÁNO 19.11.2026: `testPronePlayerLowMAOnlyStandInPlace` kódoval vadu (pod 3 MA jen vstát na místě).
+    //   Ř. 690-695: po úspěšném vstání „may not move further squares UNLESS HE GOES FOR IT“ — viz
+    //   `AuditZbytkyP182Test::testPoVstaniPodTriMaSmiDalPresGfi`.
 
     public function testPronePlayerStandUpAndPickupBall(): void
     {

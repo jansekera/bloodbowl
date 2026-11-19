@@ -136,9 +136,12 @@ final class FoulHandler implements ActionHandlerInterface
         //   **and/or Injury** roll is a doubles (i.e., two 1s, or two 2s, etc),
         //   the referee has spotted the foul". Do ted se dublet cetl JEN na
         //   brneni, protoze `resolveInjury` vracel pouhy soucet 2D6.
-        // Check for ejection (doubles) — Sneaky Git avoids ejection
+        // OPRAVENO 19.11.2026 (audit parity 08.10., nález 20; C++ foul_handler.cpp totéž) -- Sneaky Git tu
+        //   chránil VŽDY. Ř. 8484-8486: „not ejected for rolling doubles on the Armour roll UNLESS THE ARMOUR
+        //   ROLL WAS SUCCESSFUL“ ⇒ chrání jen dublet na brnění, které vydrželo; dublet na zranění skill
+        //   nezmiňuje (běžné vyloučení ř. 1877-1878) a zranění se hází jen po proraženém brnění.
         $vyloucen = false;
-        if (($die1 === $die2 || $dubletNaZraneni) && !$attacker->hasSkill(SkillName::SneakyGit)) {
+        if (($die1 === $die2 || $dubletNaZraneni) && (!$attacker->hasSkill(SkillName::SneakyGit) || $armourBroken)) {
             // P287 (10.11.2026): úplatek / Argue the call (RefereeCall, parita s C++ refereeSendOff). Úplatek ⇒ zůstává
             //   a bez turnoveru; protest 6 ⇒ do rezerv, turnover zůstává (ř. 1100-1101).
             // P291: kouče-člověka se rozhodčí zeptá (jen když je co volit; P294 krok 6 přímo v `sendOff`); bez odpovědi

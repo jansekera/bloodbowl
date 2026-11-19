@@ -73,7 +73,7 @@ final class InjuryResolver
         $armourValue = $player->getStats()->getArmour();
 
         // Prolomil by hod brneni i BEZ Mighty Blow?
-        $bezMB = ($hasClaw && $armourRoll >= 8) || (($armourRoll + $armourModifier) > $armourValue);
+        $bezMB = self::brneniPadne($armourRoll + $armourModifier, $armourValue, $hasClaw);
         if ($mightyBlow && !$bezMB) {
             $armourModifier++;          // MB se utrati na brneni
         } elseif ($mightyBlow) {
@@ -81,8 +81,7 @@ final class InjuryResolver
         }
 
         $modifiedRoll = $armourRoll + $armourModifier;
-        // Claw: armor broken on 8+ regardless of AV
-        $armourBroken = ($hasClaw && $armourRoll >= 8) || ($modifiedRoll > $armourValue);
+        $armourBroken = self::brneniPadne($modifiedRoll, $armourValue, $hasClaw);
 
         $events[] = GameEvent::armourRoll(
             $player->getId(),
@@ -137,6 +136,17 @@ final class InjuryResolver
     }
 
     /**
+     * Padne brnění? Hod po modifikacích > AV; s Claw stačí 8+ PO modifikacích.
+     * OPRAVENO 19.11.2026 (audit parity 08.10., nález 21; C++ `injury.cpp` breaksArmour) -- Claw se četl na
+     * nemodifikovaném hodu, takže 7 + Mighty Blow = 8 brnění neprorazilo. Ř. 8020-8022: „any Armour roll of
+     * 8 or more AFTER MODIFICATIONS automatically breaks armour“.
+     */
+    private static function brneniPadne(int $modifiedRoll, int $armourValue, bool $hasClaw): bool
+    {
+        return $modifiedRoll > $armourValue || ($hasClaw && $modifiedRoll >= 8);
+    }
+
+    /**
      * Resolve with a pre-rolled armor value (used by Chainsaw).
      *
      * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
@@ -154,7 +164,7 @@ final class InjuryResolver
         $events = [];
         $modifiedRoll = $armourRoll + $armourModifier;
         $armourValue = $player->getStats()->getArmour();
-        $armourBroken = ($hasClaw && $armourRoll >= 8) || ($modifiedRoll > $armourValue);
+        $armourBroken = self::brneniPadne($modifiedRoll, $armourValue, $hasClaw);
 
         $events[] = GameEvent::armourRoll(
             $player->getId(),

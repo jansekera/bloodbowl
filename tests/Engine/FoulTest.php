@@ -234,24 +234,9 @@ final class FoulTest extends TestCase
         $this->assertFalse($result->isTurnover());
     }
 
-    public function testDubletNaZraneniSeSneakyGitemNevylucuje(): void
-    {
-        // r. 8523-8525: Sneaky Git -- "is never sent off for committing a foul
-        //   unless he rolls doubles for the Armour roll" ... u nas plati, ze
-        //   Sneaky Git vylouceni odvraci; test hlida, ze se to nezmenilo.
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::SneakyGit], id: 1)
-            ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
-            ->build();
-
-        $dice = new FixedDiceRoller([6, 4, 3, 3]);
-        $result = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, [
-            'playerId' => 1, 'targetId' => 2,
-        ]);
-
-        $attacker = $result->getNewState()->requirePlayer(1);
-        $this->assertNotSame(PlayerState::EJECTED, $attacker->getState());
-    }
+    // PŘEPSÁNO 19.11.2026: `testDubletNaZraneniSeSneakyGitemNevylucuje` kódoval vadu (citoval jiné znění než
+    //   `rules_bb2016.txt` ř. 8484-8486). Sneaky Git chrání jen dublet na brnění, které vydrželo — viz
+    //   `AuditZbytkyP182Test::testSneakyGitJeVyloucenZaDubletNaZraneni`.
 
     // ⛔ PREPSANO 16.09.2026: faul neni turnover JEN kdyz nepadne dublet.
     //   Pri dubletu je (r. 1879-1881) -- to hlida `FoulRulesTest`.
