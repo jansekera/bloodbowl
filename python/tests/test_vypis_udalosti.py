@@ -47,7 +47,8 @@ def test_vypis_ze_skutecnych_udalosti_enginu():
                     assert e["roll"] > 0 and ("omráčen" in radek or "KO" in radek), radek
                 assert " cíl -1 hod " not in radek or t in ("PUSH", "KNOCKED_DOWN", "TOUCHDOWN", "TURNOVER",
                                                              "KICKOFF", "WEATHER", "FOUL", "HAND_OFF",
-                                                             "REGENERATION", "EJECTED", "BLOODLUST_FEED"), radek
+                                                             "REGENERATION", "EJECTED", "BLOODLUST_FEED",
+                                                             "ARGUE_CALL", "BRIBE"), radek   # P287: bez cíle, hod D6
                 videno[t] = videno.get(t, 0) + 1
     # Vhazování v náhodné hře prakticky nenastane (0 ve 200 poločasech, 13.10.) -- jeho událost
     # hlídá C++ test P145ThrowInEventCarriesTheTemplateDie… a tvar řádku test níž.

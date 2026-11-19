@@ -809,3 +809,30 @@ TEST(ActionResolver, P307BlockOnAnAdjacentTargetStillResolves) {
     EXPECT_EQ(dice.remaining(), 0u);
     EXPECT_NE(gs.getPlayer(13).state, PlayerState::STANDING);
 }
+
+// P317 (19.11.2026, parita s PHP `FoulHandler.php:53`): faul jen na soupeře „Prone or Stunned and in an adjacent
+// square“ (ř. 1840-1843). Dřív C++ `resolveFoul` sousedství nekontroloval (jen nabídka) a faul přes pole se odházel.
+TEST(ActionResolver, P317FoulOnANonAdjacentTargetIsRejectedWithoutDice) {
+    GameState gs = p307Fixture();
+    gs.getPlayer(12).state = PlayerState::PRONE;   // vzdálenost 2
+    FixedDiceRoller dice({6, 5, 6, 6, 6, 6});      // bez kontroly: brnění 6+5 > 8 ⇒ zranění
+    auto r = executeAction(gs, {ActionType::FOUL, 1, 12, {12, 7}}, dice, nullptr);
+    EXPECT_FALSE(r.success) << "faul jen na sousední pole (ř. 1840-1843)";
+    EXPECT_EQ(dice.remaining(), 6u) << "žádná kostka nepadla";
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_FALSE(gs.getTeamState(TeamSide::HOME).foulUsedThisTurn) << "týmový faul se nespotřebuje";
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+}
+
+// P318 (19.11.2026, parita s PHP `HypnoticGazeHandler.php:46`): Hypnotic Gaze jen na soupeře „in an adjacent square“
+// (ř. 8180-8182). Dřív C++ `resolveHypnoticGaze` sousedství nekontroloval a pohled přes pole uspal cíl.
+TEST(ActionResolver, P318HypnoticGazeOnANonAdjacentTargetIsRejectedWithoutDice) {
+    GameState gs = p307Fixture();
+    gs.getPlayer(1).skills.add(SkillName::HypnoticGaze);
+    FixedDiceRoller dice({6, 6, 6, 6});   // bez kontroly: AG hod 6 uspěje ⇒ cíl ztratí zóny
+    auto r = executeAction(gs, {ActionType::HYPNOTIC_GAZE, 1, 12, {12, 7}}, dice, nullptr);
+    EXPECT_FALSE(r.success) << "pohled jen na sousední pole (ř. 8180-8182)";
+    EXPECT_EQ(dice.remaining(), 4u) << "žádná kostka nepadla";
+    EXPECT_FALSE(gs.getPlayer(12).lostTacklezones);
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+}
