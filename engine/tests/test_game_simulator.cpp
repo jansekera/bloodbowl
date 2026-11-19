@@ -75,6 +75,25 @@ TEST(GameSimulator, SetupHomeFacingRight) {
     EXPECT_TRUE(foundAwayLOS);
 }
 
+// P163 (19.11.2026): kdo se rozestavil jako kopající, ten kope — „The team that sets up first is called the kicking
+// team, because they will kick-off the ball“ (ř. 305-307). Výkop (`resolveKickoff`) bere přijímající jako
+// opponent(state.kickingTeam), takže rozestavení musí pole nastavit samo. Dřív ho setupHalf/setupDrive nenastavovaly
+// a každý volající (tři vazby v bb_module.cpp, simulateGame) to musel udělat ručně; kdo zapomněl, rozestavil
+// „kope HOME“ a míč kopl AWAY (P163, měření klece 07.10.).
+TEST(GameSimulator, P163SetupSetsTheKickingTeam) {
+    for (const TeamSide kick : {TeamSide::HOME, TeamSide::AWAY}) {
+        GameState half;
+        half.kickingTeam = opponent(kick);
+        setupHalf(half, getHumanRoster(), getHumanRoster(), kick);
+        EXPECT_EQ(half.kickingTeam, kick) << "setupHalf";
+
+        GameState drive;
+        drive.kickingTeam = opponent(kick);
+        setupDrive(drive, getHumanRoster(), getHumanRoster(), kick);
+        EXPECT_EQ(drive.kickingTeam, kick) << "setupDrive";
+    }
+}
+
 TEST(GameSimulator, RandomVsRandomCompletes) {
     DiceRoller dice(42);
     auto homePolicy = [&dice](const GameState& s) { return randomPolicy(s, dice); };

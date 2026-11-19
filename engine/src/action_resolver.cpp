@@ -559,8 +559,26 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
     }
 }
 
+// P307 (19.11.2026, parita s PHP P304 (8) `BlockHandler::overitSousedstvi`): blok jen na hráče „in an adjacent
+// square“ (ř. 539-540), Multiple Block jen proti dvěma, k nimž je hráč „adjacent“ (ř. 8299-8300). OPRAVENO 19.11. —
+// dřív sousedství nekontroloval nikdo kromě nabídky (`getAvailableActions`) a blok přes pole se odházel.
+static bool blockTargetsAdjacent(const GameState& state, const Action& action) {
+    if (action.type != ActionType::BLOCK && action.type != ActionType::MULTIPLE_BLOCK) return true;
+    const Position from = state.getPlayer(action.playerId).position;
+    auto adjacent = [&](int targetId) {
+        const Position to = state.getPlayer(targetId).position;
+        return from.isOnPitch() && to.isOnPitch() && from.distanceTo(to) == 1;
+    };
+    // MULTIPLE_BLOCK: druhý cíl je v target.x (kódování nabídky, rules_engine.cpp)
+    return adjacent(action.targetId) && (action.type == ActionType::BLOCK || adjacent(action.target.x));
+}
+
 ActionResult executeAction(GameState& state, const Action& action,
                            DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    // P307: neplatný blok se odmítne PŘED čímkoli, co mění stav nebo hází — uzavření předchozí aktivace (níž),
+    // kontrola před akcí (Bone-head ř. 7976-7978, resolveActionInner) i Jump Up (proneBlockGate). Jako v PHP, kde
+    // výjimka z `overitSousedstvi` zahodí celý stav akce.
+    if (!blockTargetsAdjacent(state, action)) return ActionResult::fail();
     // Activation close-out at the actor-switch boundary: a successful MOVE never
     // sets hasActed (only failure paths do), so without this a player who moved
     // could be independently reactivated later in the same team-turn (free

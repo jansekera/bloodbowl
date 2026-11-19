@@ -380,6 +380,10 @@ namespace {
 void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
                       TeamSide kickingTeam, bool isNewHalf, DiceRollerBase* dice,
                       std::vector<GameEvent>* events) {
+    // P163 (19.11.2026): kdo se rozestaví jako kopající, ten kope (ř. 305-307) — `resolveKickoff` bere přijímající
+    // jako opponent(state.kickingTeam). OPRAVENO 19.11. — dřív pole nastavoval každý volající zvlášť (tři vazby
+    // v bb_module.cpp); setup_half to do 12.10. (P195) nedělal a výkop letěl na tým rozestavený jako kopající.
+    state.kickingTeam = kickingTeam;
     // Package G, layer 1 (2026-08-10): casualties must SURVIVE the end of a
     // drive. This loop used to reset EVERY player to OFF_PITCH with no branch
     // for KO/INJURED/DEAD, and buildTeam then stood them all up again -- so
