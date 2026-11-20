@@ -246,6 +246,17 @@ final class ActionResolver
             return $this->resolveSPrehranim($state->withPendingReroll(null), $r->withAnswers($r->answers->withReroll($volba)));
         }
 
+        // P308: kostka bloku, kterou v tahu AI vybírá obránce-člověk (ř. 633-634) — přehrání jako výše
+        if ($action === ActionType::RESOLVE_BLOCK_DIE) {
+            $pending = $state->getPendingBlockDie() ?? throw new \InvalidArgumentException('No pending block die question');
+            $r = $pending->getReplay();
+
+            return $this->resolveSPrehranim(
+                $state->withPendingBlockDie(null),
+                $r->withAnswers($r->answers->withBlockDie((int) ($params['faceIndex'] ?? -1))),
+            );
+        }
+
         return $this->resolveSPrehranim($state, new ReplayContext($action, $params));
     }
 
@@ -509,7 +520,7 @@ final class ActionResolver
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
             // odpovědi na otázky kouče se přehrávají v `resolve()` (P294)
             ActionType::RESOLVE_REROLL, ActionType::RESOLVE_DIVING_CATCH, ActionType::RESOLVE_BOMB_RETHROW,
-            ActionType::RESOLVE_REFEREE => throw new \LogicException("{$action->value} se vyřizuje v resolve()"),
+            ActionType::RESOLVE_REFEREE, ActionType::RESOLVE_BLOCK_DIE => throw new \LogicException("{$action->value} se vyřizuje v resolve()"),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)

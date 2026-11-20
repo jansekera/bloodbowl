@@ -342,7 +342,10 @@ final class StandFirmKoucTest extends TestCase
 
         $q = $o->executeAction($s, ActionType::END_TURN, [])['state'];
         $this->assertNotNull($q->getPendingStandFirm(), 'fixtura: otázka na první ránu');
-        $oba = $o->executeAction($q, ActionType::RESOLVE_STAND_FIRM, ['use' => false])['state'];
+        $kostka = $o->executeAction($q, ActionType::RESOLVE_STAND_FIRM, ['use' => false])['state'];
+        // P308: druhou ránu (2 kostky, asistence obránce) vybírá obránce-člověk (ř. 633-634) ⇒ napřed otázka na kostku
+        $this->assertNotNull($kostka->getPendingBlockDie(), 'fixtura: kostku druhé rány volí kouč obránce');
+        $oba = $o->executeAction($kostka, ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0])['state'];
         $this->assertNotNull($oba->getPendingApothecary(), 'fixtura: hráč v davu KO ⇒ lékárník');
         $this->assertNotNull($oba->getPendingStandFirm(), 'fixtura: druhá rána Frenzy ⇒ otázka');
 

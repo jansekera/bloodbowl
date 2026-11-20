@@ -244,6 +244,11 @@ async function handleActionResult(result: ActionResult): Promise<void> {
         showRefereeModal(result.state);
         return;
     }
+    // P308: AI blokuje hráče kouče a kostku vybírá obránce (ř. 633-634) — uprostřed tahu AI, přednostně
+    if (result.state.pendingBlockDie) {
+        showDefenderBlockDieModal(result.state);
+        return;
+    }
 
     // Show block dice modal if there's a pending block (P224: ne, když kouč už kostku zvolil a čeká Grab)
     if (result.state.pendingBlock && !result.state.pendingGrab && !result.state.pendingStandFirm
@@ -479,6 +484,28 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
         },
         opponentPicks,
     );
+}
+
+/** P308: kouč obránce volí kostku bloku AI (ř. 633-634); po odpovědi server tah AI přehraje a dohraje. */
+function showDefenderBlockDieModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingBlockDie;
+    if (!pending) return;
+    const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
+    blockDiceModal.showDefenderPick(pending, nameOf(pending.attackerId), nameOf(pending.defenderId), async (faceIndex: number) => {
+        isProcessing = true;
+        try {
+            const result = await api.submitAction(matchId, 'resolve_block_die', { faceIndex });
+            await handleActionResult(result);
+            clearAllTargets();
+            actionPanel.setSelectedMode(null);
+        } catch (err) {
+            console.error(err);
+            toast.error('Block die choice failed');
+            showDefenderBlockDieModal(state); // otázka na serveru stále čeká
+        } finally {
+            isProcessing = false;
+        }
+    });
 }
 
 function showRerollModal(state: import('./api/types').GameState): void {
@@ -1317,6 +1344,8 @@ async function init(): Promise<void> {
             enterBombRethrow(state); // P272: i po obnovení stránky
         } else if (state.pendingReferee) {
             showRefereeModal(state); // P291: i po obnovení stránky
+        } else if (state.pendingBlockDie) {
+            showDefenderBlockDieModal(state); // P308: i po obnovení stránky
         } else {
             // Show block dice modal if there's a pending block on load
             if (state.pendingBlock && !state.pendingGrab && !state.pendingStandFirm && state.aiTeam !== state.activeTeam) {

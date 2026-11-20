@@ -1055,6 +1055,22 @@ final class BlockHandler implements ActionHandlerInterface
 
         // Note: team rerolls are NOT auto-used on blocks (available through interactive dialog only)
 
+        // OPRAVENO 20.11.2026 (P308) -- kostku vybíral engine i za člověka-obránce (`autoChooseBlockDie`). Pravidla
+        //   ř. 633-634: "The coach of the stronger player picks which block dice is used." ⇒ vybírá-li obránce
+        //   kouče-člověka, akce se přeruší otázkou (`Coach::blockDie`) a po odpovědi přehraje. (Útočník-člověk
+        //   volí v dialogu: na jeho tahu jsou bloky interaktivní a sem se nedojde.)
+        if (!$pending->isAttackerChooses()) {
+            $bestFace = $this->coach->blockDie(
+                $defender->getTeamSide(),
+                $pending->getAttackerId(),
+                $pending->getDefenderId(),
+                $pending->getFaces(),
+                $pending->isFrenzy(),
+                $bestFace,
+                $state,
+            );
+        }
+
         // Choose best face
         $bestIdx = 0;
         foreach ($pending->getFaces() as $idx => $f) {
@@ -1292,6 +1308,12 @@ final class BlockHandler implements ActionHandlerInterface
                     $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, false, null);
                 }
             }
+        }
+        // OPRAVENO 20.11.2026 (P308) -- i za člověka-obránce vybral kostku engine. Ř. 633-634: "The coach of the
+        //   stronger player picks which block dice is used." Jen v tahu AI (útočník není kouč-člověk): hot-seat
+        //   dvou lidí server nerozliší (P308 ho odkládá). Silnější útočník-člověk: kostku dál volí engine (P308, otevřené).
+        if (!$attackerChooses && !$this->coach->decides($attacker->getTeamSide())) {
+            $chosenFace = $this->coach->blockDie($defender->getTeamSide(), $attacker->getId(), $defender->getId(), $faces, false, $chosenFace, $state);
         }
 
         $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);

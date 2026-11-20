@@ -54,6 +54,8 @@ final class GameState
         private ?PendingBombRethrowDTO $pendingBombRethrow = null,
         // P291, 10.11.2026: rozhodčí vylučuje hráče kouče-člověka — úplatek / protest? (viz PendingRefereeDTO)
         private ?PendingRefereeDTO $pendingReferee = null,
+        // P308, 20.11.2026: AI blokuje hráče kouče-člověka a kostku vybírá obránce (viz PendingBlockDieDTO).
+        private ?PendingBlockDieDTO $pendingBlockDie = null,
     ) {}
 
     /**
@@ -408,6 +410,18 @@ final class GameState
         return $clone;
     }
 
+    public function getPendingBlockDie(): ?PendingBlockDieDTO
+    {
+        return $this->pendingBlockDie;
+    }
+
+    public function withPendingBlockDie(?PendingBlockDieDTO $pending): self
+    {
+        $clone = clone $this;
+        $clone->pendingBlockDie = $pending;
+        return $clone;
+    }
+
     public function getPendingReferee(): ?PendingRefereeDTO
     {
         return $this->pendingReferee;
@@ -421,12 +435,14 @@ final class GameState
     }
 
     /**
-     * Čeká otázka, po jejíž odpovědi se přerušená akce přehraje (Diving Catch, kam hodit bombu, rozhodčí u faulu),
-     * přehoz hodu (P292), nebo rozhodčí na konci drive (P291)? Žádná jiná akce ani tah AI do odpovědi.
+     * Čeká otázka, po jejíž odpovědi se přerušená akce přehraje (Diving Catch, kam hodit bombu, rozhodčí u faulu,
+     * kostka bloku obránce-člověka v tahu AI — P308), přehoz hodu (P292), nebo rozhodčí na konci drive (P291)?
+     * Žádná jiná akce ani tah AI do odpovědi.
      */
     public function hasPendingReplayQuestion(): bool
     {
         return $this->pendingDivingCatch !== null || $this->pendingBombRethrow !== null || $this->pendingReferee !== null
+            || $this->pendingBlockDie !== null
             || $this->pendingReroll !== null;   // P292/P294: přehoz hodu (i v tahu soupeře), vždy přehráním
     }
 
@@ -611,6 +627,7 @@ final class GameState
             'pendingDivingCatch' => $this->pendingDivingCatch?->toArray($sPrehranim),
             'pendingBombRethrow' => $this->pendingBombRethrow?->toArray($sPrehranim),
             'pendingReferee' => $this->pendingReferee?->toArray($sPrehranim),
+            'pendingBlockDie' => $this->pendingBlockDie?->toArray($sPrehranim),
         ];
     }
 
@@ -648,6 +665,7 @@ final class GameState
             pendingDivingCatch: isset($data['pendingDivingCatch']) ? PendingDivingCatchDTO::fromArray((array) $data['pendingDivingCatch']) : null,
             pendingBombRethrow: isset($data['pendingBombRethrow']) ? PendingBombRethrowDTO::fromArray((array) $data['pendingBombRethrow']) : null,
             pendingReferee: isset($data['pendingReferee']) ? PendingRefereeDTO::fromArray((array) $data['pendingReferee']) : null,
+            pendingBlockDie: isset($data['pendingBlockDie']) ? PendingBlockDieDTO::fromArray((array) $data['pendingBlockDie']) : null,
         );
     }
 }

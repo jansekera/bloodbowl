@@ -17,34 +17,41 @@ final class ReplayAnswers
      * @param list<array{x: int, y: int}> $bombTargets kam hodit chycenou bombu (P272)
      * @param list<array{bribe: bool, argue: bool}> $referee úplatek / protest u faulu (P291)
      * @param list<string> $rerolls přehoz hodu: 'pro' | 'team_reroll' | 'decline' (P292)
+     * @param list<int> $blockDice index kostky bloku, kterou zvolil obránce-člověk v tahu AI (P308)
      */
     public function __construct(
         public readonly array $divingCatch = [],
         public readonly array $bombTargets = [],
         public readonly array $referee = [],
         public readonly array $rerolls = [],
+        public readonly array $blockDice = [],
     ) {}
 
     public function withDivingCatch(bool $use): self
     {
-        return new self([...$this->divingCatch, $use], $this->bombTargets, $this->referee, $this->rerolls);
+        return new self([...$this->divingCatch, $use], $this->bombTargets, $this->referee, $this->rerolls, $this->blockDice);
     }
 
     /** @param array{x: int, y: int} $target */
     public function withBombTarget(array $target): self
     {
-        return new self($this->divingCatch, [...$this->bombTargets, $target], $this->referee, $this->rerolls);
+        return new self($this->divingCatch, [...$this->bombTargets, $target], $this->referee, $this->rerolls, $this->blockDice);
     }
 
     /** @param array{bribe: bool, argue: bool} $choice */
     public function withReferee(array $choice): self
     {
-        return new self($this->divingCatch, $this->bombTargets, [...$this->referee, $choice], $this->rerolls);
+        return new self($this->divingCatch, $this->bombTargets, [...$this->referee, $choice], $this->rerolls, $this->blockDice);
     }
 
     public function withReroll(string $choice): self
     {
-        return new self($this->divingCatch, $this->bombTargets, $this->referee, [...$this->rerolls, $choice]);
+        return new self($this->divingCatch, $this->bombTargets, $this->referee, [...$this->rerolls, $choice], $this->blockDice);
+    }
+
+    public function withBlockDie(int $faceIndex): self
+    {
+        return new self($this->divingCatch, $this->bombTargets, $this->referee, $this->rerolls, [...$this->blockDice, $faceIndex]);
     }
 
     /** @return array<string, mixed> */
@@ -55,6 +62,7 @@ final class ReplayAnswers
             'bombTargets' => $this->bombTargets,
             'referee' => $this->referee,
             'rerolls' => $this->rerolls,
+            'blockDice' => $this->blockDice,
         ];
     }
 
@@ -72,6 +80,7 @@ final class ReplayAnswers
                 (array) ($data['referee'] ?? []),
             )),
             array_values(array_map('strval', (array) ($data['rerolls'] ?? []))),
+            array_values(array_map('intval', (array) ($data['blockDice'] ?? []))),
         );
     }
 }

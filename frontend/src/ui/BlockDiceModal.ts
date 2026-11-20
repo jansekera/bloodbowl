@@ -1,4 +1,4 @@
-import type { PendingBlock } from '../api/types';
+import type { PendingBlock, PendingBlockDie } from '../api/types';
 import { escapeHtml } from './escapeHtml';
 
 const DICE_DISPLAY: Record<string, { label: string; css: string; title: string }> = {
@@ -8,6 +8,21 @@ const DICE_DISPLAY: Record<string, { label: string; css: string; title: string }
     'defender_stumbles': { label: 'DS', css: 'stumble', title: 'Defender Stumbles' },
     'defender_down': { label: 'DD', css: 'pow', title: 'Defender Down' },
 };
+
+function titleHtml(isFrenzy: boolean): string {
+    const frenzyLabel = isFrenzy ? ' <span class="block-dice-modal__frenzy">(Frenzy)</span>' : '';
+    return `<div class="block-dice-modal__title">Block Dice${frenzyLabel}</div>`;
+}
+
+/** Kostky bloku; `clickable` = nesou data-index a dají se zvolit (jinak jen k nahlédnutí). */
+function diceHtml(faces: string[], clickable: boolean): string {
+    return faces.map((face, idx) => {
+        const d = DICE_DISPLAY[face] ?? { label: '?', css: 'default', title: face };
+        return clickable
+            ? `<button class="block-dice-modal__die block-dice-modal__die--${d.css}" data-index="${idx}" title="${d.title}">${d.label}</button>`
+            : `<button class="block-dice-modal__die block-dice-modal__die--${d.css}" disabled title="${d.title}">${d.label}</button>`;
+    }).join('');
+}
 
 export class BlockDiceModal {
     private container: HTMLElement;
@@ -47,21 +62,12 @@ export class BlockDiceModal {
             rerollButtons += '<button class="block-dice-modal__reroll block-dice-modal__reroll--team" data-type="team" title="Reroll all block dice">Team Reroll</button>';
         }
 
-        const diceHtml = pending.faces.map((face, idx) => {
-            const d = DICE_DISPLAY[face] ?? { label: '?', css: 'default', title: face };
-            return opponentPicks
-                ? `<button class="block-dice-modal__die block-dice-modal__die--${d.css}" disabled title="${d.title}">${d.label}</button>`
-                : `<button class="block-dice-modal__die block-dice-modal__die--${d.css}" data-index="${idx}" title="${d.title}">${d.label}</button>`;
-        }).join('');
-
-        const frenzyLabel = pending.isFrenzy ? ' <span class="block-dice-modal__frenzy">(Frenzy)</span>' : '';
-
         this.container.innerHTML = `
             <div class="block-dice-modal__backdrop"></div>
             <div class="block-dice-modal__content">
-                <div class="block-dice-modal__title">Block Dice${frenzyLabel}</div>
+                ${titleHtml(pending.isFrenzy)}
                 <div class="block-dice-modal__info">${escapeHtml(chooserLabel)} chooses</div>
-                <div class="block-dice-modal__dice">${diceHtml}</div>
+                <div class="block-dice-modal__dice">${diceHtml(pending.faces, !opponentPicks)}</div>
                 ${opponentPicks ? '<button class="block-dice-modal__accept">Continue (opponent picks the die)</button>' : ''}
                 <label class="block-dice-modal__followup"><input type="checkbox" class="block-dice-modal__followup-input" checked> Follow up if the defender is pushed</label>
                 ${rerollButtons ? `<div class="block-dice-modal__rerolls">${rerollButtons}</div>` : ''}
@@ -94,6 +100,37 @@ export class BlockDiceModal {
                 this.hide();
                 this.onReroll?.(type);
             });
+        });
+    }
+
+    /**
+     * P308: AI blokuje hráče kouče-člověka a kostku vybírá obránce (BB2016 ř. 633-634). Follow-up a přehoz patří
+     * útočníkovi (AI), dialog nabízí jen volbu kostky.
+     */
+    showDefenderPick(
+        question: PendingBlockDie,
+        attackerName: string,
+        defenderName: string,
+        onChoose: (faceIndex: number) => void,
+    ): void {
+        this.container.innerHTML = `
+            <div class="block-dice-modal__backdrop"></div>
+            <div class="block-dice-modal__content">
+                ${titleHtml(question.isFrenzy)}
+                <div class="block-dice-modal__info">${escapeHtml(attackerName)} blocks ${escapeHtml(defenderName)} — ${escapeHtml(defenderName)} chooses</div>
+                <div class="block-dice-modal__dice">${diceHtml(question.faces, true)}</div>
+            </div>
+        `;
+        this.container.style.display = '';
+
+        this.container.querySelectorAll('.block-dice-modal__die').forEach(btn => {
+            const index = (btn as HTMLElement).dataset.index;
+            if (index !== undefined) {
+                btn.addEventListener('click', () => {
+                    this.hide();
+                    onChoose(parseInt(index, 10));
+                });
+            }
         });
     }
 

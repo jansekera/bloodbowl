@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BlockDiceModal } from './BlockDiceModal';
-import type { PendingBlock } from '../api/types';
+import type { PendingBlock, PendingBlockDie } from '../api/types';
 
 /**
  * P81 krok 3 (30.09.2026): follow-up je volba utocnika (BB2016 r. 608-611)
@@ -107,5 +107,36 @@ describe('BlockDiceModal follow-up', () => {
         modal.show({ ...pending, attackerChooses: false }, 'A', 'B', onChoose, vi.fn(), true);
         modalEl.clickAccept();
         expect(onChoose).toHaveBeenCalledWith(null, true);
+    });
+});
+
+// P308: v tahu AI vybírá kostku obránce-člověk (BB2016 ř. 633-634) — dialog bez follow-upu a přehozů útočníka
+describe('BlockDiceModal defender pick', () => {
+    let modalEl: ReturnType<typeof mockElement>;
+    const question: PendingBlockDie = { attackerId: 1, defenderId: 2, faces: ['defender_down', 'attacker_down'], isFrenzy: false };
+
+    beforeEach(() => {
+        modalEl = mockElement();
+        vi.stubGlobal('document', { createElement: () => modalEl });
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('lets the defending coach pick any rolled die', () => {
+        const modal = new BlockDiceModal(mockElement() as unknown as HTMLElement);
+        const onChoose = vi.fn();
+        modal.showDefenderPick(question, 'Orc', 'Elf', onChoose);
+        expect(modalEl.dieHandlerCount()).toBe(2);
+        modalEl.clickDie(0);
+        expect(onChoose).toHaveBeenCalledWith(0);
+        expect(modal.isVisible()).toBe(false);
+    });
+
+    it('names the defender as the chooser and offers no follow-up or reroll', () => {
+        const modal = new BlockDiceModal(mockElement() as unknown as HTMLElement);
+        modal.showDefenderPick(question, 'Orc', 'Elf', vi.fn());
+        expect(modalEl.innerHTML).toContain('Elf chooses');
+        expect(modalEl.innerHTML).not.toContain('followup-input');
+        expect(modalEl.innerHTML).not.toContain('block-dice-modal__reroll');
+        expect(modalEl.innerHTML).not.toContain('block-dice-modal__accept');
     });
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\Enum\BlockDiceFace;
 use App\Enum\RollCategory;
 use App\Enum\RollType;
 use App\DTO\GameState;
@@ -29,6 +30,8 @@ final class Coach
     private array $referee = [];
     /** @var list<string> */
     private array $rerolls = [];
+    /** @var list<int> */
+    private array $blockDice = [];
 
     /** @param list<TeamSide> $sides strany kouče-člověka */
     public function __construct(array $sides = [])
@@ -54,11 +57,12 @@ final class Coach
         $this->bombTargets = $answers->bombTargets;
         $this->referee = $answers->referee;
         $this->rerolls = $answers->rerolls;
+        $this->blockDice = $answers->blockDice;
     }
 
     public function end(): void
     {
-        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = [];
+        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = $this->blockDice = [];
     }
 
     /** Skočí hráč pro míč? (ř. 8065 "can attempt") */
@@ -96,6 +100,31 @@ final class Coach
         }
 
         return array_shift($this->referee) ?? throw (new RefereeQuestion($playerId, $canBribe, $canArgue))->naStavu($stav);
+    }
+
+    /**
+     * Kostka bloku, kterou vybírá strana `$vybira` (P308). `rules_bb2016.txt` ř. 633-634: "The coach of the stronger
+     * player picks which block dice is used." Dřív ji v tahu AI za člověka-obránce vybral engine (`autoChooseBlockDie`).
+     *
+     * @param list<BlockDiceFace> $faces
+     * @param BlockDiceFace $suggested volba enginu (AI ji vezme)
+     */
+    public function blockDie(
+        TeamSide $vybira,
+        int $attackerId,
+        int $defenderId,
+        array $faces,
+        bool $isFrenzy,
+        BlockDiceFace $suggested,
+        GameState $stav,
+    ): BlockDiceFace {
+        if (!$this->decides($vybira)) {
+            return $suggested;
+        }
+        $i = array_shift($this->blockDice)
+            ?? throw (new BlockDieQuestion($attackerId, $defenderId, $faces, $isFrenzy))->naStavu($stav->withPendingBlock(null));
+
+        return $faces[$i] ?? throw new \InvalidArgumentException("Block die {$i} not rolled");
     }
 
     /**

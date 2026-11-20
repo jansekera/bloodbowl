@@ -69,6 +69,17 @@ final class RulesEngine
         if ($action === ActionType::RESOLVE_BOMB_RETHROW) {
             return ['No pending bomb rethrow question'];
         }
+        // P308: kostka bloku, kterou v tahu AI vybírá obránce-člověk (ř. 633-634) — jen odpověď, jen padlá kostka
+        $kostka = $state->getPendingBlockDie();
+        if ($kostka !== null) {
+            if ($action !== ActionType::RESOLVE_BLOCK_DIE) {
+                return ['Must choose the block die first'];
+            }
+            return $kostka->isFaceIndex($params['faceIndex'] ?? null) ? [] : ['Invalid face index'];
+        }
+        if ($action === ActionType::RESOLVE_BLOCK_DIE) {
+            return ['No pending block die question'];
+        }
         // P291: rozhodčí vylučuje hráče kouče-člověka — jen odpověď; volit smí jen to, co tým má
         $rozhodci = $state->getPendingReferee();
         if ($rozhodci !== null) {
@@ -198,6 +209,10 @@ final class RulesEngine
         // P291: rozhodčí — jen odpověď kouče
         if ($state->getPendingReferee() !== null) {
             return [['type' => ActionType::RESOLVE_REFEREE->value]];
+        }
+        // P308: kostka bloku obránce-člověka v tahu AI — jen odpověď kouče
+        if ($state->getPendingBlockDie() !== null) {
+            return [['type' => ActionType::RESOLVE_BLOCK_DIE->value]];
         }
 
         // P206 (b): čekající volba o lékárníkovi — jen odpověď kouče

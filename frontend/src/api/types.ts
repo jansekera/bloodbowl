@@ -154,6 +154,18 @@ export interface PendingBombRethrow {
     suggested: { x: number; y: number } | null;
 }
 
+/**
+ * P308: AI blokuje hráče kouče-člověka a kostku vybírá obránce (`rules_bb2016.txt` ř. 633-634: „The coach of the
+ * stronger player picks which block dice is used“). Stav je okamžik otázky (jen k zobrazení); po odpovědi
+ * (`resolve_block_die`, `faceIndex`) server akci AI přehraje se stejnými kostkami.
+ */
+export interface PendingBlockDie {
+    attackerId: number;
+    defenderId: number;
+    faces: string[];
+    isFrenzy: boolean;
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -180,6 +192,7 @@ export interface GameState {
     pendingDivingCatch?: PendingDivingCatch | null;
     pendingBombRethrow?: PendingBombRethrow | null;
     pendingReferee?: PendingReferee | null;
+    pendingBlockDie?: PendingBlockDie | null;
 }
 
 export interface TeamState {
