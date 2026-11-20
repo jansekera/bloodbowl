@@ -143,8 +143,9 @@ final class MoveHandler implements ActionHandlerInterface
                 throw new \InvalidArgumentException("Player {$playerId} not found after stand-up");
             }
 
-            // Stand in place only
-            if ($player->getPosition() !== null && $player->getPosition()->equals($destination)) {
+            // Stand in place only. Zakořeněný (Take Root při ohlášení pohybu) jen vstane a zůstane: MA 0 a „may not
+            //   Go For It“ (ř. 8575-8584). Dřív hledal cestu a akce spadla na „No valid path“ (P182 zbytky, 19.11.).
+            if ($player->isRooted() || ($player->getPosition() !== null && $player->getPosition()->equals($destination))) {
                 return ActionResult::success($this->ukoncitKrok($state, $player, $partial), $events);
             }
         }

@@ -18,7 +18,13 @@ use App\ValueObject\Position;
 
 final class BallResolver
 {
-    private const MAX_BOUNCES = 5;
+    /**
+     * Pojistka proti nekonečné rekurzi, ne pravidlo (jako C++ `ball_handler.cpp` `depth > 200`).
+     * OPRAVENO 19.11.2026 (audit parity 08.10., nález 22) -- tady bylo 5: po pátém odrazu zůstal míč ležet
+     * i pod stojícím nebo ležícím hráčem. Ř. 903-906: odráží se, „until it is either caught or bounces into
+     * an empty square or off the pitch“.
+     */
+    private const MAX_BOUNCES = 200;
 
 
     public function __construct(

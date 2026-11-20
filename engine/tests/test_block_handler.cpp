@@ -2791,3 +2791,27 @@ TEST(BlockHandler, P250PushSomeoneOntoTheLooseBallWhenWeOutnumberAroundIt) {
         }
     }
 }
+
+// Zbytky auditu parity 08.10.2026 (P182, nález 18), 19.11.2026. Horns ř. 8173-8175: „adds 1 to the
+// player's Strength for ANY BLOCK(S) he makes during a Blitz Action“ ⇒ i druhý blok Frenzy v blitzu.
+// Dřív `secondParams.hornsBonus = false`. ST3 + Horns proti ST4: s Horns 1 kostka (útočník), bez nich
+// 2 kostky proti ⇒ starý kód sáhne pro třetí kostku a FixedDiceRoller vyhodí výjimku.
+TEST(BlockHandler, HornsApplyToFrenzySecondBlockInBlitz) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);               // ST3
+    gs.getPlayer(1).skills.add(SkillName::Horns);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 4, 3, 8);  // ST4
+    std::vector<GameEvent> events;
+    // 1. blok: 1 kostka, 3 = PUSHED (obránce na (12,7), útočník následuje); 2. blok: 1 kostka, 3 = PUSHED
+    FixedDiceRoller dice({3, 3});
+    BlockParams params{1, 12, true, true};
+    ASSERT_NO_THROW(resolveBlock(gs, params, dice, &events));
+    int bloky = 0;
+    for (const auto& e : events) {
+        if (e.type != GameEvent::Type::BLOCK) continue;
+        ++bloky;
+    }
+    EXPECT_EQ(bloky, 2) << "po Pushed přijde druhý blok Frenzy";
+    EXPECT_EQ(dice.remaining(), 0u);
+}

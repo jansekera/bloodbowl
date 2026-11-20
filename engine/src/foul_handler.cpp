@@ -150,10 +150,13 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
         handleBallOnPlayerDown(state, target.id, dice, events);
     }
 
-    // Doubles: fouler ejected (SneakyGit prevents)
+    // Doubles: fouler ejected. OPRAVENO 19.11.2026 (audit parity 08.10., nález 20) -- Sneaky Git tu
+    // chránil VŽDY. Pravidla ř. 8484-8486: „not ejected for rolling doubles on the Armour roll UNLESS THE
+    // ARMOUR ROLL WAS SUCCESSFUL“ ⇒ chrání jen dublet na brnění, které vydrželo; dublet na zranění skill
+    // nezmiňuje (ř. 1877-1878) a zranění se hází jen po proraženém brnění.
     bool sentToReserves = false;
     if (isDoubles) {
-        if (!fouler.hasSkill(SkillName::SneakyGit)) {
+        if (!fouler.hasSkill(SkillName::SneakyGit) || armourBroken) {
             // OPRAVENO 09.10.2026 (T5.26) — pozice se nastavila na (−1,−1) DŘÍV, než se míč
             // pustil, takže se odrážel z pole mimo hřiště. Pravidla ř. 1882-1884: „If the sent
             // off player was holding the ball, the ball bounces from the square he was standing

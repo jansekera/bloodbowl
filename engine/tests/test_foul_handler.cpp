@@ -447,3 +447,31 @@ TEST(FoulHandler, P291SoupereSeNeptaAUplatekPouzije) {
     resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getTeamState(TeamSide::AWAY).bribes, 0);
 }
+
+// Zbytky auditu parity 08.10.2026 (P182, nález 20), 19.11.2026. Sneaky Git ř. 8484-8486: „not ejected for
+// rolling doubles on the Armour roll UNLESS THE ARMOUR ROLL WAS SUCCESSFUL“. Dřív Sneaky Git chránil vždy.
+TEST(FoulHandler, SneakyGitEjectedWhenDoublesBreakArmour) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::SneakyGit);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    // brnění 5+5 = 10 > 8 (dublet), zranění 3+4 = 7 omráčen, protest 3 = nic (P287)
+    FixedDiceRoller dice({5, 5, 3, 4, 3});
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
+    EXPECT_TRUE(result.turnover);
+}
+
+// Dublet na ZRANĚNÍ Sneaky Git nezmiňuje ⇒ běžné vyloučení (ř. 1877-1878); brnění navíc prorazilo.
+TEST(FoulHandler, SneakyGitEjectedOnInjuryDoubles) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::SneakyGit);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    // brnění 6+4 = 10 > 8, zranění 3+3 = 6 (dublet) omráčen, protest 3 = nic
+    FixedDiceRoller dice({6, 4, 3, 3, 3});
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
+}

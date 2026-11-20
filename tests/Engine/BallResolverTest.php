@@ -432,7 +432,7 @@ final class BallResolverTest extends TestCase
      * s neúspěšným chytáním. P223 review LOW: `resolveLanding` → `resolveCatch` při neúspěchu
      * odrážel s hloubkou 0 ⇒ smyčka „odraz ven → vhazování → nechytí → odraz ven“ neměla strop.
      * A na (6,0) a B na (6,1), oba nechytají (1); každý odraz na sever, vhazování kolmo dovnitř
-     * o jedno pole na B. Kostek je na 30 kol smyčky — bez stropu dojdou.
+     * o jedno pole na B. Kostek je na 300 kol smyčky — bez stropu dojdou.
      */
     public function testBounceChainThroughThrowInsWithFailedCatchesStopsAtTheSafetyCap(): void
     {
@@ -444,8 +444,9 @@ final class BallResolverTest extends TestCase
 
         // odraz z A ven (1); vhazování: šablona 3, 2D6 = 1+1 ⇒ B; B nechytí (1), odraz (1) ⇒ A;
         // A nechytí (1), odraz (1) ⇒ ven; …
+        // 19.11.2026: pojistka je 200 (jako C++), dřív 5 ⇒ kostek na 300 kol
         $rolls = [1];
-        for ($i = 0; $i < 30; $i++) {
+        for ($i = 0; $i < 300; $i++) {
             array_push($rolls, 3, 1, 1, 1, 1, 1, 1);
         }
         $dice = new FixedDiceRoller($rolls);

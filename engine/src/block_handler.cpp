@@ -694,7 +694,7 @@ static BlockDiceInfo blockDiceFor(const GameState& state, const Player& att, con
 }
 
 // P225: podepsaný počet kostek (+ volí útočník, − obránce), jako getBlockDiceCount.
-// Horns na druhý blok neplatí (secondParams.hornsBonus = false).
+// `attST` už nese Horns v blitzu (platí i pro druhý blok Frenzy, ř. 8173-8175).
 static int signedDice(const GameState& state, const Player& att, const Player& def, int attST) {
     const BlockDiceInfo info = blockDiceFor(state, att, def, attST, def.stats.strength);
     return info.attackerChooses ? info.count : -info.count;
@@ -753,7 +753,8 @@ static bool frenzyTrapReady(const GameState& state, const Player& att, const Pla
     // jsou poměrové -- jedno srovnání bez něj by lhalo (ST3 vs ST6: +asistence obránce mění
     // počet kostek jinak než u ST6 vs ST6). Hod Dauntless ještě nepadl ⇒ obě větve: past jen,
     // když je nové pole horší aspoň v jedné a v žádné lepší.
-    const int baseST = att.stats.strength;
+    // Horns (ř. 8173-8175) i na druhý blok v blitzu; Dauntless se porovnává až po něm (ř. 8034-8035).
+    const int baseST = att.stats.strength + ((isBlitz && att.hasSkill(SkillName::Horns)) ? 1 : 0);
     const bool dauntless = att.hasSkill(SkillName::Dauntless) && def.stats.strength > baseST;
     bool worse = false;
     for (const int st : {baseST, dauntless ? def.stats.strength : baseST}) {
@@ -1681,8 +1682,10 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             return turnover ? ActionResult::turnovr() : ActionResult::ok();
         }
         // Mandatory second block
+        // OPRAVENO 19.11.2026 (audit parity 08.10., nález 18) -- tady bylo `hornsBonus = false`. Horns
+        // ř. 8173-8175: „adds 1 to the player's Strength for ANY BLOCK(S) he makes during a Blitz Action“
+        // ⇒ druhý blok Frenzy v blitzu má Horns taky (params.hornsBonus nese blitz i skill).
         BlockParams secondParams = params;
-        secondParams.hornsBonus = false; // no Horns on 2nd block
         att.hasActed = false; // allow second block
         ActionResult secondResult = resolveBlock(state, secondParams, dice, events, true);
         return secondResult;
