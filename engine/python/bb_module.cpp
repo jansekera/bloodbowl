@@ -598,7 +598,6 @@ PYBIND11_MODULE(bb_engine, m) {
                                       bb::TeamSide coachSide, const std::vector<int>& answers, bool bothSides) {
         py::tuple t = runCoached(state, dice, coachSide, answers, bothSides, [&](std::vector<bb::GameEvent>& ev) {
             bb::DiceRollerBase& base = dice;
-            state.kickingTeam = kickingTeam;
             if (secondHalf) {
                 state.half = 2;
                 bb::setupHalf(state, home, away, kickingTeam, &base, &ev);
@@ -829,11 +828,7 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("setup_half",
           [](bb::GameState& state, const bb::TeamRoster& home,
              const bb::TeamRoster& away, bb::TeamSide kickingTeam) {
-              // OPRAVENO 12.10.2026 (P195): chybělo -- výkop bere přijímající jako
-              // opponent(state.kickingTeam), takže při kicking_team=HOME se rozestavilo
-              // "kope HOME", ale výkop proběhl, jako by kopali AWAY (výchozí hodnota).
-              // setup_drive a setup_second_half to nastavovaly; volání s AWAY se nemění.
-              state.kickingTeam = kickingTeam;
+              // state.kickingTeam nastavuje setupHalf sám (P163; dřív tady, P195 12.10.2026).
               bb::setupHalf(state, home, away, kickingTeam, nullptr);
           },
           py::arg("state"), py::arg("home"), py::arg("away"),
@@ -843,7 +838,6 @@ PYBIND11_MODULE(bb_engine, m) {
           [eventsToList](bb::GameState& state, const bb::TeamRoster& home, const bb::TeamRoster& away,
              bb::TeamSide kickingTeam, bb::DiceRoller& dice) {
               bb::DiceRollerBase& base = dice;
-              state.kickingTeam = kickingTeam;   // simpleKickoff bere přijímající = opponent(state.kickingTeam)
               std::vector<bb::GameEvent> events;   // P201 (13): návrat z KO
               bb::setupDrive(state, home, away, kickingTeam, &base, &events);
               return eventsToList(events);
@@ -856,7 +850,6 @@ PYBIND11_MODULE(bb_engine, m) {
              bb::TeamSide kickingTeam, bb::DiceRoller& dice) {
               bb::DiceRollerBase& base = dice;
               state.half = 2;
-              state.kickingTeam = kickingTeam;
               std::vector<bb::GameEvent> events;   // P201 (13): návrat z KO
               bb::setupHalf(state, home, away, kickingTeam, &base, &events);
               return eventsToList(events);

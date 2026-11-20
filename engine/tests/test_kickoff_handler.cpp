@@ -1167,8 +1167,9 @@ TEST(KickoffHandler, KoPlayerRollsOnceToRecoverBetweenHalvesAfterALastTurnTouchd
 namespace {
 GameState korLosFixture() {
     GameState gs;
-    gs.kickingTeam = TeamSide::HOME;
-    setupHalf(gs, getHumanRoster(), getHumanRoster());
+    // P163: kope HOME. Dřív `gs.kickingTeam = HOME` + setupHalf s výchozím AWAY, které pole nepřepsalo
+    // (fixtura stála na té vadě; hráče stejně sundá z hřiště níž, rozestavení nehraje roli).
+    setupHalf(gs, getHumanRoster(), getHumanRoster(), TeamSide::HOME);
     gs.receiverSpeed = RosterSpeed::FAST;   // kop na (18,7)
     for (auto& p : gs.players) {
         p.skills.remove(SkillName::KickOffReturn);

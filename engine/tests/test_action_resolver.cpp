@@ -735,3 +735,104 @@ TEST(ActionResolver, P304ProneMultipleBlockWithAChainsawIsRejectedBeforeTheRoll)
     EXPECT_EQ(dice.remaining(), 4u) << "žádná kostka nepadla";
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
 }
+
+// P307 (19.11.2026, parita s PHP P304 (8) `BlockHandler::overitSousedstvi`): blok jen na soupeře „in an adjacent
+// square“ (ř. 539-540); Multiple Block jen proti dvěma, k nimž je hráč „adjacent“ (ř. 8299-8300). Dřív C++ sousedství
+// nekontroloval (legalitu držela jen nabídka `getAvailableActions`) a blok přes pole se odházel. Akce mimo pravidla
+// se odmítne dřív, než padne jakákoli kostka — i kontrola před akcí (Bone-head ř. 7976-7978) a Jump Up — a nic nezmění.
+static GameState p307Fixture() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 4, 3);
+    placePlayer(gs, 12, {12, 7}, TeamSide::AWAY);   // vzdálenost 2
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);   // soused
+    return gs;
+}
+
+TEST(ActionResolver, P307BlockOnANonAdjacentTargetIsRejectedWithoutDice) {
+    GameState gs = p307Fixture();
+    FixedDiceRoller dice({6, 6, 6, 6, 6, 6});   // bez kontroly: 2 kostky Defender Down ⇒ cíl leží
+    auto r = executeAction(gs, {ActionType::BLOCK, 1, 12, {12, 7}}, dice, nullptr);
+    EXPECT_FALSE(r.success) << "blok jen na sousední pole (ř. 539-540)";
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(dice.remaining(), 6u) << "žádná kostka nepadla";
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}));
+    EXPECT_FALSE(gs.getPlayer(1).hasActed) << "odmítnutá akce hráče nespotřebuje";
+}
+
+TEST(ActionResolver, P307ProneJumpUpBlockOnANonAdjacentTargetIsRejectedBeforeTheRoll) {
+    GameState gs = p307Fixture();
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).skills.add(SkillName::JumpUp);
+    FixedDiceRoller dice({6, 6, 6, 6, 6, 6});
+    auto r = executeAction(gs, {ActionType::BLOCK, 1, 12, {12, 7}}, dice, nullptr);
+    EXPECT_FALSE(r.success);
+    EXPECT_EQ(dice.remaining(), 6u) << "hod Jump Up se nehází";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+}
+
+TEST(ActionResolver, P307BoneHeadIsNotRolledForANonAdjacentBlock) {
+    GameState gs = p307Fixture();
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+    FixedDiceRoller dice({1, 6, 6, 6, 6, 6});   // bez kontroly: Bone-head 1 ⇒ ztratí zóny i akci
+    auto r = executeAction(gs, {ActionType::BLOCK, 1, 12, {12, 7}}, dice, nullptr);
+    EXPECT_FALSE(r.success);
+    EXPECT_EQ(dice.remaining(), 6u) << "kontrola před akcí se u neplatné akce nehází";
+    EXPECT_FALSE(gs.getPlayer(1).bigGuyCheckedThisTurn);
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+}
+
+TEST(ActionResolver, P307MultipleBlockNeedsBothTargetsAdjacent) {
+    for (const bool firstFar : {true, false}) {
+        GameState gs = p307Fixture();
+        gs.getPlayer(1).skills.add(SkillName::MultipleBlock);
+        FixedDiceRoller dice({6, 6, 6, 6, 6, 6, 6, 6, 6, 6});
+        const Action a = firstFar ? Action{ActionType::MULTIPLE_BLOCK, 1, 12, {13, 0}}
+                                  : Action{ActionType::MULTIPLE_BLOCK, 1, 13, {12, 0}};
+        auto r = executeAction(gs, a, dice, nullptr);
+        EXPECT_FALSE(r.success) << "ř. 8299-8300: oba cíle sousedí (firstFar=" << firstFar << ")";
+        EXPECT_EQ(dice.remaining(), 10u) << "žádná kostka nepadla (firstFar=" << firstFar << ")";
+        EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+        EXPECT_EQ(gs.getPlayer(13).state, PlayerState::STANDING);
+    }
+}
+
+// Pozitivní kontrola téhož přípravku: sousední cíl se blokuje dál.
+TEST(ActionResolver, P307BlockOnAnAdjacentTargetStillResolves) {
+    GameState gs = p307Fixture();
+    FixedDiceRoller dice({6, 6, 3, 3});   // 2 kostky Defender Down; brnění 3+3
+    auto r = executeAction(gs, {ActionType::BLOCK, 1, 13, {11, 8}}, dice, nullptr);
+    EXPECT_TRUE(r.success);
+    EXPECT_EQ(dice.remaining(), 0u);
+    EXPECT_NE(gs.getPlayer(13).state, PlayerState::STANDING);
+}
+
+// P317 (19.11.2026, parita s PHP `FoulHandler.php:53`): faul jen na soupeře „Prone or Stunned and in an adjacent
+// square“ (ř. 1840-1843). Dřív C++ `resolveFoul` sousedství nekontroloval (jen nabídka) a faul přes pole se odházel.
+TEST(ActionResolver, P317FoulOnANonAdjacentTargetIsRejectedWithoutDice) {
+    GameState gs = p307Fixture();
+    gs.getPlayer(12).state = PlayerState::PRONE;   // vzdálenost 2
+    FixedDiceRoller dice({6, 5, 6, 6, 6, 6});      // bez kontroly: brnění 6+5 > 8 ⇒ zranění
+    auto r = executeAction(gs, {ActionType::FOUL, 1, 12, {12, 7}}, dice, nullptr);
+    EXPECT_FALSE(r.success) << "faul jen na sousední pole (ř. 1840-1843)";
+    EXPECT_EQ(dice.remaining(), 6u) << "žádná kostka nepadla";
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_FALSE(gs.getTeamState(TeamSide::HOME).foulUsedThisTurn) << "týmový faul se nespotřebuje";
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+}
+
+// P318 (19.11.2026, parita s PHP `HypnoticGazeHandler.php:46`): Hypnotic Gaze jen na soupeře „in an adjacent square“
+// (ř. 8180-8182). Dřív C++ `resolveHypnoticGaze` sousedství nekontroloval a pohled přes pole uspal cíl.
+TEST(ActionResolver, P318HypnoticGazeOnANonAdjacentTargetIsRejectedWithoutDice) {
+    GameState gs = p307Fixture();
+    gs.getPlayer(1).skills.add(SkillName::HypnoticGaze);
+    FixedDiceRoller dice({6, 6, 6, 6});   // bez kontroly: AG hod 6 uspěje ⇒ cíl ztratí zóny
+    auto r = executeAction(gs, {ActionType::HYPNOTIC_GAZE, 1, 12, {12, 7}}, dice, nullptr);
+    EXPECT_FALSE(r.success) << "pohled jen na sousední pole (ř. 8180-8182)";
+    EXPECT_EQ(dice.remaining(), 4u) << "žádná kostka nepadla";
+    EXPECT_FALSE(gs.getPlayer(12).lostTacklezones);
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+}
