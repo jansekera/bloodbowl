@@ -27,6 +27,11 @@ final class BlitzHandler implements ActionHandlerInterface
     {
         $attackerId = (int) $params['playerId'];
 
+        $zakoreneny = $this->vstatZakorenenyBezRany($state, $attackerId);
+        if ($zakoreneny !== null) {
+            return $zakoreneny;
+        }
+
         // P210 (16.10.2026): OHLASENI blitzu bez cile. `rules_bb2016.txt` r. 346-349: „The player may
         //   move … He may make one block during the move. The block may be made at any point during the
         //   move“ -- cil se pri ohlaseni nerika, hrac pak chodi kamkoli (MOVE) a ranu da, kdy chce
@@ -86,6 +91,24 @@ final class BlitzHandler implements ActionHandlerInterface
 
         $events = [];
 
+        // P86 (19.11.2026): ležící vstane na začátku akce (`rules_bb2016.txt` ř. 670-672, 690-695; Jump Up zdarma
+        //   ř. 8197-8199) -- týmž `MoveHandler` jako MOVE (vstání na místě; `partial` nechá pohyb otevřený pro
+        //   doběh k cíli). Nevstal-li (pod 3 MA hod 4+), akce končí bez rány; turnover to není (ř. 694-695).
+        if ($attacker->getState() === PlayerState::PRONE) {
+            $vstani = $this->moveHandler->resolve($state, [
+                'playerId' => $attackerId,
+                'x' => $attackerPos->getX(),
+                'y' => $attackerPos->getY(),
+                'partial' => true,
+            ]);
+            $state = $vstani->getNewState();
+            $events = $vstani->getEvents();
+            $attacker = $state->requirePlayer($attackerId);
+            if ($attacker->getState() !== PlayerState::STANDING) {
+                return ActionResult::success($state, $events);
+            }
+        }
+
         // If not adjacent, move to adjacent square first
         if ($attackerPos->distanceTo($defenderPos) > 1) {
             // Find best adjacent square to move to
@@ -140,8 +163,9 @@ final class BlitzHandler implements ActionHandlerInterface
                 'y' => $moveTarget->getY(),
             ]);
 
+            // P86: před pohybem mohlo proběhnout vstání -- jeho události se při turnoveru pohybu nesmí ztratit.
             if ($moveResult->isTurnover()) {
-                return $moveResult;
+                return ActionResult::turnover($moveResult->getNewState(), array_merge($events, $moveResult->getEvents()));
             }
 
             // Pending reroll from dodge/GFI during blitz movement
@@ -209,6 +233,32 @@ final class BlitzHandler implements ActionHandlerInterface
     }
 
     /**
+     * P86 (19.11.2026): ležící, který v tomhle blitzu propadl Take Root (`BigGuyCheckResolver` ho pustil dál), smí jen
+     * vstát -- `rules_bb2016.txt` ř. 8582-8584: „he may not block that turn (he can still roll to stand up if he is
+     * Prone)“; MA je 0, takže vstává hodem 4+ a dál se nehne (ř. 8577-8580). Ležící a zakořeněný současně je jen tenhle
+     * případ: zakořenění končí, když hráč nestojí (`MatchPlayerDTO::withState`). Blitz se spotřebuje (ohlášený je),
+     * akce končí -- i ohlášená bez cíle, aby se rána nedala dát později. null = netýká se.
+     */
+    private function vstatZakorenenyBezRany(GameState $state, int $attackerId): ?ActionResult
+    {
+        $hrac = $state->getPlayer($attackerId);
+        $pole = $hrac?->getPosition();
+        if ($hrac === null || $pole === null || $hrac->getState() !== PlayerState::PRONE || !$hrac->isRooted()) {
+            return null;
+        }
+        $side = $hrac->getTeamSide();
+        $state = $state->withTeamState($side, $state->getTeamState($side)->withBlitzUsed())->withDeclaredBlitzer(null);
+        $vstani = $this->moveHandler->resolve($state, ['playerId' => $attackerId, 'x' => $pole->getX(), 'y' => $pole->getY()]);
+        $state = $vstani->getNewState();
+        $po = $state->getPlayer($attackerId);
+        if ($po !== null && $state->getPendingReroll() === null) {
+            $state = $state->withPlayer($po->withHasActed(true)->withHasMoved(true));
+        }
+
+        return ActionResult::success($state, $vstani->getEvents());
+    }
+
+    /**
      * Nejbližší DOSAŽITELNÉ pole k cíli, když na sousední pole nedosáhneme.
      *
      * ⭐ Používá se jen pro blitz, který se nedá dokončit (viz `resolve`).
@@ -253,8 +303,8 @@ final class BlitzHandler implements ActionHandlerInterface
         // P82 (30.09.2026): rana stoji pole (`BlockHandler::payBlitzBlock`),
         //   takze cil blitzu je jen pole, odkud na ni jeste zbyde -- normalni
         //   pohyb, nebo aspon jedno GFI.
-        $gfiCap = $attacker->hasSkill(SkillName::Sprint) ? 3 : 2;
-        $maxCost = $attacker->getMovementRemaining() + $gfiCap - 1;
+        // P86: ležící platí vstání -- cesty pathfinderu začínají až po něm (`Pathfinder::pohybPoVstani`).
+        $maxCost = Pathfinder::pohybPoVstani($attacker) + Pathfinder::maxGfi($attacker) - 1;
         $payable = array_filter($validMoves, fn($p) => $p->getTotalCost() <= $maxCost);
 
         return self::findBlitzMoveTarget($payable, $defenderPos);

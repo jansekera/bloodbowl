@@ -26,6 +26,7 @@ use App\Engine\ThrowReroll;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\PassResolver;
+use App\Engine\Pathfinder;
 use App\Engine\StrengthCalculator;
 use App\Engine\TacklezoneCalculator;
 
@@ -592,7 +593,7 @@ final class BlockHandler implements ActionHandlerInterface
     /** Nejnižší zbývající pohyb, kam hráč smí jít přes GFI (2, se Sprintem 3; zakořeněný 0). Jedno místo (review 16.10.). */
     private function gfiPodlaha(MatchPlayerDTO $hrac): int
     {
-        return $hrac->isRooted() ? 0 : ($hrac->hasSkill(SkillName::Sprint) ? -3 : -2);
+        return -Pathfinder::maxGfi($hrac);
     }
 
     /**

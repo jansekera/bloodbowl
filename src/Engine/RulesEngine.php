@@ -235,7 +235,7 @@ final class RulesEngine
                     if ($player->canMove() && $this->canPlayerMoveAnywhere($state, $player)) {
                         $actions[] = ['type' => ActionType::MOVE->value, 'playerId' => $player->getId()];
                     }
-                    if ($player->canAct()) {
+                    if ($player->canTakeBlitzAction()) {
                         $actions[] = ['type' => ActionType::BLITZ->value, 'playerId' => $player->getId()];
                     }
                     continue;
@@ -297,9 +297,10 @@ final class RulesEngine
 
             // Blitz: once per turn, any unmoved player (excluding B&C). P210: ohlasuje se na zacatku
             //   aktivace -- kdo uz ohlasil pohyb (MOVE), blitz nedostane (r. 346-349, 414-427).
+            //   P86: i lezici (r. 676), `canTakeBlitzAction`.
             if (!$teamState->isBlitzUsedThisTurn()) {
                 foreach ($state->getTeamPlayers($side) as $player) {
-                    if ($player->canAct() && !$player->hasMovedThisTurn() && !$player->hasSkill(SkillName::BallAndChain)) {
+                    if ($player->canTakeBlitzAction() && !$player->hasMovedThisTurn() && !$player->hasSkill(SkillName::BallAndChain)) {
                         $actions[] = ['type' => ActionType::BLITZ->value, 'playerId' => $player->getId()];
                     }
                 }
@@ -398,6 +399,8 @@ final class RulesEngine
 
         $moves = $this->pathfinder->findValidMoves($state, $player);
         $targets = [];
+        // P86: pod 3 pole se vstává na 4+ (ř. 690-692) -- šance cesty i vstání na místě ho zahrnuje
+        $vstani = Pathfinder::sanceVstani($player);
 
         // PRONE players can always stand in place
         if ($player->getState() === PlayerState::PRONE && $player->getPosition() !== null) {
@@ -407,7 +410,7 @@ final class RulesEngine
                 'y' => $pos->getY(),
                 'dodges' => 0,
                 'gfis' => 0,
-                'successChance' => 100,
+                'successChance' => (int) round($vstani * 100),
                 'path' => [],
             ];
         }
@@ -425,7 +428,7 @@ final class RulesEngine
                     'dodgeTarget' => $step->getDodgeTarget(),
                 ];
             }
-            $chance = 1.0;
+            $chance = $vstani;
             foreach ($path->getSteps() as $step) {
                 if ($step->requiresDodge()) {
                     $chance *= (7 - $step->getDodgeTarget()) / 6.0;
@@ -662,7 +665,8 @@ final class RulesEngine
             return ['Can only blitz with players from the active team'];
         }
 
-        if (!$player->canAct()) {
+        // P86: i ležící, který ještě nejednal (vstane na začátku akce, ř. 670-676)
+        if (!$player->canTakeBlitzAction()) {
             return ['Player cannot act'];
         }
 
@@ -735,7 +739,7 @@ final class RulesEngine
     public function getBlitzTargets(GameState $state, MatchPlayerDTO $player): array
     {
         $declared = $state->getDeclaredBlitzerId() === $player->getId();   // P210: ohlášený blitz
-        if (!$player->canAct() || (!$declared && ($player->hasMovedThisTurn()
+        if (!$player->canTakeBlitzAction() || (!$declared && ($player->hasMovedThisTurn()
                 || $state->getTeamState($player->getTeamSide())->isBlitzUsedThisTurn()))) {
             return [];   // bez ohlášení: blitz jen na začátku aktivace (P210)
         }

@@ -15,6 +15,8 @@ use App\ValueObject\Position;
 final class Pathfinder
 {
     private const GFI_SQUARES = 2;
+    /** Hod na vstání pod 3 pole pohybu (`rules_bb2016.txt` ř. 690-692). */
+    public const CIL_VSTANI = 4;
     private const SPRINT_GFI_SQUARES = 3;
 
     private readonly TacklezoneCalculator $tzCalc;
@@ -22,6 +24,49 @@ final class Pathfinder
     public function __construct(?TacklezoneCalculator $tzCalc = null)
     {
         $this->tzCalc = $tzCalc ?? new TacklezoneCalculator();
+    }
+
+    /**
+     * Pohyb, který hráči zbude po vstání na začátku akce (bez GFI) -- JEDINÉ místo pro MOVE i dosah Blitzu.
+     * `rules_bb2016.txt` ř. 670-672: vstání stojí 3 pole; ř. 690-695: pod 3 pole hod 4+ a pak „may not move
+     * further squares unless he Goes For It“ ⇒ 0; Jump Up ř. 8197-8199 zdarma. Hod samotný je
+     * `MoveHandler::resolveStandUp`. OPRAVENO 19.11.2026 (P86) -- pod 3 MA se dřív nevracela žádná cesta,
+     * takže ležící pod 3 MA nesměl po vstání GFI. Vzor: C++ `movementAfterStandUp` (helpers.cpp).
+     */
+    public static function pohybPoVstani(MatchPlayerDTO $player): int
+    {
+        $ma = $player->getMovementRemaining();
+        if ($player->getState() !== PlayerState::PRONE || $player->hasSkill(SkillName::JumpUp)) {
+            return $ma;
+        }
+
+        return $ma >= 3 ? $ma - 3 : 0;
+    }
+
+    /**
+     * Kolik GFI hráč smí za akci: 2 (ř. 1695-1697), se Sprintem 3 (ř. 8487-8490), zakořeněný 0 (ř. 8577-8578). JEDINÉ
+     * místo -- pathfinder, dosah blitzu (`BlitzHandler::poleDopadu`) i rána v blitzu (`BlockHandler::gfiPodlaha`).
+     * Vzor: C++ `maxGfiSquares` (helpers.cpp). P86 review 19.11.2026: dřív tři kopie, v `poleDopadu` bez zakořenění.
+     */
+    public static function maxGfi(MatchPlayerDTO $player): int
+    {
+        if ($player->isRooted()) {
+            return 0;
+        }
+
+        return $player->hasSkill(SkillName::Sprint) ? self::SPRINT_GFI_SQUARES : self::GFI_SQUARES;
+    }
+
+    /**
+     * Šance, že hráč na začátku akce vstane (bez přehozu): 1, pokud nestojí na hodu; pod 3 pole hod 4+ (ř. 690-692).
+     * Týž rozpočet jako `pohybPoVstani`. P86 (19.11.2026): nabídka pohybu dřív ukazovala vstání s jistotou.
+     */
+    public static function sanceVstani(MatchPlayerDTO $player): float
+    {
+        $naHod = $player->getState() === PlayerState::PRONE && !$player->hasSkill(SkillName::JumpUp)
+            && $player->getMovementRemaining() < 3;
+
+        return $naHod ? (7 - self::CIL_VSTANI) / 6.0 : 1.0;
     }
 
     /**
@@ -43,20 +88,9 @@ final class Pathfinder
             return [];
         }
 
-        $ma = $player->getMovementRemaining();
+        $ma = self::pohybPoVstani($player);
 
-        // PRONE players spend 3 MA to stand up (Jump Up: free)
-        if ($player->getState() === PlayerState::PRONE) {
-            if ($player->hasSkill(SkillName::JumpUp)) {
-                // Free stand-up, no MA cost
-            } elseif ($ma < 3) {
-                return []; // Must roll to stand; can only stand in place (handled by RulesEngine)
-            } else {
-                $ma -= 3;
-            }
-        }
-
-        $gfiSquares = $player->hasSkill(SkillName::Sprint) ? self::SPRINT_GFI_SQUARES : self::GFI_SQUARES;
+        $gfiSquares = self::maxGfi($player);
         $maxRange = $ma + $gfiSquares;
         $isInTz = $this->tzCalc->isInTacklezone($state, $player);
 

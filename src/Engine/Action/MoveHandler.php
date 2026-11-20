@@ -580,51 +580,47 @@ final class MoveHandler implements ActionHandlerInterface
     }
 
     /**
-     * Resolve stand-up for a prone player.
-     * Jump Up: free stand-up (0 MA cost).
-     * MA >= 3: automatic, costs 3 MA. MA < 3: roll 4+ required.
+     * Vstání ležícího na začátku akce. Na hod (4+) a kolik pohybu zbude, rozhoduje JEDINÉ místo `Pathfinder::sanceVstani`
+     * / `pohybPoVstani` (ř. 690-695, Jump Up ř. 8197-8199) -- tentýž rozpočet, ze kterého počítá cesty pathfinder.
+     * OPRAVENO 19.11.2026 (P86, review): rozhodoval MA ze statistik (C++ i pravidla: zbývající pohyb, „less than three
+     * squares of movement“) a vlastní kopie větví Jump Up / −3 / 0.
      *
      * @return array{state: GameState, events: list<GameEvent>, success: bool}
      */
     private function resolveStandUp(GameState $state, MatchPlayerDTO $player): array
     {
         $playerId = $player->getId();
+        $poVstani = Pathfinder::pohybPoVstani($player);
 
-        // Jump Up: stand up for free (0 MA cost)
-        if ($player->hasSkill(SkillName::JumpUp)) {
-            $events = [GameEvent::standUp($playerId)];
-            $player = $player->withState(PlayerState::STANDING);
-            $state = $state->withPlayer($player);
-            return ['state' => $state, 'events' => $events, 'success' => true];
-        }
-
-        if ($player->getStats()->getMovement() < 3) {
-            // Low MA: roll 4+ to stand
+        if (Pathfinder::sanceVstani($player) < 1.0) {
             $roll = $this->dice->rollD6();
-            $success = $roll >= 4;
+            $success = $roll >= Pathfinder::CIL_VSTANI;
             $events = [GameEvent::standUp($playerId, $roll, $success)];
-
+            // OPRAVENO 19.11.2026 (P86) -- hod šel holou kostkou bez přehozu. Ř. 929-933: týmový přehoz smí přehodit
+            //   „any dice roll (other than Armour, Injury or Casualty rolls)“ ve vlastním kole ⇒ i vstání (ř. 690-695).
+            //   Týž žebříček jako úhyb a GFI (Pro → týmový přehoz, Loner; kouče-člověka se zeptá). Vzor: C++ `attemptRoll`.
             if (!$success) {
-                // Failed: player stays prone, action done
-                $player = $player->withHasMoved(true)->withHasActed(true);
-                $state = $state->withPlayer($player);
+                $success = $this->prehoz(
+                    $state,
+                    $player,
+                    RollType::STAND_UP,
+                    Pathfinder::CIL_VSTANI,
+                    $roll,
+                    $player->requirePosition(),
+                    $events,
+                    static fn(int $r, bool $o): GameEvent => GameEvent::standUp($playerId, $r, $o),
+                );
+            }
+            if (!$success) {
+                // nevstal: leží dál, akce končí, turnover to není (ř. 694-695)
+                $state = $state->withPlayer($player->withHasMoved(true)->withHasActed(true));
                 return ['state' => $state, 'events' => $events, 'success' => false];
             }
-
-            // Success: stand up with 0 MA remaining
-            $player = $player
-                ->withState(PlayerState::STANDING)
-                ->withMovementRemaining(0);
-            $state = $state->withPlayer($player);
-            return ['state' => $state, 'events' => $events, 'success' => true];
+        } else {
+            $events = [GameEvent::standUp($playerId)];
         }
 
-        // Normal stand-up: costs 3 MA
-        $events = [GameEvent::standUp($playerId)];
-        $player = $player
-            ->withState(PlayerState::STANDING)
-            ->withMovementRemaining($player->getMovementRemaining() - 3);
-        $state = $state->withPlayer($player);
+        $state = $state->withPlayer($player->withState(PlayerState::STANDING)->withMovementRemaining($poVstani));
 
         return ['state' => $state, 'events' => $events, 'success' => true];
     }

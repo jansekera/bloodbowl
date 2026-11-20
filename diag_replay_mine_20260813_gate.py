@@ -105,9 +105,7 @@ def _game_worker(args: tuple) -> dict:
         weights_path=W, away_weights_path=W,
         epsilon=0.0, vf_blend=VF_BLEND,
         policy_weights_path=POLICY_PATH,
-        # jediný rozdíl proti 20260811b: brána na trpasličí straně
-        cage_advance=CAGE_GATE and dwarf_home,
-        away_cage_advance=CAGE_GATE and not dwarf_home,
+        # 18.11.2026: parametr `cage_advance` binding už nemá (klec je v produkci bez ramene) ⇒ CAGE_GATE se ignoruje
         dauntless_in_offer=DAUNTLESS,
     )
     turns = lgr.get_turn_logs()

@@ -217,9 +217,12 @@ final class PathfinderTest extends TestCase
         }
     }
 
-    public function testPronePlayerLowMACantMove(): void
+    /**
+     * `rules_bb2016.txt` ř. 690-694: pod 3 MA vstane na 4+ a „may not move further squares unless he Goes For It“.
+     * PŘEPSÁNO 19.11.2026 (P86) -- test dřív tvrdil, že pathfinder nevrátí nic (ležící jen vstane na místě); kódoval vadu.
+     */
+    public function testPronePlayerLowMAMayOnlyGoForItAfterStandingUp(): void
     {
-        // Prone player with MA=2 (< 3): pathfinder returns empty
         $state = (new GameStateBuilder())
             ->addPronePlayer(TeamSide::HOME, 5, 5, movement: 2, id: 1)
             ->build();
@@ -227,6 +230,10 @@ final class PathfinderTest extends TestCase
         $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
-        $this->assertEmpty($moves);
+        $this->assertNotEmpty($moves);
+        foreach ($moves as $path) {
+            $this->assertLessThanOrEqual(2, $path->getTotalCost(), 'víc než 2 GFI');
+            $this->assertSame($path->getTotalCost(), $path->getGfiCount(), 'po vstání pod 3 MA je každý krok GFI');
+        }
     }
 }

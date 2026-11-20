@@ -346,7 +346,9 @@ final class BigGuyCheckResolver
             ActionType::PASS,
             ActionType::HAND_OFF,
             ActionType::FOUL,
-        ], true) || ($action === ActionType::MOVE && $player->getState() === PlayerState::PRONE);
+        ], true) || (in_array($action, [ActionType::MOVE, ActionType::BLITZ], true) && $player->getState() === PlayerState::PRONE);
+        // P86 (19.11.2026): i v BLITZ -- ř. 8582-8584 mluví právě o blitzu („he may not block that turn (he can still
+        //   roll to stand up if he is Prone)“). Ránu pak vynechá `BlitzHandler::vstatZakorenenyBezRany`. Dřív jen MOVE.
 
         $state = $state->withPlayer($player);
         $events = [GameEvent::takeRoot($player->getId(), $roll, true)];

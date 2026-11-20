@@ -26,6 +26,7 @@ enum RollType: string
     case TTM_LANDING = 'ttm_landing';
     case ALWAYS_HUNGRY = 'always_hungry';
     case JUMP_UP = 'jump_up';
+    case STAND_UP = 'stand_up';
 
     public function label(): string
     {
@@ -45,13 +46,14 @@ enum RollType: string
             self::TTM_LANDING => 'Landing (Right Stuff)',
             self::ALWAYS_HUNGRY => 'Always Hungry',
             self::JUMP_UP => 'Jump Up (blok z lehu)',
+            self::STAND_UP => 'Stand Up (4+)',
         };
     }
 
     public function category(): RollCategory
     {
         return match ($this) {
-            self::DODGE, self::GFI, self::LEAP, self::LEAP_GFI => RollCategory::MOVE,
+            self::DODGE, self::GFI, self::LEAP, self::LEAP_GFI, self::STAND_UP => RollCategory::MOVE,
             self::PICKUP, self::CATCH => RollCategory::BALL,
             self::BONE_HEAD, self::REALLY_STUPID, self::WILD_ANIMAL => RollCategory::BIG_GUY,
             // bez `default` (review P306): nový druh hodu musí dostat kategorii vědomě
@@ -67,6 +69,8 @@ enum RollType: string
             self::DODGE, self::GFI, self::LEAP, self::LEAP_GFI => 'Accept Failure = the player falls (armour roll) and the turn ends.',
             // nepovedené zvednutí = turnover (ř. 371-375), chytání ne (ř. 376-378)
             self::PICKUP => 'Accept Failure = the ball bounces and the turn ends.',
+            // vstání pod 3 MA: neúspěch není turnover (ř. 694-695)
+            self::STAND_UP => 'Accept Failure = the player stays prone and his action ends (not a turnover).',
             self::CATCH => 'Accept Failure = the ball bounces.',
             // akce propadne (ř. 7980-7986, 8398-8401, 8668-8669)
             self::BONE_HEAD, self::REALLY_STUPID => 'Accept Failure = the player loses the declared action and his tackle zones.',

@@ -287,6 +287,17 @@ final class MatchPlayerDTO
             || ($this->state === PlayerState::PRONE && !$this->hasActed && $this->hasSkill(SkillName::JumpUp));
     }
 
+    /**
+     * Smí hráč ohlásit Blitz? Stojící, který nejednal, nebo LEŽÍCÍ, který ještě nejednal -- vstane
+     * na začátku akce (`rules_bb2016.txt` ř. 670-676: „The player may take any Action other than a Block Action“;
+     * Blitz Block Action není). OPRAVENO 19.11.2026 (P86) -- dřív `canAct()`, tedy jen stojící. Vzor: C++ 38e4fd85.
+     * Ball & Chain a týmový limit hlídá `RulesEngine`.
+     */
+    public function canTakeBlitzAction(): bool
+    {
+        return $this->canAct() || ($this->state === PlayerState::PRONE && !$this->hasActed);
+    }
+
     public function canMove(): bool
     {
         return ($this->state === PlayerState::STANDING || $this->state === PlayerState::PRONE) && !$this->hasMoved;

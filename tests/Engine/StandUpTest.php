@@ -130,11 +130,13 @@ final class StandUpTest extends TestCase
 
     public function testPronePlayerLowMAStandUpRollFail(): void
     {
-        // Prone player with MA=2, rolls 3 (needs 4+) = fail
+        // Prone player with MA=2, rolls 3 (needs 4+) = fail. Bez týmového přehozu: od P86 (19.11.2026) se hod na
+        //   vstání přehazuje (ř. 929-933) -- to hlídá `StandUpRerollTest`.
         $state = (new GameStateBuilder())
             ->addPronePlayer(TeamSide::HOME, 5, 7, movement: 2, id: 1)
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
+        $state = $state->withTeamState(TeamSide::HOME, $state->getTeamState(TeamSide::HOME)->withRerolls(0));
 
         $dice = new FixedDiceRoller([3]); // roll 3 = fail
         $resolver = new ActionResolver($dice);
@@ -174,9 +176,12 @@ final class StandUpTest extends TestCase
         $this->assertNotEmpty($moveActions, 'Prone player should have MOVE available');
     }
 
-    public function testPronePlayerLowMAOnlyStandInPlace(): void
+    /**
+     * `rules_bb2016.txt` ř. 690-694: pod 3 MA po vstání (4+) jen přes GFI. PŘEPSÁNO 19.11.2026 (P86) -- test dřív
+     * tvrdil „jen vstát na místě“ (kódoval vadu); teď: vstát na místě i odejít nejvýš 2 pole (2 GFI).
+     */
+    public function testPronePlayerLowMAStandsInPlaceOrGoesForIt(): void
     {
-        // MA=2 player can only stand in place (pathfinder returns empty)
         $state = (new GameStateBuilder())
             ->addPronePlayer(TeamSide::HOME, 5, 7, movement: 2, id: 1)
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
@@ -185,10 +190,11 @@ final class StandUpTest extends TestCase
         $rules = new RulesEngine();
         $targets = $rules->getValidMoveTargets($state, 1);
 
-        // Should only have current position
-        $this->assertCount(1, $targets);
-        $this->assertEquals(5, $targets[0]['x']);
-        $this->assertEquals(7, $targets[0]['y']);
+        $this->assertEquals([5, 7], [$targets[0]['x'], $targets[0]['y']], 'vstát na místě');
+        $this->assertCount(1 + 24, $targets, 'vstát na místě + 24 polí do vzdálenosti 2');
+        foreach ($targets as $t) {
+            $this->assertSame(count($t['path']), $t['gfis'], 'po vstání pod 3 MA je každý krok GFI');
+        }
     }
 
     public function testPronePlayerStandUpAndPickupBall(): void
