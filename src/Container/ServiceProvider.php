@@ -39,6 +39,8 @@ use App\Service\TeamService;
 use App\Validation\RosterValidator;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
+use Twig\TwigFunction;
+use App\Twig\AssetUrl;
 
 final class ServiceProvider
 {
@@ -47,7 +49,10 @@ final class ServiceProvider
         // Twig
         $container->set(Environment::class, function () {
             $loader = new FilesystemLoader(__DIR__ . '/../../templates');
-            return new Environment($loader, ['cache' => false]);
+            $twig = new Environment($loader, ['cache' => false]);
+            $twig->addFunction(new TwigFunction('asset', new AssetUrl(__DIR__ . '/../../public')));   // P313
+
+            return $twig;
         });
 
         // Repositories
