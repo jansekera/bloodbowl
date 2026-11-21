@@ -698,6 +698,29 @@ TEST(BlockHandler, P309ChooserPrefersKeptBothDownOverPushOnJuggernautBlitz) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
 }
 
+// Review P309 (4): převod je vidět v událostech jako SKILL_USED Juggernaut (jako Dauntless); ponechaný Both Down ne.
+static bool juggernautUsed(const std::vector<GameEvent>& ev) {
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::SKILL_USED && e.roll == static_cast<int>(SkillName::Juggernaut)) return true;
+    return false;
+}
+
+TEST(BlockHandler, P309ConversionEmitsSkillUsedJuggernaut) {
+    {
+        GameState gs = juggernautBlitz();
+        gs.getPlayer(12).skills.add(SkillName::Block);   // převede
+        FixedDiceRoller dice({2});
+        std::vector<GameEvent> ev;
+        resolveBlock(gs, BlockParams{1, 12, true, false}, dice, &ev);
+        EXPECT_TRUE(juggernautUsed(ev));
+    }
+    GameState gs = juggernautBlitz();                    // ponechá
+    FixedDiceRoller dice({2, 1, 1});
+    std::vector<GameEvent> ev;
+    resolveBlock(gs, BlockParams{1, 12, true, false}, dice, &ev);
+    EXPECT_FALSE(juggernautUsed(ev));
+}
+
 TEST(BlockHandler, P309CounterSeesJuggernautBothDownAndKeptOnes) {
     takeJuggernautBothDowns();
     {

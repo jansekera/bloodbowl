@@ -757,6 +757,7 @@ final class BlockHandler implements ActionHandlerInterface
         array $params,
         Position|false|null $grabVolba = null,
         ?array $standFirm = null,
+        ?bool $juggernautVolba = null,
     ): ActionResult {
         $pending = $state->getPendingBlock();
         if ($pending === null) {
@@ -798,15 +799,17 @@ final class BlockHandler implements ActionHandlerInterface
         // P309 (uživatel 20.11.2026): Juggernaut v blitzu "may choose to treat a 'Both Down' result as if a 'Pushed'
         //   result has been rolled instead" (ř. 8191-8195). OPRAVENO 20.11. -- dřív převod vždy (`applyBlockResult`).
         //   Rozhoduje útočník: kouč-člověk otázkou (`Coach::juggernaut`, přehrání), AI podle `aiJuggernautFace`.
-        //   Jedno místo nad definitivně zvolenou kostkou (i když ji vybral obránce).
-        $juggernaut = $chosenFace === BlockDiceFace::BOTH_DOWN && $isBlitz && $attacker->hasSkill(SkillName::Juggernaut)
-            && $this->coach->juggernaut(
-                $attacker->getTeamSide(),
-                $attacker->getId(),
-                $defender->getId(),
-                $this->aiJuggernautFace($chosenFace, $attacker, $defender, true) === BlockDiceFace::PUSHED,
-                $state->withPendingBlock(null),
-            );
+        //   Jedno místo nad definitivně zvolenou kostkou (i když ji vybral obránce). `$juggernautVolba` = odpověď
+        //   z dřívějšího přerušení téhož bloku otázkou na Stand Firm / Grab (vnitřní argument, review P309 (1)).
+        $mozno = $chosenFace === BlockDiceFace::BOTH_DOWN && $isBlitz && $attacker->hasSkill(SkillName::Juggernaut);
+        $juggernaut = $mozno && ($juggernautVolba ?? $this->coach->juggernaut(
+            $attacker->getTeamSide(),
+            $attacker->getId(),
+            $defender->getId(),
+            $this->aiJuggernautFace($chosenFace, $attacker, $defender, true) === BlockDiceFace::PUSHED,
+            $state->withPendingBlock(null),
+        ));
+        $juggernautOdpoved = $mozno ? $juggernaut : null;
         $ucinek = $juggernaut ? BlockDiceFace::PUSHED : $chosenFace;   // jak se kostka vyhodnotí
         // P81 krok 3: follow-up je volba -- clovek ji posila spolu s kostkou,
         //   bez parametru rozhodne pravidlo AI (`wantsFollowUp`).
@@ -816,7 +819,7 @@ final class BlockHandler implements ActionHandlerInterface
         //   hodí nebo pohne (odtlačení je až do rozhodnutí čisté) -- stav se vrací s čekajícím blokem
         //   a po odpovědi se blok vyhodnotí znovu od téže kostky se všemi odpověďmi.
         $odpovedi = $standFirm ?? [];
-        [$result, $kdo] = $this->sOtazkouNaStandFirm($odpovedi, function () use ($state, $attacker, $defender, $chosenFace, $ucinek, $juggernaut, $isBlitz, $grabVolba, $index, $odpovedi, $faces, $pending, $followUpChoice): ActionResult {
+        [$result, $kdo] = $this->sOtazkouNaStandFirm($odpovedi, function () use ($state, $attacker, $defender, $chosenFace, $ucinek, $juggernaut, $juggernautOdpoved, $isBlitz, $grabVolba, $index, $odpovedi, $faces, $pending, $followUpChoice): ActionResult {
             if ($grabVolba === null) {
                 $squares = $this->grabQuestionSquares($state, $attacker, $defender, $ucinek, $isBlitz);
                 if ($squares !== []) {
@@ -827,6 +830,7 @@ final class BlockHandler implements ActionHandlerInterface
                         $squares,
                         faceIndex: (int) $index,
                         standFirm: $odpovedi,
+                        juggernaut: $juggernautOdpoved,
                     )), []);
                 }
             }
@@ -859,6 +863,7 @@ final class BlockHandler implements ActionHandlerInterface
                 answers: $odpovedi,
                 followUp: $followUpChoice,
                 grab: $grabVolba,
+                juggernaut: $juggernautOdpoved,
             )), []);
         }
         assert($result instanceof ActionResult);

@@ -1360,8 +1360,13 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                               ? askCoach(CoachQuestion::USE_JUGGERNAUT, att.id, def.id, 0, 0, 3) == CoachAnswer::TEAM
                               : aiJuggernautFace(chosen, att, def, true) == BlockDiceFace::PUSHED;
         ++g_juggernautBothDowns.total;
-        if (push) chosen = BlockDiceFace::PUSHED;
-        else ++g_juggernautBothDowns.kept;
+        if (push) {
+            chosen = BlockDiceFace::PUSHED;
+            emitEvent(events, {GameEvent::Type::SKILL_USED, att.id, def.id, {}, {},
+                              static_cast<int>(SkillName::Juggernaut), true});
+        } else {
+            ++g_juggernautBothDowns.kept;
+        }
     }
     ++g_blocksThrown;
     // 02.10.2026 (uživatel: „zkus do logu doplnit všechny kostky hodu"): die1 nese VŠECHNY hozené

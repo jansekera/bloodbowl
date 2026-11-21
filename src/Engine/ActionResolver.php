@@ -637,7 +637,7 @@ final class ActionResolver
             $blockParams['followUp'] = $params['followUp'];
         }
 
-        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams, $volba, $pending->getStandFirm());
+        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams, $volba, $pending->getStandFirm(), $pending->getJuggernaut());
     }
 
     /**
@@ -666,7 +666,7 @@ final class ActionResolver
             $blockParams['followUp'] = $pending->getFollowUp();
         }
 
-        return $this->blockHandler->resolveBlockChoice($state->withPendingStandFirm(null), $blockParams, $pending->getGrab(), $odpovedi);
+        return $this->blockHandler->resolveBlockChoice($state->withPendingStandFirm(null), $blockParams, $pending->getGrab(), $odpovedi, $pending->getJuggernaut());
     }
 
     /**

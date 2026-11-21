@@ -714,6 +714,8 @@ def event_str(e):
             return f"MIGHTY BLOW: +1 na {'brnění' if e['die1'] == 1 else 'zranění'} {who}"
         if jm == "StandFirm":   # P201 (4)
             return f"STAND FIRM {who}: zůstává stát, odtlačen není"
+        if jm == "Juggernaut":   # P309: Both Down v blitzu vzat jako Pushed
+            return f"JUGGERNAUT {who}: Both Down bere jako Pushed"
         if jm == "KickOffReturn":
             return f"SKILL Kick-Off Return {who}: {e['from']} -> {e['to']}"
         hod = f" hod {e['die1']}" if e["die1"] else ""

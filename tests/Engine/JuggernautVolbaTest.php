@@ -66,6 +66,16 @@ final class JuggernautVolbaTest extends TestCase
         return $r;
     }
 
+    /** @param list<int> $kostky */
+    private function obaLide(array $kostky): ActionResolver
+    {
+        $r = new ActionResolver(new FixedDiceRoller($kostky));
+        $r->setInteractiveBlocks(true);
+        $r->setHumanSides([TeamSide::HOME, TeamSide::AWAY]);
+
+        return $r;
+    }
+
     /** Kouč-člověk zablitzuje, padne Both Down a zvolí ho. */
     private function clovekZvoliBothDown(GameState $s): ActionResult
     {
@@ -166,5 +176,69 @@ final class JuggernautVolbaTest extends TestCase
 
         $this->assertNull($s->getPendingJuggernaut());
         $this->assertSame(PlayerState::PRONE, $s->requirePlayer(1)->getState(), 'obyčejný blok: Both Down platí');
+    }
+
+    /**
+     * Review P309 (1): hot-seat — po odpovědi na Juggernaut se v řetězu ptá kouč obránce na Stand Firm. Odpověď na
+     * Juggernaut musí přežít `RESOLVE_STAND_FIRM` (dřív se blok vyhodnotil znovu bez ní a otázka přišla podruhé).
+     */
+    public function testOdpovedNaJuggernautPreziteOtazkuNaStandFirmVRetezu(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Juggernaut, SkillName::Block], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
+            ->addPlayer(TeamSide::AWAY, 7, 4, skills: [SkillName::StandFirm], id: 3)
+            ->addPlayer(TeamSide::AWAY, 7, 5, skills: [SkillName::StandFirm], id: 4)
+            ->addPlayer(TeamSide::AWAY, 7, 6, skills: [SkillName::StandFirm], id: 5)
+            ->withBallOffPitch()
+            ->build();
+        $hod = $this->obaLide([2])->resolve($s, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2])->getNewState();
+        $q = $this->obaLide(array_fill(0, 12, 3))->resolve($hod, ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0])->getNewState();
+        $this->assertNotNull($q->getPendingJuggernaut(), 'fixtura: otázka na Juggernaut');
+        $sf = $this->obaLide(array_fill(0, 12, 3))->resolve($q, ActionType::RESOLVE_JUGGERNAUT, ['use' => true])->getNewState();
+        $this->assertNotNull($sf->getPendingStandFirm(), 'fixtura: řetěz se ptá na Stand Firm');
+        $po = $sf;
+        for ($i = 0; $i < 3 && $po->getPendingStandFirm() !== null; $i++) {   // každý hráč řetězu se Stand Firm
+            $po = $this->obaLide(array_fill(0, 12, 3))->resolve($po, ActionType::RESOLVE_STAND_FIRM, ['use' => true])->getNewState();
+            $this->assertNull($po->getPendingJuggernaut(), 'na Juggernaut už se neptá podruhé');
+        }
+        $this->assertNull($po->getPendingStandFirm());
+        $this->assertNull($po->getPendingBlock());
+        $this->assertSame(6, $po->requirePlayer(2)->requirePosition()->getX(), 'Stand Firm v řetězu: nikdo se nehne');
+        $this->assertSame(PlayerState::STANDING, $po->requirePlayer(2)->getState(), 'převedeno na Pushed');
+    }
+
+    public function testValidaceOdpovediNaJuggernaut(): void
+    {
+        $e = new RulesEngine();
+        $this->assertNotSame([], $e->validate($this->stav(), ActionType::RESOLVE_JUGGERNAUT, ['use' => true]), 'bez otázky');
+        $q = $this->clovekZvoliBothDown($this->stav([SkillName::Juggernaut]))->getNewState();
+        foreach ([1, 'true', null] as $podvrh) {
+            $this->assertNotSame([], $e->validate($q, ActionType::RESOLVE_JUGGERNAUT, ['use' => $podvrh]), 'use=' . var_export($podvrh, true));
+        }
+        $this->assertNotSame([], $e->validate($q, ActionType::RESOLVE_JUGGERNAUT, []));
+        $this->assertSame([], $e->validate($q, ActionType::RESOLVE_JUGGERNAUT, ['use' => false]));
+    }
+
+    public function testCekajiciOtazkaPrezijeUlozeniStavu(): void
+    {
+        $q = $this->clovekZvoliBothDown($this->stav([SkillName::Juggernaut]))->getNewState();
+        $znovu = GameState::fromArray($q->toArray());
+        $otazka = $znovu->getPendingJuggernaut();
+        $this->assertNotNull($otazka);
+        $this->assertSame([1, 2], [$otazka->getPlayerId(), $otazka->getDefenderId()]);
+        $this->assertSame(ActionType::CHOOSE_BLOCK_DIE, $otazka->getReplay()->action);
+        $this->assertSame(['playerId' => 1, 'defenderId' => 2], $q->toArray(false)['pendingJuggernaut'], 'klient: bez přehrání');
+
+        // po uložení se odpověď přehraje stejně
+        $s = $this->clovek([1, 1, 1, 1])->resolve($znovu, ActionType::RESOLVE_JUGGERNAUT, ['use' => true])->getNewState();
+        $this->assertSame(7, $s->requirePlayer(2)->requirePosition()->getX());
+    }
+
+    public function testReplayAnswersNesouOdpovedNaJuggernaut(): void
+    {
+        $a = (new \App\DTO\ReplayAnswers())->withJuggernaut(true)->withJuggernaut(false);
+        $this->assertSame([true, false], \App\DTO\ReplayAnswers::fromArray($a->toArray())->juggernaut);
+        $this->assertSame([], \App\DTO\ReplayAnswers::fromArray([])->juggernaut);
     }
 }
