@@ -361,7 +361,11 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 };
             }
             assert($faces !== []); // getBlockDiceInfo vraci vzdy 1-3 kostky
-            $face = $this->vyberStranu($faces, $target->getTeamSide() === $bncPlayer->getTeamSide(), $info['attackerChooses']);
+            // OPRAVENO 20.11.2026 (P320) -- stranu volil engine i za kouče-člověka. B&C blokuje "following normal
+            //   blocking rules" (ř. 7819-7822) ⇒ ř. 633-634: volí kouč silnějšího (proti vlastnímu kouč B&C).
+            $vlastni = $target->getTeamSide() === $bncPlayer->getTeamSide();
+            $vybiraBnc = $vlastni || $info['attackerChooses'];
+            $face = $faces[$this->blockHandler->kostkaKouce($state, $bncPlayer, $target, $faces, $vybiraBnc, $this->vyberStranu($faces, $vlastni, $info['attackerChooses']))];
 
             $events[] = GameEvent::blockAttempt(
                 $bncPlayer->getId(),
@@ -482,11 +486,11 @@ final class BallAndChainHandler implements ActionHandlerInterface
     /**
      * Volba strany kostky. Proti VLASTNIMU hraci voli nas kouc za obe strany a bere,
      * co mu nejmene ublizi (rozhodnuti uzivatele 25.09.); proti souperi voli silnejsi
-     * -- nejlepsi pro B&C, nebo nejhorsi, kdyz voli souper.
+     * -- nejlepsi pro B&C, nebo nejhorsi, kdyz voli souper. Vraci index v `$faces`.
      *
      * @param non-empty-list<BlockDiceFace> $faces
      */
-    private function vyberStranu(array $faces, bool $vlastni, bool $attackerChooses): BlockDiceFace
+    private function vyberStranu(array $faces, bool $vlastni, bool $attackerChooses): int
     {
         $poradi = $vlastni
             ? [BlockDiceFace::PUSHED, BlockDiceFace::DEFENDER_STUMBLES, BlockDiceFace::BOTH_DOWN, BlockDiceFace::ATTACKER_DOWN, BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW]
@@ -495,12 +499,13 @@ final class BallAndChainHandler implements ActionHandlerInterface
             $poradi = array_reverse($poradi);
         }
         foreach ($poradi as $f) {
-            if (in_array($f, $faces, true)) {
-                return $f;
+            $i = array_search($f, $faces, true);
+            if ($i !== false) {
+                return $i;
             }
         }
 
-        return $faces[0];
+        return 0;
     }
 
     /**

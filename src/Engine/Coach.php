@@ -119,15 +119,15 @@ final class Coach
     }
 
     /**
-     * Index kostky bloku, kterou volí kouč-člověk (P308). `rules_bb2016.txt` ř. 633-634: "The coach of
+     * Index kostky bloku, kterou volí kouč-člověk (P308, P319, P320). `rules_bb2016.txt` ř. 633-634: "The coach of
      * the stronger player picks which block dice is used." Komu se ptát, rozhoduje `BlockHandler::kostkaKouce`.
      *
      * @param list<BlockDiceFace> $faces
      */
-    public function blockDie(int $attackerId, int $defenderId, array $faces, bool $isFrenzy, GameState $stav): int
+    public function blockDie(int $attackerId, int $defenderId, array $faces, bool $isFrenzy, bool $attackerChooses, GameState $stav): int
     {
         $i = array_shift($this->blockDice)
-            ?? throw (new BlockDieQuestion($attackerId, $defenderId, $faces, $isFrenzy))->naStavu($stav->withPendingBlock(null));
+            ?? throw (new BlockDieQuestion($attackerId, $defenderId, $faces, $isFrenzy, $attackerChooses))->naStavu($stav->withPendingBlock(null));
 
         return isset($faces[$i]) ? $i : throw new \InvalidArgumentException("Block die {$i} not rolled");
     }

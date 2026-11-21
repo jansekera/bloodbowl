@@ -58,6 +58,7 @@ final class BlockDieObranceKoucTest extends TestCase
         $this->assertNotNull($q, 'ř. 633-634: kostku vybírá kouč silnějšího hráče — člověk-obránce, ne engine');
         $this->assertSame(1, $q->getAttackerId());
         $this->assertSame(2, $q->getDefenderId());
+        $this->assertFalse($q->isAttackerChooses());
         $this->assertSame(['defender_down', 'attacker_down'], array_map(fn($f) => $f->value, $q->getFaces()));
         $this->assertTrue($r->getNewState()->hasPendingReplayQuestion(), 'tah AI stojí, dokud kouč neodpoví');
         $this->assertFalse($r->isTurnover());
@@ -252,6 +253,55 @@ final class BlockDieObranceKoucTest extends TestCase
 
         $this->assertSame('state', $prvni['type'] ?? null);
         $this->assertSame('home', $prvni['perspective'] ?? null, 'rozhodl kouč-člověk');
+    }
+
+    public function testMultipleBlockClovekaUtocnikaKdeVybiraSeZepta(): void
+    {
+        // P319: ř. 633-634 — silnější útočník-člověk (ST 6 proti 3+2 = 5) volí kostku sám; dřív za něj volil engine.
+        //   Kostky 1, 6: engine by vzal Defender Down (index 1), člověk volí Attacker Down (index 0).
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 6, skills: [SkillName::MultipleBlock], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, armour: 9, id: 2)
+            ->addPlayer(TeamSide::AWAY, 4, 5, strength: 3, armour: 9, id: 3)
+            ->withBallOffPitch()
+            ->build()
+            ->withAiTeam(TeamSide::AWAY);
+        $resolver = new ActionResolver(new FixedDiceRoller([1, 6, 1, 1]));
+        $resolver->setInteractiveBlocks(true);
+        $resolver->setHumanSides([TeamSide::HOME]);
+
+        $r = $resolver->resolve($state, ActionType::MULTIPLE_BLOCK, ['playerId' => 1, 'targetId' => 2, 'targetId2' => 3]);
+        $q = $r->getNewState()->getPendingBlockDie();
+        $this->assertNotNull($q, 'ř. 633-634: volí kouč silnějšího = člověk-útočník');
+        $this->assertSame(2, $q->getDefenderId());
+        $this->assertTrue($q->isAttackerChooses(), 'web ukáže, kdo volí');
+
+        $r = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
+        $this->assertTrue($r->isTurnover(), 'zvolil Attacker Down');
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::STANDING, $r->getNewState()->requirePlayer(2)->getState());
+    }
+
+    public function testBallAndChainAiProtiSilnejsimuClovekuSeZepta(): void
+    {
+        // P320: B&C blokuje „following normal blocking rules“ (ř. 7819-7822) ⇒ ř. 633-634: silnější obránce-člověk volí.
+        //   D6 3 = pohyb na (6,7); kostky 6, 1: engine by za obránce vzal Attacker Down, člověk volí Defender Down.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, strength: 2, id: 1, skills: [SkillName::BallAndChain])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 4, armour: 9, id: 2)
+            ->withBallOffPitch()
+            ->build()
+            ->withAiTeam(TeamSide::HOME);
+        $resolver = $this->resolverTahuAi(new FixedDiceRoller([3, 6, 1, 1, 1]));
+
+        $r = $resolver->resolve($state, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+        $q = $r->getNewState()->getPendingBlockDie();
+        $this->assertNotNull($q, 'ř. 633-634 + 7819-7822');
+        $this->assertSame(['defender_down', 'attacker_down'], array_map(fn($f) => $f->value, $q->getFaces()));
+
+        $r = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState());
+        $this->assertSame(PlayerState::STANDING, $r->getNewState()->requirePlayer(1)->getState());
     }
 
     public function testOtazkaPrezijeUlozeniStavuAKlientNedostanePrehrani(): void

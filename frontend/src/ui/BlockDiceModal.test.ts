@@ -111,9 +111,9 @@ describe('BlockDiceModal follow-up', () => {
 });
 
 // P308: v tahu AI vybírá kostku obránce-člověk (BB2016 ř. 633-634) — dialog bez follow-upu a přehozů útočníka
-describe('BlockDiceModal defender pick', () => {
+describe('BlockDiceModal coach pick (question)', () => {
     let modalEl: ReturnType<typeof mockElement>;
-    const question: PendingBlockDie = { attackerId: 1, defenderId: 2, faces: ['defender_down', 'attacker_down'], isFrenzy: false };
+    const question: PendingBlockDie = { attackerId: 1, defenderId: 2, faces: ['defender_down', 'attacker_down'], isFrenzy: false, attackerChooses: false };
 
     beforeEach(() => {
         modalEl = mockElement();
@@ -124,7 +124,7 @@ describe('BlockDiceModal defender pick', () => {
     it('lets the defending coach pick any rolled die', () => {
         const modal = new BlockDiceModal(mockElement() as unknown as HTMLElement);
         const onChoose = vi.fn();
-        modal.showDefenderPick(question, 'Orc', 'Elf', onChoose);
+        modal.showCoachPick(question, 'Orc', 'Elf', onChoose);
         expect(modalEl.dieHandlerCount()).toBe(2);
         modalEl.clickDie(0);
         expect(onChoose).toHaveBeenCalledWith(0);
@@ -133,10 +133,18 @@ describe('BlockDiceModal defender pick', () => {
 
     it('names the defender as the chooser and offers no follow-up or reroll', () => {
         const modal = new BlockDiceModal(mockElement() as unknown as HTMLElement);
-        modal.showDefenderPick(question, 'Orc', 'Elf', vi.fn());
+        modal.showCoachPick(question, 'Orc', 'Elf', vi.fn());
         expect(modalEl.innerHTML).toContain('Elf chooses');
         expect(modalEl.innerHTML).not.toContain('followup-input');
         expect(modalEl.innerHTML).not.toContain('block-dice-modal__reroll');
         expect(modalEl.innerHTML).not.toContain('block-dice-modal__accept');
+    });
+
+    // P319/P320: otázka padne i silnějšímu útočníkovi-člověku (Multiple Block, Ball & Chain)
+    it('names the attacker as the chooser when the attacker picks', () => {
+        const modal = new BlockDiceModal(mockElement() as unknown as HTMLElement);
+        modal.showCoachPick({ ...question, attackerChooses: true }, 'Orc', 'Elf', vi.fn());
+        expect(modalEl.innerHTML).toContain('Orc chooses');
+        expect(modalEl.innerHTML).not.toContain('Elf chooses');
     });
 });

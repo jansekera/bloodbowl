@@ -106,12 +106,12 @@ final class BlockHandler implements ActionHandlerInterface
         }
     }
 
-    /** P224: ptá se kouče-člověka na Grab (`ActionResolver::setInteractiveBlocks`); AI se neptá */
-    private bool $ptatSeNaGrab = false;
+    /** Tah kouče-člověka s dialogy (`ActionResolver::setInteractiveBlocks`): ptá se ho na Grab (P224) a na kostku (P319) */
+    private bool $interaktivniTah = false;
 
     public function setAskGrab(bool $ptatSe): void
     {
-        $this->ptatSeNaGrab = $ptatSe;
+        $this->interaktivniTah = $ptatSe;
     }
 
     /**
@@ -384,7 +384,7 @@ final class BlockHandler implements ActionHandlerInterface
         bool $sOtazkouNaGrab,
         int $kdo,
     ): array {
-        $grabPossible = $sOtazkouNaGrab && $grabVolba === null && $this->ptatSeNaGrab
+        $grabPossible = $sOtazkouNaGrab && $grabVolba === null && $this->interaktivniTah
             && $this->grabSquares($state, $attacker, $defender, $grabNeplati) !== [];
         $odpovedi[$kdo] = false;
         $this->neodpovezeni = [];
@@ -478,7 +478,7 @@ final class BlockHandler implements ActionHandlerInterface
         BlockDiceFace $face,
         bool $isBlitz,
     ): array {
-        $squares = $this->ptatSeNaGrab ? $this->grabSquares($state, $attacker, $defender, $isBlitz) : [];
+        $squares = $this->interaktivniTah ? $this->grabSquares($state, $attacker, $defender, $isBlitz) : [];
         $pushes = $squares !== [] && match ($face) {
             BlockDiceFace::PUSHED, BlockDiceFace::DEFENDER_STUMBLES, BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW
                 // Grab a Frenzy se vylučují (`maGrab`) ⇒ past na Frenzy tu nevzniká
@@ -1304,7 +1304,7 @@ final class BlockHandler implements ActionHandlerInterface
                 }
             }
         }
-        // OPRAVENO 20.11.2026 (P308) -- kostku vybíral engine i za člověka-obránce.
+        // OPRAVENO 20.11.2026 (P308 obránce, P319 útočník) -- kostku vybíral engine i za kouče-člověka.
         //   Ř. 633-634: "The coach of the stronger player picks which block dice is used." (`kostkaKouce`)
         $chosenFace = $faces[$this->kostkaKouce($state, $attacker, $defender, $faces, $attackerChooses, $chosenIdx)];
 
@@ -2202,14 +2202,15 @@ final class BlockHandler implements ActionHandlerInterface
     /**
      * Kostka bloku, kterou zvolí kouč strany, jež vybírá (`rules_bb2016.txt` ř. 633-634: "The coach of the stronger
      * player picks which block dice is used"): kouč-člověk otázkou (`Coach::blockDie`, akce se po odpovědi přehraje),
-     * AI `$navrh`. Jediné místo podmínky „ptát se kouče na kostku?“ (blok v tahu AI, Multiple Block AI). Ptá se
-     * obránce-člověka proti útočníkovi AI; hot-seat (člověk za obě strany) server nerozliší (P308 odkládá). Silnější
-     * útočník-člověk u Multiple Block: P319 (zatím volí engine).
+     * AI `$navrh`. Jediné místo podmínky „ptát se kouče na kostku?“ (blok v tahu AI, Multiple Block, Ball & Chain).
+     * Ptá se jen proti AI: hraje-li člověk za obě strany (hot-seat), server kouče nerozliší (P308 odkládá) — volí
+     * útočník u dialogu, resp. engine. Útočníka-člověka jen na jeho tahu s dialogy (`interaktivniTah`); blok, který
+     * server vyhodnocuje sám (`autoResolvePendingBlock`), je blok AI.
      *
      * @param list<BlockDiceFace> $faces
      * @return int index v `$faces`
      */
-    private function kostkaKouce(
+    public function kostkaKouce(
         GameState $state,
         MatchPlayerDTO $attacker,
         MatchPlayerDTO $defender,
@@ -2218,9 +2219,11 @@ final class BlockHandler implements ActionHandlerInterface
         int $navrh,
         bool $isFrenzy = false,
     ): int {
-        $ptat = !$attackerChooses && $this->coach->decides($defender->getTeamSide()) && !$this->coach->decides($attacker->getTeamSide());
+        $clovekUtoci = $this->coach->decides($attacker->getTeamSide());
+        $clovekBrani = $this->coach->decides($defender->getTeamSide());
+        $ptat = $attackerChooses ? ($clovekUtoci && !$clovekBrani && $this->interaktivniTah) : ($clovekBrani && !$clovekUtoci);
 
-        return $ptat ? $this->coach->blockDie($attacker->getId(), $defender->getId(), $faces, $isFrenzy, $state) : $navrh;
+        return $ptat ? $this->coach->blockDie($attacker->getId(), $defender->getId(), $faces, $isFrenzy, $attackerChooses, $state) : $navrh;
     }
 
     /**

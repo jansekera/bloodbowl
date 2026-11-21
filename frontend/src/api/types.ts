@@ -164,6 +164,8 @@ export interface PendingBlockDie {
     defenderId: number;
     faces: string[];
     isFrenzy: boolean;
+    /** P319/P320: volí útočník-člověk (Multiple Block, Ball & Chain), jinak obránce */
+    attackerChooses: boolean;
 }
 
 /**

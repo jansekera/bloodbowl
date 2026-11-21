@@ -10,7 +10,7 @@ use App\DTO\ReplayContext;
 use App\Enum\BlockDiceFace;
 
 /**
- * P308: AI blokuje hráče kouče-člověka, kostku vybírá obránce (`rules_bb2016.txt` ř. 633-634) a kouč ještě
+ * P308/P319/P320: kostku bloku vybírá kouč-člověk (`rules_bb2016.txt` ř. 633-634) a ještě
  * nevybral (viz `Coach::blockDie`). Chytá ji jen `ActionResolver::resolve` (stav v okamžiku otázky
  * s `PendingBlockDieDTO`).
  */
@@ -22,6 +22,7 @@ final class BlockDieQuestion extends CoachQuestion
         public readonly int $defenderId,
         public readonly array $faces,
         public readonly bool $isFrenzy,
+        public readonly bool $attackerChooses,
     ) {
         parent::__construct('Block die question pending');
     }
@@ -33,6 +34,7 @@ final class BlockDieQuestion extends CoachQuestion
             $this->defenderId,
             $this->faces,
             $this->isFrenzy,
+            $this->attackerChooses,
             $replay,
         ));
     }

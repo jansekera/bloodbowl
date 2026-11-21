@@ -728,7 +728,11 @@ final class StandFirmKoucTest extends TestCase
         $zakoreneny = $this->zvolKostku($s->withPlayer($s->requirePlayer(2)->withRooted(true)), lide: [TeamSide::HOME]);
         $this->assertSame([], $this->standFirmUdalosti($zakoreneny->getEvents()), 'zakořeněný není Stand Firm');
 
-        $bnc = $this->resolver(array_fill(0, 20, 3), [TeamSide::HOME])->resolve($this->bnc(), ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+        $r = $this->resolver(array_fill(0, 20, 3), [TeamSide::HOME]);
+        $bnc = $r->resolve($this->bnc(), ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+        // P320: silnější B&C kouče-člověka volí kostku sám (ř. 633-634, 7819-7822) — napřed odpověď
+        $this->assertNotNull($bnc->getNewState()->getPendingBlockDie());
+        $bnc = $r->resolve($bnc->getNewState(), ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
         $this->assertSame([2], $this->standFirmUdalosti($bnc->getEvents()), 'i proti B&C');
     }
 }

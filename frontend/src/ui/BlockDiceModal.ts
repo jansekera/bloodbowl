@@ -104,10 +104,10 @@ export class BlockDiceModal {
     }
 
     /**
-     * P308: AI blokuje hráče kouče-člověka a kostku vybírá obránce (BB2016 ř. 633-634). Follow-up a přehoz patří
-     * útočníkovi (AI), dialog nabízí jen volbu kostky.
+     * Otázka kouči-člověku na kostku bloku (BB2016 ř. 633-634): obránce v tahu AI (P308), silnější útočník u Multiple
+     * Block a Ball & Chain (P319, P320). Follow-up a přehoz se tu nevolí, dialog nabízí jen volbu kostky.
      */
-    showDefenderPick(
+    showCoachPick(
         question: PendingBlockDie,
         attackerName: string,
         defenderName: string,
@@ -117,7 +117,7 @@ export class BlockDiceModal {
             <div class="block-dice-modal__backdrop"></div>
             <div class="block-dice-modal__content">
                 ${titleHtml(question.isFrenzy)}
-                <div class="block-dice-modal__info">${escapeHtml(attackerName)} blocks ${escapeHtml(defenderName)} — ${escapeHtml(defenderName)} chooses</div>
+                <div class="block-dice-modal__info">${escapeHtml(attackerName)} blocks ${escapeHtml(defenderName)} — ${escapeHtml(question.attackerChooses ? attackerName : defenderName)} chooses</div>
                 <div class="block-dice-modal__dice">${diceHtml(question.faces, true)}</div>
             </div>
         `;

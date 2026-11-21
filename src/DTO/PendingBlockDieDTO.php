@@ -22,6 +22,7 @@ final class PendingBlockDieDTO
         private readonly int $defenderId,
         private readonly array $faces,
         private readonly bool $isFrenzy,
+        private readonly bool $attackerChooses,
         private readonly ReplayContext $replay,
     ) {}
 
@@ -46,6 +47,12 @@ final class PendingBlockDieDTO
         return $this->isFrenzy;
     }
 
+    /** volí útočník (P319 Multiple Block, P320 Ball & Chain), jinak obránce (P308) */
+    public function isAttackerChooses(): bool
+    {
+        return $this->attackerChooses;
+    }
+
     public function getReplay(): ReplayContext
     {
         return $this->replay;
@@ -67,6 +74,7 @@ final class PendingBlockDieDTO
             'defenderId' => $this->defenderId,
             'faces' => array_map(static fn(BlockDiceFace $f): string => $f->value, $this->faces),
             'isFrenzy' => $this->isFrenzy,
+            'attackerChooses' => $this->attackerChooses,
         ] + ($sPrehranim ? ['replay' => $this->replay->toArray()] : []);
     }
 
@@ -78,6 +86,7 @@ final class PendingBlockDieDTO
             (int) $data['defenderId'],
             array_values(array_map(static fn(mixed $f): BlockDiceFace => BlockDiceFace::from((string) $f), (array) $data['faces'])),
             (bool) $data['isFrenzy'],
+            (bool) $data['attackerChooses'],
             ReplayContext::fromArray((array) $data['replay']),
         );
     }
