@@ -1039,6 +1039,62 @@ TEST(CoachChoiceBlock, AttackerWrestle_Declined_BlockKeepsHimStanding) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
 }
 
+// ───────────── P309 (uživatel 20.11.2026): Juggernaut v blitzu — Both Down jako Pushed je volba kouče ─────────────
+// rules_bb2016.txt ř. 8191-8195: "If this player takes a Blitz Action ... he MAY CHOOSE to treat a 'Both Down'
+// result as if a 'Pushed' result has been rolled instead." Dřív engine převedl vždy a kouče se neptal.
+static ActionResult blitz(GameState& gs, DiceRollerBase& dice) {
+    return resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
+}
+
+TEST(CoachChoiceBlock, P309JuggernautDeclined_BothDownStands_AttackerFalls) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Juggernaut);   // bez Blocku: AI by převedla
+    FixedDiceRoller dice({2, 1, 1, 1, 1});               // Both Down, zbroj obou 1+1
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});
+    auto r = blitz(gs, dice);
+    EXPECT_TRUE(r.turnover);                             // útočník bez Blocku padl
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+TEST(CoachChoiceBlock, P309JuggernautAsked_PlayerAndOpponent) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Juggernaut);
+    FixedDiceRoller dice({2});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try { blitz(gs, dice); FAIL(); } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_JUGGERNAUT);
+        EXPECT_EQ(p.playerId, 1);
+        EXPECT_EQ(p.otherId, 12);
+    }
+}
+
+TEST(CoachChoiceBlock, P309JuggernautAccepted_Pushed) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Juggernaut);
+    gs.getPlayer(1).skills.add(SkillName::Block);        // AI by nepřevedla (obránce Block nemá)
+    FixedDiceRoller dice({2});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM, CoachAnswer::NONE});   // převést; bez follow-upu
+    auto r = blitz(gs, dice);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).position.x, 12);          // odtlačen
+}
+
+// Kouč silnějšího obránce vybral Both Down; o převodu rozhoduje útočník (tady AI) — dřív se po volbě obránce
+// Juggernaut neuplatnil vůbec.
+TEST(CoachChoiceBlock, P309DefenderCoachPicksBothDown_AiJuggernautStillConverts) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Juggernaut);
+    gs.getPlayer(12).stats.strength = 4;                 // dvě kostky, vybírá obránce
+    FixedDiceRoller dice({2, 3, 1, 1, 1, 1});            // Both Down, Pushed
+    CoachChoiceScope scope(TeamSide::AWAY, {static_cast<int>(BlockDiceFace::BOTH_DOWN)});
+    auto r = blitz(gs, dice);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).position.x, 12);
+}
+
 // ───────────── P201 (8): kam se započetl +1 z Mighty Blow ─────────────
 // Výpis ukazoval jen součet; z „9 (4+4)“ šlo +1 odhadnout, ale ne říct, že je to Mighty Blow.
 // V živé partii SKILL_USED MightyBlow, die1 = 1 brnění, 2 zranění (ř. 8285-8292: jen jeden z hodů).

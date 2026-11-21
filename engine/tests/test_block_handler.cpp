@@ -609,7 +609,7 @@ TEST(BlockHandler, AutoChoosePrefersDDOverAD) {
     def.id = 12; def.teamSide = TeamSide::AWAY;
 
     BlockDiceFace faces[] = {BlockDiceFace::ATTACKER_DOWN, BlockDiceFace::DEFENDER_DOWN};
-    auto chosen = autoChooseBlockDie(faces, 2, true, att, def);
+    auto chosen = autoChooseBlockDie(faces, 2, true, att, def, false);
     EXPECT_EQ(chosen, BlockDiceFace::DEFENDER_DOWN);
 }
 
@@ -619,7 +619,7 @@ TEST(BlockHandler, DefenderChoosesWorstForAttacker) {
     def.id = 12; def.teamSide = TeamSide::AWAY;
 
     BlockDiceFace faces[] = {BlockDiceFace::PUSHED, BlockDiceFace::DEFENDER_DOWN};
-    auto chosen = autoChooseBlockDie(faces, 2, false, att, def);
+    auto chosen = autoChooseBlockDie(faces, 2, false, att, def, false);
     EXPECT_EQ(chosen, BlockDiceFace::PUSHED); // less bad for defender
 }
 
@@ -635,6 +635,86 @@ TEST(BlockHandler, JuggernautConvertsBDToPushOnBlitz) {
     EXPECT_FALSE(result.turnover);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+}
+
+// ───────────── P309 (uživatel 20.11.2026): Juggernaut převádí Both Down jen volbou ─────────────
+// rules_bb2016.txt ř. 8192-8195: "If this player takes a Blitz Action, then opposing players may not use their
+// Fend, Stand Firm or Wrestle skills against blocks, and he MAY CHOOSE to treat a 'Both Down' result as if
+// a 'Pushed' result has been rolled instead." Dřív oba enginy převáděly vždy. AI: nepřevádí, má-li útočník Block
+// a obránce ne (Both Down pak srazí jen obránce); jinak převede.
+// kostka: 1 lebka · 2 Both Down · 3-4 Pushed · 5 Defender Stumbles · 6 Defender Down
+static GameState juggernautBlitz() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Juggernaut);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    return gs;
+}
+
+TEST(BlockHandler, P309JuggernautWithBlockKeepsBothDownAgainstDefenderWithoutBlock) {
+    GameState gs = juggernautBlitz();
+    FixedDiceRoller dice({2, 1, 1});                    // Both Down, zbroj obránce 1+1
+    auto r = resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);        // Block útočníka drží
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);          // obránce sražen na svém poli
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(dice.remaining(), 0u);                                // hodilo se na zbroj
+}
+
+TEST(BlockHandler, P309JuggernautStillPushesWhenDefenderHasBlock) {
+    GameState gs = juggernautBlitz();
+    gs.getPlayer(12).skills.add(SkillName::Block);      // Both Down by neudělal nic ⇒ převést
+    FixedDiceRoller dice({2});
+    resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+    EXPECT_NE(gs.getPlayer(12).position, (Position{11, 7}));       // odtlačen
+}
+
+// Ponechaný Both Down nesmí oživit Wrestle obránce, který Juggernaut v blitzu ruší (ř. 8192-8194).
+TEST(BlockHandler, P309KeptBothDownDefenderMayNotWrestle) {
+    GameState gs = juggernautBlitz();
+    gs.getPlayer(12).skills.add(SkillName::Wrestle);
+    FixedDiceRoller dice({2, 1, 1});
+    auto r = resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);        // Wrestle by položil i útočníka
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_EQ(dice.remaining(), 0u);                                // sražen (zbroj), ne Placed Prone
+}
+
+// Výběr kostky oceňuje to, co se pak stane: proti obránci s Wrestle by Both Down bez Juggernautu položil oba,
+// v blitzu s Juggernautem srazí jen obránce ⇒ je lepší než Pushed.
+TEST(BlockHandler, P309ChooserPrefersKeptBothDownOverPushOnJuggernautBlitz) {
+    GameState gs = juggernautBlitz();
+    gs.getPlayer(1).stats.strength = 4;                 // dvě kostky, vybírá útočník
+    gs.getPlayer(12).skills.add(SkillName::Wrestle);
+    FixedDiceRoller dice({3, 2, 1, 1});                 // Pushed, Both Down, zbroj 1+1
+    resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+}
+
+TEST(BlockHandler, P309CounterSeesJuggernautBothDownAndKeptOnes) {
+    takeJuggernautBothDowns();
+    {
+        GameState gs = juggernautBlitz();
+        FixedDiceRoller dice({2, 1, 1});
+        resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
+    }
+    {
+        GameState gs = juggernautBlitz();
+        gs.getPlayer(12).skills.add(SkillName::Block);
+        FixedDiceRoller dice({2});
+        resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
+    }
+    const JuggernautBothDowns c = takeJuggernautBothDowns();
+    EXPECT_EQ(c.total, 2);
+    EXPECT_EQ(c.kept, 1);
+    EXPECT_EQ(takeJuggernautBothDowns().total, 0);      // čtení nuluje
 }
 
 // --- MultipleBlock tests ---
@@ -1191,7 +1271,7 @@ TEST(BlockHandler, WrestleMakesBothDownWorthMoreThanAPushAgainstABlockWall) {
     Player att; att.skills.add(SkillName::Block); att.skills.add(SkillName::Wrestle);
     Player def; def.skills.add(SkillName::Block);
     BlockDiceFace faces[2] = {BlockDiceFace::PUSHED, BlockDiceFace::BOTH_DOWN};
-    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def), BlockDiceFace::BOTH_DOWN);
+    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def, false), BlockDiceFace::BOTH_DOWN);
 }
 
 TEST(BlockHandler, WithoutWrestleAPushStillBeatsBothDownAgainstABlockWall) {
@@ -1199,7 +1279,7 @@ TEST(BlockHandler, WithoutWrestleAPushStillBeatsBothDownAgainstABlockWall) {
     Player att; att.skills.add(SkillName::Block);
     Player def; def.skills.add(SkillName::Block);
     BlockDiceFace faces[2] = {BlockDiceFace::PUSHED, BlockDiceFace::BOTH_DOWN};
-    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def), BlockDiceFace::PUSHED);
+    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def, false), BlockDiceFace::PUSHED);
 }
 
 TEST(BlockHandler, DefenderDownStillBeatsAWrestledBothDown) {
@@ -1207,7 +1287,7 @@ TEST(BlockHandler, DefenderDownStillBeatsAWrestledBothDown) {
     Player att; att.skills.add(SkillName::Block); att.skills.add(SkillName::Wrestle);
     Player def; def.skills.add(SkillName::Block);
     BlockDiceFace faces[2] = {BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::BOTH_DOWN};
-    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def), BlockDiceFace::DEFENDER_DOWN);
+    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def, false), BlockDiceFace::DEFENDER_DOWN);
 }
 
 TEST(BlockHandler, BothDownKnocksBothPlayersDownInPlaceWithNoPushOrFollowUp) {

@@ -78,6 +78,14 @@ def test_neplatna_odpoved_nic_nezmeni():
     raise AssertionError("žádná otázka se nenašla — test nic neověřil")
 
 
+def test_p309_otazka_juggernaut_ve_vypisu_a_odpoved():
+    """P309: Juggernaut v blitzu (ř. 8191-8195 "may choose") — otázka má text a „ano“ = převést na Pushed (1)."""
+    q = {"question": "USE_JUGGERNAUT", "player": 3, "other": 15, "roll": 0, "target": 0, "options": 3}
+    assert "Juggernaut" in ps.otazka_str(q) and ps.otazka_str(q).startswith("❓")
+    assert ps.preloz_odpoved(q, "ano") == 1
+    assert ps.preloz_odpoved(q, "ne") == 0
+
+
 def test_bez_kouce_se_druha_strana_nepta():
     # kouč je AWAY, na tahu HOME: přehozy HOME zůstávají automatické; ptát se smí jen na skilly AWAY
     s, d = nova_hra(3)

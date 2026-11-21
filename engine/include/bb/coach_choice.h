@@ -63,7 +63,11 @@ enum class CoachQuestion : int {
     // vylučuje hráče kouče (faul ř. 1878-1884, tajná zbraň na konci drive) — úplatek (ř. 2871-2879) / Argue the call
     // (ř. 1091-1102)? playerId = hráč, otherId = 1 faul / 0 tajná zbraň, roll = úplatků v zásobě, target = 1 trenér smí
     // protestovat. Odpověď = bitová volba: 0 nic, 1 úplatek, 2 protest, 3 obojí (pořadí určuje druh výroku).
-    REFEREE_CALL = 19
+    REFEREE_CALL = 19,
+    // P309 (uživatel 20.11.2026): útočník s Juggernautem v blitzu hodil Both Down (ř. 8191-8195 "may choose to treat
+    // a 'Both Down' result as if a 'Pushed' result has been rolled instead"). playerId = útočník, otherId = obránce.
+    // Odpověď 1 = brát jako Pushed, 0 = nechat Both Down.
+    USE_JUGGERNAUT = 20
 };
 
 namespace CoachAnswer {

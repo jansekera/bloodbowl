@@ -32,6 +32,8 @@ final class Coach
     private array $rerolls = [];
     /** @var list<int> */
     private array $blockDice = [];
+    /** @var list<bool> */
+    private array $juggernaut = [];
 
     /** @param list<TeamSide> $sides strany kouče-člověka */
     public function __construct(array $sides = [])
@@ -58,11 +60,25 @@ final class Coach
         $this->referee = $answers->referee;
         $this->rerolls = $answers->rerolls;
         $this->blockDice = $answers->blockDice;
+        $this->juggernaut = $answers->juggernaut;
     }
 
     public function end(): void
     {
-        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = $this->blockDice = [];
+        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = $this->blockDice = $this->juggernaut = [];
+    }
+
+    /**
+     * P309: brát Both Down útočníka s Juggernautem v blitzu jako Pushed? (ř. 8191-8195 "may choose"). AI = `$aiPush`
+     * (`BlockHandler::aiJuggernautFace`).
+     */
+    public function juggernaut(TeamSide $strana, int $attackerId, int $defenderId, bool $aiPush, GameState $stav): bool
+    {
+        if (!$this->decides($strana)) {
+            return $aiPush;
+        }
+
+        return array_shift($this->juggernaut) ?? throw (new JuggernautQuestion($attackerId, $defenderId))->naStavu($stav);
     }
 
     /** Skočí hráč pro míč? (ř. 8065 "can attempt") */
