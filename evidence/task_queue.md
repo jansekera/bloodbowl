@@ -742,6 +742,14 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 
 # CO JE TEĎ PRVNÍ
 
+## ⏸ K DOŘEŠENÍ — ODLOŽENO (uživatel 21.11.2026: „všechny tři odrážky zapiš k dořešení — ale samotné řešení zatím odlož“)
+*Dnes jen dokončeno rozpracované z 20.11. (P86, P307–P309, P313, P317–P320, P163, P182/P186 — vše na main). Nic z níže uvedeného nespouštět bez pokynu.*
+| pořadí | položka | stav |
+|---|---|---|
+| 1 | **P39/M11 — N1–N4** (`evidence/m11_rozbor_20261120.md`): N1 uvolnit cestu, pak klec (zeď = kdo brání, bez ohledu na vzdálenost; plánovač: méně bezpečné pole vpřed místo 0 maker); N2 cíl blitzu v útoku napřed podle klece; N3 zkontrolovat výpočet nutného postupu / časové rezervy (P177; g0035 t6: 13 polí, 3 tahy); N4 v tísni nosič u kraje se 2 rohy (podle soupeře, goblin napřed shodit) | schváleno, ⏸ odloženo |
+| 2 | **P321** soupisky obou enginů podle pravidel · **P322** AI Wrestle útočník s Blockem × nosič bez Blocku · **P323** Juggernaut + Wrestle bez Blocku (podle rychlosti / surfu) | rozhodnuto, ⏸ odloženo |
+| 3 | **P310** Piling On (volba, oběma týmům na zkoušku) · **P311** Dump-Off (sekce Přihrávka) · **P312** otázky Wrestle a Side Step ve webu (+ útočníkův Wrestle po Juggernautu) · **P315** PORT C++ Take Root × blitz z lehu · **P316** ostatní akce ležícímu · **P320 v C++** (B&C `chooseFace`) · audit parity: ocenění Both Down PHP 90 × C++ 8 | rozhodnuto / otevřeno, ⏸ odloženo |
+
 ## ⭐⭐⭐ 5.11.2026 — SEBRAT MÍČ SOUPEŘI (P245 → P249)
 *Uživatel 5.11.: „když AI nesebere míč soupeři a člověk to udělá — i s rizikem třeba větším než 0,5 — tak člověk vyhraje“; „bojím se, že nastavíš nějaké statické číslo rizika … a AI nepůjde pak sebrat míč soupeři — je to jediná nej akce“.*
 | pořadí | položka | stav |
