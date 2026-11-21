@@ -129,7 +129,7 @@ final class MoveHandler implements ActionHandlerInterface
 
         // Handle PRONE player stand-up
         if ($player->getState() === PlayerState::PRONE) {
-            $standUpResult = $this->resolveStandUp($state, $player);
+            $standUpResult = $this->resolveStandUp($state, $player, (bool) ($params['aiNeprehazujeVstani'] ?? false));
             $events = array_merge($events, $standUpResult['events']);
             $state = $standUpResult['state'];
 
@@ -588,7 +588,7 @@ final class MoveHandler implements ActionHandlerInterface
      *
      * @return array{state: GameState, events: list<GameEvent>, success: bool}
      */
-    private function resolveStandUp(GameState $state, MatchPlayerDTO $player): array
+    private function resolveStandUp(GameState $state, MatchPlayerDTO $player, bool $aiNeprehazuje = false): array
     {
         $playerId = $player->getId();
         $poVstani = Pathfinder::pohybPoVstani($player);
@@ -600,7 +600,9 @@ final class MoveHandler implements ActionHandlerInterface
             // OPRAVENO 19.11.2026 (P86) -- hod šel holou kostkou bez přehozu. Ř. 929-933: týmový přehoz smí přehodit
             //   „any dice roll (other than Armour, Injury or Casualty rolls)“ ve vlastním kole ⇒ i vstání (ř. 690-695).
             //   Týž žebříček jako úhyb a GFI (Pro → týmový přehoz, Loner; kouče-člověka se zeptá). Vzor: C++ `attemptRoll`.
-            if (!$success) {
+            // `$aiNeprehazuje` (rozhodnutí uživatele 20.11., P86 otázka 9): blitz na cíl mimo dosah i po vstání -- AI
+            //   přehoz neutratí; kouče-člověka se zeptá vždy (ř. 929-933: přehoz je volba kouče).
+            if (!$success && !($aiNeprehazuje && !$this->coach->decides($player->getTeamSide()))) {
                 $success = $this->prehoz(
                     $state,
                     $player,

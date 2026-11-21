@@ -132,4 +132,48 @@ final class StandUpRerollTest extends TestCase
         $this->assertSame(3, \App\Engine\Pathfinder::maxGfi($s->requirePlayer(3)), 'Sprint ř. 8487-8490');
         $this->assertSame(0, \App\Engine\Pathfinder::maxGfi($s->requirePlayer(1)->withRooted(true)), 'Take Root ř. 8577-8578');
     }
+    /**
+     * Rozhodnutí uživatele 20.11. (P86, otázka 9): AI v BLITZU nepřehazuje neúspěšné vstání, když na cíl ani po vstání
+     * nedosáhne. Pod 3 MA zbude po vstání 0 pohybu, dál jen 2 GFI, a rána stojí pole (ř. 549-550, 690-695) ⇒ dojde
+     * nejvýš na 1 pole. Soupeř na (9,7): sousední pole (8,7) jsou 3 kroky ⇒ nedosáhne, přehoz by byl zbytečný.
+     */
+    public function testTheAiDoesNotRerollTheStandUpInABlitzAtATargetItCannotReach(): void
+    {
+        $s = $this->state();
+        $s = $s->withPlayer($s->requirePlayer(2)->withPosition(new \App\ValueObject\Position(9, 7)));
+
+        // vstání 3 = neúspěch; víc kostek není -- přehoz by spadl na „no more rolls“
+        $r = (new ActionResolver(new FixedDiceRoller([3])))->resolve($s, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertFalse($r->isTurnover());
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(1, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls(), 'týmový přehoz utracen na nedosažitelný cíl');
+    }
+
+    /** Pozitivní kontrola k předchozímu: cíl, na který po vstání dosáhne přes GFI (1 krok + rána), AI přehodí. */
+    public function testTheAiRerollsTheStandUpInABlitzAtATargetReachableWithGfi(): void
+    {
+        $s = $this->state();
+        $s = $s->withPlayer($s->requirePlayer(2)->withPosition(new \App\ValueObject\Position(7, 7)));
+
+        // vstání 3 · přehoz 4 · GFI kroku 6 · GFI rány 6 · rána 3 = PUSHED
+        $r = (new ActionResolver(new FixedDiceRoller([3, 4, 6, 6, 3])))->resolve($s, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertSame(PlayerState::STANDING, $r->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(0, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls());
+        $this->assertSame(8, $r->getNewState()->requirePlayer(2)->requirePosition()->getX(), 'rána se nehodila');
+    }
+
+    /** Uživatel 20.11.: „člověka se zeptat“ -- omezení je jen pro AI. */
+    public function testAHumanCoachIsAskedEvenWhenTheBlitzTargetIsOutOfReach(): void
+    {
+        $s = $this->state();
+        $s = $s->withPlayer($s->requirePlayer(2)->withPosition(new \App\ValueObject\Position(9, 7)));
+        $r = new ActionResolver(new FixedDiceRoller([3]));
+        $r->setHumanSides([TeamSide::HOME]);
+
+        $q = $r->resolve($s, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2])->getNewState()->getPendingReroll();
+        $this->assertNotNull($q);
+        $this->assertSame(RollType::STAND_UP, $q->getRollType());
+    }
 }

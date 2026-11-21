@@ -764,14 +764,9 @@ final class RulesEngine
         $out = [];
         foreach ($targets as $target) {
             $to = $target->getPosition();
-            if ($attacker === null || $from === null || $to === null) {
-                $out[$target->getId()] = null;
-            } elseif ($from->distanceTo($to) === 1) {
-                $out[$target->getId()] = $from;
-            } else {
-                $moves ??= $this->pathfinder->findValidMoves($state, $attacker);
-                $out[$target->getId()] = Action\BlitzHandler::poleDopadu($moves, $attacker, $to);
-            }
+            $out[$target->getId()] = $attacker === null || $from === null || $to === null
+                ? null
+                : Action\BlitzHandler::poleRany($this->pathfinder, $state, $attacker, $to, $moves);
         }
 
         return $out;

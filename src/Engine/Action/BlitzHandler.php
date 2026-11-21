@@ -95,11 +95,16 @@ final class BlitzHandler implements ActionHandlerInterface
         //   ř. 8197-8199) -- týmž `MoveHandler` jako MOVE (vstání na místě; `partial` nechá pohyb otevřený pro
         //   doběh k cíli). Nevstal-li (pod 3 MA hod 4+), akce končí bez rány; turnover to není (ř. 694-695).
         if ($attacker->getState() === PlayerState::PRONE) {
+            // Rozhodnutí uživatele 20.11. (P86, otázka 9): na cíl, kam ani po vstání nedojde (dosah včetně GFI, rána
+            //   za pole), AI neúspěšné vstání nepřehazuje; člověka se zeptá vždy (`MoveHandler::resolveStandUp`).
+            $moves = null;
+            $naDosah = self::poleRany($this->pathfinder, $state, $attacker, $defenderPos, $moves) !== null;
             $vstani = $this->moveHandler->resolve($state, [
                 'playerId' => $attackerId,
                 'x' => $attackerPos->getX(),
                 'y' => $attackerPos->getY(),
                 'partial' => true,
+                'aiNeprehazujeVstani' => !$naDosah,
             ]);
             $state = $vstani->getNewState();
             $events = $vstani->getEvents();
@@ -289,6 +294,27 @@ final class BlitzHandler implements ActionHandlerInterface
         }
 
         return $bestTarget;
+    }
+
+    /**
+     * Odkud hráč v blitzu dá ránu cíli na `$to`: jeho pole, sousedí-li, jinak `poleDopadu`; null = nedosáhne. JEDINÉ
+     * místo dosahu -- `RulesEngine::blitzLandingSquares` (AI) i rozhodnutí o přehozu vstání. Ležícímu počítá vstání
+     * (`Pathfinder::pohybPoVstani`). `$moves` = cesty pathfinderu, spočítají se nejvýš jednou (sdílí se mezi cíli).
+     *
+     * @param array<string, \App\DTO\MovePath>|null $moves
+     */
+    public static function poleRany(Pathfinder $pathfinder, GameState $state, MatchPlayerDTO $attacker, Position $to, ?array &$moves): ?Position
+    {
+        $from = $attacker->getPosition();
+        if ($from === null) {
+            return null;
+        }
+        if ($from->distanceTo($to) === 1) {
+            return $from;
+        }
+        $moves ??= $pathfinder->findValidMoves($state, $attacker);
+
+        return self::poleDopadu($moves, $attacker, $to);
     }
 
     /**
