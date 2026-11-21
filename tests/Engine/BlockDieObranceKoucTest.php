@@ -129,8 +129,8 @@ final class BlockDieObranceKoucTest extends TestCase
             ->withBallOffPitch()
             ->build()
             ->withAiTeam(TeamSide::HOME);
-        // 6, 1 = kostky 1. rány; 1, 1 = brnění hráče 2; 6, 1 = kostky 2. rány
-        $resolver = $this->resolverTahuAi(new FixedDiceRoller([6, 1, 1, 1, 6, 1]));
+        // 6, 1 = kostky 1. rány; 1, 1 = brnění hráče 2; 6, 1 = kostky 2. rány; 1, 1 = brnění hráče 3
+        $resolver = $this->resolverTahuAi(new FixedDiceRoller([6, 1, 1, 1, 6, 1, 1, 1]));
         $r = $resolver->resolve($state, ActionType::MULTIPLE_BLOCK, ['playerId' => 1, 'targetId' => 2, 'targetId2' => 3]);
 
         $this->assertSame(2, $r->getNewState()->getPendingBlockDie()?->getDefenderId(), 'ř. 633-634: u 1. rány volí člověk');
@@ -138,6 +138,120 @@ final class BlockDieObranceKoucTest extends TestCase
 
         $this->assertSame(3, $r->getNewState()->getPendingBlockDie()?->getDefenderId(), 'u 2. rány znovu člověk');
         $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState(), 'stav k zobrazení: 1. rána už padla');
+
+        // 2. odpověď: Defender Down i u hráče 3 (brnění 1+1 drží); útočník stojí, akce skončila
+        $r = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
+        $this->assertNull($r->getNewState()->getPendingBlockDie());
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState());
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(3)->getState());
+        $this->assertSame(PlayerState::STANDING, $r->getNewState()->requirePlayer(1)->getState());
+        $this->assertTrue($r->getNewState()->requirePlayer(1)->hasActed());
+        $this->assertFalse($r->isTurnover());
+    }
+
+    /**
+     * @param list<\App\DTO\GameEvent> $udalosti
+     * @return list<string>
+     */
+    private function typy(array $udalosti): array
+    {
+        return array_map(static fn($e): string => $e->getType(), $udalosti);
+    }
+
+    public function testFrenzyDruhaRanaSeZeptaZnovuAPrvniRanaSeNeopakuje(): void
+    {
+        // ST 3 proti 4 ⇒ 2 kostky, vybírá obránce: 1. rána 3, 4 = Pushed, Pushed; 2. rána 6, 1; brnění 1+1
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, skills: [SkillName::Frenzy], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, strength: 4, armour: 9, id: 2)
+            ->withBallOffPitch()->build()->withAiTeam(TeamSide::HOME);
+        $resolver = $this->resolverTahuAi(new FixedDiceRoller([3, 4, 6, 1, 1, 1, 1, 1, 1, 1]));
+
+        $a = $resolver->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+        $this->assertFalse($a->getNewState()->getPendingBlockDie()?->isFrenzy(), '1. rána');
+        $b = $resolver->resolve($a->getNewState(), ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
+        $q2 = $b->getNewState()->getPendingBlockDie();
+        $this->assertTrue($q2?->isFrenzy(), 'druhá rána Frenzy: ř. 633-634 platí i pro ni');
+        $this->assertSame(['defender_down', 'attacker_down'], array_map(fn($f) => $f->value, $q2->getFaces()));
+        $this->assertContains('frenzy', $this->typy($b->getEvents()));
+
+        $c = $resolver->resolve($b->getNewState(), ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
+        $this->assertNull($c->getNewState()->getPendingBlockDie());
+        $this->assertSame(PlayerState::PRONE, $c->getNewState()->requirePlayer(2)->getState());
+        $this->assertNotContains('frenzy', $this->typy($c->getEvents()), 'události 1. rány kouč už viděl');
+        $this->assertCount(1, array_keys($this->typy($c->getEvents()), 'block'), 'jen 2. rána');
+    }
+
+    public function testProPrehodiDrivNezSeObranceZeptá(): void
+    {
+        // 1, 1 = Attacker Down ×2 ⇒ AI-útočník zkusí Pro (4 = povedl), nové kostky 6, 1 ⇒ pak teprve otázka
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, skills: [SkillName::Pro], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, strength: 4, armour: 9, id: 2)
+            ->withBallOffPitch()->build()->withAiTeam(TeamSide::HOME);
+        $dice = new FixedDiceRoller([1, 1, 4, 6, 1, 1, 1]);
+        $resolver = $this->resolverTahuAi($dice);
+
+        $a = $resolver->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+        $this->assertSame(['defender_down', 'attacker_down'], array_map(fn($f) => $f->value, $a->getNewState()->getPendingBlockDie()?->getFaces() ?? []));
+        $this->assertContains('pro', $this->typy($a->getEvents()));
+
+        $b = $resolver->resolve($a->getNewState(), ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
+        $this->assertSame(PlayerState::PRONE, $b->getNewState()->requirePlayer(2)->getState());
+        $this->assertNotContains('pro', $this->typy($b->getEvents()), 'Pro se po odpovědi neopakuje');
+        $this->assertFalse($dice->hasRemainingRolls());
+    }
+
+    public function testOrchestratorTahAiStojiAPoOdpovediDobehne(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::AWAY, 5, 5, strength: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 5, strength: 4, armour: 9, id: 2)
+            ->withBallOffPitch()->withActiveTeam(TeamSide::HOME)->build()->withAiTeam(TeamSide::AWAY);
+        $o = $this->orchestrator();
+
+        $x = $o->executeAction($s, ActionType::END_TURN, []);
+        $this->assertNotNull($x['state']->getPendingBlockDie(), 'tah AI stojí na otázce');
+        $this->assertSame(TeamSide::AWAY, $x['state']->getActiveTeam());
+
+        $y = $o->executeAction($x['state'], ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
+        $this->assertSame(PlayerState::PRONE, $y['state']->requirePlayer(2)->getState(), 'kouč zvolil Defender Down');
+        $this->assertSame(TeamSide::HOME, $y['state']->getActiveTeam(), 'AI dohrála tah');
+        $this->assertSame('end_turn', $this->typy($y['events'])[count($y['events']) - 1]);
+    }
+
+    /** AI (away): napřed BLOCK hráčem 1 na hráče 2, pak END_TURN. */
+    private function orchestrator(): \App\Service\GameOrchestrator
+    {
+        $tahy = 0;
+        $ai = $this->createStub(\App\AI\AICoachInterface::class);
+        $ai->method('decideAction')->willReturnCallback(static function () use (&$tahy): array {
+            return $tahy++ === 0
+                ? ['action' => ActionType::BLOCK, 'params' => ['playerId' => 1, 'targetId' => 2]]
+                : ['action' => ActionType::END_TURN, 'params' => []];
+        });
+
+        return new \App\Service\GameOrchestrator(new RulesEngine(), new FixedDiceRoller(array_merge([6, 1, 1, 1], array_fill(0, 40, 3))), $ai);
+    }
+
+    public function testOdpovedKoucePisLogJakoStranuCloveka(): void
+    {
+        // Review P308 (8): odpověď kouče v tahu AI je rozhodnutí člověka (home), ne AI (away)
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::AWAY, 5, 5, strength: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 5, strength: 4, armour: 9, id: 2)
+            ->withBallOffPitch()->withActiveTeam(TeamSide::HOME)->build()->withAiTeam(TeamSide::AWAY);
+        $o = $this->orchestrator();
+        $x = $o->executeAction($s, ActionType::END_TURN, []);
+
+        $log = tempnam(sys_get_temp_dir(), 'p308log');
+        $o->setGameLogger(new \App\AI\GameLogger($log));
+        $o->executeAction($x['state'], ActionType::RESOLVE_BLOCK_DIE, ['faceIndex' => 0]);
+        $prvni = json_decode((string) strtok((string) file_get_contents($log), "\n"), true);
+        unlink($log);
+
+        $this->assertSame('state', $prvni['type'] ?? null);
+        $this->assertSame('home', $prvni['perspective'] ?? null, 'rozhodl kouč-člověk');
     }
 
     public function testOtazkaPrezijeUlozeniStavuAKlientNedostanePrehrani(): void

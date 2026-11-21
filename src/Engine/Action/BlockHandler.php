@@ -779,24 +779,21 @@ final class BlockHandler implements ActionHandlerInterface
         //   Vybírá-li strana, kterou vede AI, volí její kouč (`autoChooseBlockDie`) a
         //   `faceIndex` se nečte. Jinak vybírá člověk v dialogu.
         if ($state->getPendingBlockChooserSide() === $state->getAiTeam()) {
-            $chosenFace = $this->autoChooseBlockDie($faces, $pending->isAttackerChooses(), $attacker, $defender);
+            $index = $this->autoChooseBlockDie($faces, $pending->isAttackerChooses(), $attacker, $defender);
         } else {
             $faceIndex = (int) ($params['faceIndex'] ?? -1);
             if ($faceIndex < 0 || $faceIndex >= count($faces)) {
                 throw new \InvalidArgumentException('Invalid face index');
             }
-            $chosenFace = $faces[$faceIndex];
+            $index = $faceIndex;
         }
+        $chosenFace = $faces[$index];
 
         // P224: kouč-člověk se ptá na Grab dřív, než se blok vyhodnotí; odpověď (`grabVolba`: pole
         //   nebo false) přijde přes `ActionType::RESOLVE_GRAB` a blok se dokončí stejnou volbou kostky.
         //   `$grabVolba` je jen vnitřní argument (volá ho `ActionResolver::resolveGrab`), klient ho
         //   v parametrech akce poslat nemůže. Follow-up se při otázce nebere z kostky: pravidla
         //   (ř. 608-611) ho řadí až za odtlačení, volí se spolu s odpovědí.
-        $index = array_search($chosenFace, $faces, true);
-        if ($index === false) {
-            throw new \LogicException('Chosen block face is not among the rolled faces');
-        }
         $isBlitz = $pending->isBlitz();
         // P81 krok 3: follow-up je volba -- clovek ji posila spolu s kostkou,
         //   bez parametru rozhodne pravidlo AI (`wantsFollowUp`).
@@ -1033,10 +1030,10 @@ final class BlockHandler implements ActionHandlerInterface
 
         // ⛔ 15.09.2026: tady byl nejdriv pokus o Brawler -- skill z BB2020, v BB2016
         //   neexistuje (`evidence/audit_pravidla_20260915.md`). Odstranen na pokyn uzivatele.
-        $bestFace = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
+        $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
 
         // Try Pro if result is bad
-        $bestScore = $this->scoreBlockFace($bestFace, $attacker, $defender);
+        $bestScore = $this->scoreBlockFace($pending->getFaces()[$bestIdx], $attacker, $defender);
         if ($bestScore < 0 && $pending->isProAvailable()) {
             $result = $this->resolveBlockReroll($state, ['type' => 'pro']);
             $accumulatedEvents = array_merge($accumulatedEvents, $result->getEvents());
@@ -1050,35 +1047,14 @@ final class BlockHandler implements ActionHandlerInterface
             if ($attacker === null || $defender === null) {
                 return $result;
             }
-            $bestFace = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
+            $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
         }
 
         // Note: team rerolls are NOT auto-used on blocks (available through interactive dialog only)
 
         // OPRAVENO 20.11.2026 (P308) -- kostku vybíral engine i za člověka-obránce (`autoChooseBlockDie`). Pravidla
-        //   ř. 633-634: "The coach of the stronger player picks which block dice is used." ⇒ vybírá-li obránce
-        //   kouče-člověka, akce se přeruší otázkou (`Coach::blockDie`) a po odpovědi přehraje. (Útočník-člověk
-        //   volí v dialogu: na jeho tahu jsou bloky interaktivní a sem se nedojde.)
-        if (!$pending->isAttackerChooses()) {
-            $bestFace = $this->coach->blockDie(
-                $defender->getTeamSide(),
-                $pending->getAttackerId(),
-                $pending->getDefenderId(),
-                $pending->getFaces(),
-                $pending->isFrenzy(),
-                $bestFace,
-                $state,
-            );
-        }
-
-        // Choose best face
-        $bestIdx = 0;
-        foreach ($pending->getFaces() as $idx => $f) {
-            if ($f === $bestFace) {
-                $bestIdx = $idx;
-                break;
-            }
-        }
+        //   ř. 633-634: "The coach of the stronger player picks which block dice is used." (`kostkaKouce`)
+        $bestIdx = $this->kostkaKouce($state, $attacker, $defender, $pending->getFaces(), $pending->isAttackerChooses(), $bestIdx, $pending->isFrenzy());
 
         $choiceResult = $this->resolveBlockChoice($state, ['faceIndex' => $bestIdx]);
 
@@ -1290,11 +1266,11 @@ final class BlockHandler implements ActionHandlerInterface
         }
 
         // Auto-choose best face
-        $chosenFace = $this->autoChooseBlockDie($faces, $attackerChooses, $attacker, $defender);
+        $chosenIdx = $this->autoChooseBlockDie($faces, $attackerChooses, $attacker, $defender);
 
         // Pro reroll on bad block result
         if ($attacker->hasSkill(SkillName::Pro) && !$attacker->isProUsedThisTurn()) {
-            $chosenScore = $this->scoreBlockFace($chosenFace, $attacker, $defender);
+            $chosenScore = $this->scoreBlockFace($faces[$chosenIdx], $attacker, $defender);
             if ($chosenScore < 0) {
                 $proRoll = $this->dice->rollD6();
                 $attacker = $attacker->withProUsedThisTurn(true);
@@ -1302,19 +1278,16 @@ final class BlockHandler implements ActionHandlerInterface
                 if ($proRoll >= 4) {
                     // ⛔ OPRAVA 18.09.2026: Pro prehodi VSECHNY kostky bloku (r. 919-924, 982)
                     $faces = $this->rollBlockDice(count($faces));
-                    $chosenFace = $this->autoChooseBlockDie($faces, $attackerChooses, $attacker, $defender);
+                    $chosenIdx = $this->autoChooseBlockDie($faces, $attackerChooses, $attacker, $defender);
                     $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, true, null);
                 } else {
                     $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, false, null);
                 }
             }
         }
-        // OPRAVENO 20.11.2026 (P308) -- i za člověka-obránce vybral kostku engine. Ř. 633-634: "The coach of the
-        //   stronger player picks which block dice is used." Jen v tahu AI (útočník není kouč-člověk): hot-seat
-        //   dvou lidí server nerozliší (P308 ho odkládá). Silnější útočník-člověk: kostku dál volí engine (P308, otevřené).
-        if (!$attackerChooses && !$this->coach->decides($attacker->getTeamSide())) {
-            $chosenFace = $this->coach->blockDie($defender->getTeamSide(), $attacker->getId(), $defender->getId(), $faces, false, $chosenFace, $state);
-        }
+        // OPRAVENO 20.11.2026 (P308) -- kostku vybíral engine i za člověka-obránce.
+        //   Ř. 633-634: "The coach of the stronger player picks which block dice is used." (`kostkaKouce`)
+        $chosenFace = $faces[$this->kostkaKouce($state, $attacker, $defender, $faces, $attackerChooses, $chosenIdx)];
 
         $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);
         $events[] = GameEvent::blockAttempt(
@@ -2213,7 +2186,31 @@ final class BlockHandler implements ActionHandlerInterface
     }
 
     /**
-     * Auto-choose the best block die face.
+     * Kostka bloku, kterou zvolí kouč strany, jež vybírá (`rules_bb2016.txt` ř. 633-634: "The coach of the stronger
+     * player picks which block dice is used"): kouč-člověk otázkou (`Coach::blockDie`, akce se po odpovědi přehraje),
+     * AI `$navrh`. Jediné místo podmínky „ptát se kouče na kostku?“ (blok v tahu AI, Multiple Block AI). Ptá se
+     * obránce-člověka proti útočníkovi AI; hot-seat (člověk za obě strany) server nerozliší (P308 odkládá). Silnější
+     * útočník-člověk u Multiple Block: P319 (zatím volí engine).
+     *
+     * @param list<BlockDiceFace> $faces
+     * @return int index v `$faces`
+     */
+    private function kostkaKouce(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        MatchPlayerDTO $defender,
+        array $faces,
+        bool $attackerChooses,
+        int $navrh,
+        bool $isFrenzy = false,
+    ): int {
+        $ptat = !$attackerChooses && $this->coach->decides($defender->getTeamSide()) && !$this->coach->decides($attacker->getTeamSide());
+
+        return $ptat ? $this->coach->blockDie($attacker->getId(), $defender->getId(), $faces, $isFrenzy, $state) : $navrh;
+    }
+
+    /**
+     * Auto-choose the best block die face (index v `$faces`).
      *
      * @param list<BlockDiceFace> $faces
      */
@@ -2222,10 +2219,10 @@ final class BlockHandler implements ActionHandlerInterface
         bool $attackerChooses,
         MatchPlayerDTO $attacker,
         MatchPlayerDTO $defender,
-    ): BlockDiceFace {
+    ): int {
         $scored = [];
-        foreach ($faces as $face) {
-            $scored[] = [$face, $this->scoreBlockFace($face, $attacker, $defender)];
+        foreach ($faces as $i => $face) {
+            $scored[] = [$i, $this->scoreBlockFace($face, $attacker, $defender)];
         }
 
         // Attacker wants highest score, defender wants lowest

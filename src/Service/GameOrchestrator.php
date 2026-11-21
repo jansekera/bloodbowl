@@ -41,9 +41,10 @@ final class GameOrchestrator
      */
     public function executeAction(GameState $state, ActionType $action, array $params): array
     {
-        // Log state before human decision (for learning from human games)
+        // Log state before human decision (for learning from human games). OPRAVENO 20.11.2026 (review P308) --
+        //   odpověď kouče v tahu AI (RESOLVE_*) se logovala za stranu na tahu (AI); rozhoduje člověk.
         if ($this->gameLogger !== null && $state->getPhase()->isPlayable()) {
-            $this->gameLogger->logState($state, $state->getActiveTeam());
+            $this->gameLogger->logState($state, $state->getAiTeam()?->opponent() ?? $state->getActiveTeam());
         }
 
         // Validate

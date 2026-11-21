@@ -22,6 +22,7 @@ import { GrabModal } from './ui/GrabModal';
 import { StandFirmModal } from './ui/StandFirmModal';
 import { DivingCatchModal } from './ui/DivingCatchModal';
 import { RefereeModal } from './ui/RefereeModal';
+import { answerQuestion } from './ui/answerQuestion';
 import { MovePlanBar, type MovePlanChoice } from './ui/MovePlanBar';
 import { clickTarget, describePlan, nextStep, planAfterStep, planTarget, type MovePlan } from './state/MovePlan';
 
@@ -296,16 +297,50 @@ function enterBombRethrow(state: import('./api/types').GameState): void {
 async function submitBombRethrow(targetX: number, targetY: number): Promise<void> {
     isProcessing = true;
     try {
-        const result = await api.submitAction(matchId, 'resolve_bomb_rethrow', { targetX, targetY });
-        clearAllTargets();
-        actionPanel.setSelectedMode(null);
-        stateManager.clearSelection();
-        await handleActionResult(result);
+        await answerQuestion(
+            () => api.submitAction(matchId, 'resolve_bomb_rethrow', { targetX, targetY }),
+            async result => {
+                clearAllTargets();
+                actionPanel.setSelectedMode(null);
+                stateManager.clearSelection();
+                await handleActionResult(result);
+            },
+            err => {
+                console.error(err);
+                toast.error('Bomb throw failed');
+                const state = stateManager.getGameState();
+                if (state) enterBombRethrow(state); // server odpověď nepřijal ⇒ otázka stále čeká
+            },
+        );
+    } catch (err) {
+        console.error(err);   // review P308 (7): chyba zpracování přijaté odpovědi — otázku znovu neukazovat
+    } finally {
+        isProcessing = false;
+    }
+}
+
+/**
+ * Odpověď na otázku kouči. Review P308 (7): dialog se znovu ukáže jen když server odpověď nepřijal; chyba až při
+ * zpracování přijatého výsledku otázku znovu neukazuje (na serveru už nečeká).
+ */
+async function answerCoachQuestion(action: string, params: Record<string, unknown>, failure: string, reshow: () => void): Promise<void> {
+    isProcessing = true;
+    try {
+        await answerQuestion(
+            () => api.submitAction(matchId, action, params),
+            async result => {
+                await handleActionResult(result);
+                clearAllTargets();
+                actionPanel.setSelectedMode(null);
+            },
+            err => {
+                console.error(err);
+                toast.error(failure);
+                reshow();
+            },
+        );
     } catch (err) {
         console.error(err);
-        toast.error('Bomb throw failed');
-        const state = stateManager.getGameState();
-        if (state) enterBombRethrow(state); // otázka na serveru stále čeká
     } finally {
         isProcessing = false;
     }
@@ -332,19 +367,7 @@ function showDivingCatchModal(state: import('./api/types').GameState): void {
     const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
     const attempting = pending.attemptingId !== null ? nameOf(pending.attemptingId) : null;
     divingCatchModal.show(pending, nameOf(pending.playerId), attempting, async (params: Record<string, unknown>) => {
-        isProcessing = true;
-        try {
-            const result = await api.submitAction(matchId, 'resolve_diving_catch', params);
-            await handleActionResult(result);
-            clearAllTargets();
-            actionPanel.setSelectedMode(null);
-        } catch (err) {
-            console.error(err);
-            toast.error('Diving Catch choice failed');
-            showDivingCatchModal(state); // otázka na serveru stále čeká
-        } finally {
-            isProcessing = false;
-        }
+        await answerCoachQuestion('resolve_diving_catch', params, 'Diving Catch choice failed', () => showDivingCatchModal(state));
     });
 }
 
@@ -353,19 +376,7 @@ function showRefereeModal(state: import('./api/types').GameState): void {
     if (!pending) return;
     const name = state.players.find(p => p.id === pending.playerId)?.name ?? `#${pending.playerId}`;
     refereeModal.show(pending, name, async params => {
-        isProcessing = true;
-        try {
-            const result = await api.submitAction(matchId, 'resolve_referee', params);
-            await handleActionResult(result);
-            clearAllTargets();
-            actionPanel.setSelectedMode(null);
-        } catch (err) {
-            console.error(err);
-            toast.error('Referee choice failed');
-            showRefereeModal(state); // otázka na serveru stále čeká
-        } finally {
-            isProcessing = false;
-        }
+        await answerCoachQuestion('resolve_referee', params, 'Referee choice failed', () => showRefereeModal(state));
     });
 }
 
@@ -376,19 +387,7 @@ function showStandFirmModal(state: import('./api/types').GameState): void {
     const playerPos = state.players.find(p => p.id === pending.playerId)?.position ?? null;
     const dependsOn = (pending.pushToDependsOn ?? []).map(nameOf);
     standFirmModal.show(pending, nameOf(pending.playerId), nameOf(pending.attackerId), playerPos, dependsOn, async (params: Record<string, unknown>) => {
-        isProcessing = true;
-        try {
-            const result = await api.submitAction(matchId, 'resolve_stand_firm', params);
-            await handleActionResult(result);
-            clearAllTargets();
-            actionPanel.setSelectedMode(null);
-        } catch (err) {
-            console.error(err);
-            toast.error('Stand Firm choice failed');
-            showStandFirmModal(state); // otázka na serveru stále čeká
-        } finally {
-            isProcessing = false;
-        }
+        await answerCoachQuestion('resolve_stand_firm', params, 'Stand Firm choice failed', () => showStandFirmModal(state));
     });
 }
 
@@ -398,19 +397,7 @@ function showGrabModal(state: import('./api/types').GameState): void {
     const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
     const dieFace = pending.face ?? state.pendingBlock?.faces[pending.faceIndex] ?? '?';
     grabModal.show(pending, nameOf(pending.attackerId), nameOf(pending.defenderId), dieFace, async (params: Record<string, unknown>) => {
-        isProcessing = true;
-        try {
-            const result = await api.submitAction(matchId, 'resolve_grab', params);
-            await handleActionResult(result);
-            clearAllTargets();
-            actionPanel.setSelectedMode(null);
-        } catch (err) {
-            console.error(err);
-            toast.error('Grab choice failed');
-            showGrabModal(state); // otázka na serveru stále čeká — bez dialogu by kouč uvázl do reloadu
-        } finally {
-            isProcessing = false;
-        }
+        await answerCoachQuestion('resolve_grab', params, 'Grab choice failed', () => showGrabModal(state));
     });
 }
 
@@ -492,19 +479,7 @@ function showDefenderBlockDieModal(state: import('./api/types').GameState): void
     if (!pending) return;
     const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
     blockDiceModal.showDefenderPick(pending, nameOf(pending.attackerId), nameOf(pending.defenderId), async (faceIndex: number) => {
-        isProcessing = true;
-        try {
-            const result = await api.submitAction(matchId, 'resolve_block_die', { faceIndex });
-            await handleActionResult(result);
-            clearAllTargets();
-            actionPanel.setSelectedMode(null);
-        } catch (err) {
-            console.error(err);
-            toast.error('Block die choice failed');
-            showDefenderBlockDieModal(state); // otázka na serveru stále čeká
-        } finally {
-            isProcessing = false;
-        }
+        await answerCoachQuestion('resolve_block_die', { faceIndex }, 'Block die choice failed', () => showDefenderBlockDieModal(state));
     });
 }
 

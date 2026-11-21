@@ -103,28 +103,17 @@ final class Coach
     }
 
     /**
-     * Kostka bloku, kterou vybírá strana `$vybira` (P308). `rules_bb2016.txt` ř. 633-634: "The coach of the stronger
-     * player picks which block dice is used." Dřív ji v tahu AI za člověka-obránce vybral engine (`autoChooseBlockDie`).
+     * Index kostky bloku, kterou volí kouč-člověk (P308). `rules_bb2016.txt` ř. 633-634: "The coach of
+     * the stronger player picks which block dice is used." Komu se ptát, rozhoduje `BlockHandler::kostkaKouce`.
      *
      * @param list<BlockDiceFace> $faces
-     * @param BlockDiceFace $suggested volba enginu (AI ji vezme)
      */
-    public function blockDie(
-        TeamSide $vybira,
-        int $attackerId,
-        int $defenderId,
-        array $faces,
-        bool $isFrenzy,
-        BlockDiceFace $suggested,
-        GameState $stav,
-    ): BlockDiceFace {
-        if (!$this->decides($vybira)) {
-            return $suggested;
-        }
+    public function blockDie(int $attackerId, int $defenderId, array $faces, bool $isFrenzy, GameState $stav): int
+    {
         $i = array_shift($this->blockDice)
             ?? throw (new BlockDieQuestion($attackerId, $defenderId, $faces, $isFrenzy))->naStavu($stav->withPendingBlock(null));
 
-        return $faces[$i] ?? throw new \InvalidArgumentException("Block die {$i} not rolled");
+        return isset($faces[$i]) ? $i : throw new \InvalidArgumentException("Block die {$i} not rolled");
     }
 
     /**
