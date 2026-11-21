@@ -56,6 +56,8 @@ final class GameState
         private ?PendingRefereeDTO $pendingReferee = null,
         // P308, 20.11.2026: AI blokuje hráče kouče-člověka a kostku vybírá obránce (viz PendingBlockDieDTO).
         private ?PendingBlockDieDTO $pendingBlockDie = null,
+        // P309, 20.11.2026: útočník kouče-člověka s Juggernautem hodil v blitzu Both Down — brát jako Pushed? (viz PendingJuggernautDTO)
+        private ?PendingJuggernautDTO $pendingJuggernaut = null,
     ) {}
 
     /**
@@ -434,15 +436,28 @@ final class GameState
         return $clone;
     }
 
+    public function getPendingJuggernaut(): ?PendingJuggernautDTO
+    {
+        return $this->pendingJuggernaut;
+    }
+
+    public function withPendingJuggernaut(?PendingJuggernautDTO $pending): self
+    {
+        $clone = clone $this;
+        $clone->pendingJuggernaut = $pending;
+        return $clone;
+    }
+
     /**
      * Čeká otázka, po jejíž odpovědi se přerušená akce přehraje (Diving Catch, kam hodit bombu, rozhodčí u faulu,
-     * kostka bloku obránce-člověka v tahu AI — P308), přehoz hodu (P292), nebo rozhodčí na konci drive (P291)?
-     * Žádná jiná akce ani tah AI do odpovědi.
+     * kostka bloku obránce-člověka v tahu AI — P308, Juggernaut — P309), přehoz hodu (P292), nebo rozhodčí na konci
+     * drive (P291)? Žádná jiná akce ani tah AI do odpovědi.
      */
     public function hasPendingReplayQuestion(): bool
     {
         return $this->pendingDivingCatch !== null || $this->pendingBombRethrow !== null || $this->pendingReferee !== null
             || $this->pendingBlockDie !== null
+            || $this->pendingJuggernaut !== null   // P309
             || $this->pendingReroll !== null;   // P292/P294: přehoz hodu (i v tahu soupeře), vždy přehráním
     }
 
@@ -628,6 +643,7 @@ final class GameState
             'pendingBombRethrow' => $this->pendingBombRethrow?->toArray($sPrehranim),
             'pendingReferee' => $this->pendingReferee?->toArray($sPrehranim),
             'pendingBlockDie' => $this->pendingBlockDie?->toArray($sPrehranim),
+            'pendingJuggernaut' => $this->pendingJuggernaut?->toArray($sPrehranim),
         ];
     }
 
@@ -666,6 +682,7 @@ final class GameState
             pendingBombRethrow: isset($data['pendingBombRethrow']) ? PendingBombRethrowDTO::fromArray((array) $data['pendingBombRethrow']) : null,
             pendingReferee: isset($data['pendingReferee']) ? PendingRefereeDTO::fromArray((array) $data['pendingReferee']) : null,
             pendingBlockDie: isset($data['pendingBlockDie']) ? PendingBlockDieDTO::fromArray((array) $data['pendingBlockDie']) : null,
+            pendingJuggernaut: isset($data['pendingJuggernaut']) ? PendingJuggernautDTO::fromArray((array) $data['pendingJuggernaut']) : null,
         );
     }
 }

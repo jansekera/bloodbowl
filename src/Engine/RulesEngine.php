@@ -55,6 +55,14 @@ final class RulesEngine
         if ($action === ActionType::RESOLVE_DIVING_CATCH) {
             return ['No pending Diving Catch question'];
         }
+        // P309: Juggernaut v blitzu — Both Down brát jako Pushed? Stejně přednostně (přehrání akce po odpovědi).
+        if ($state->getPendingJuggernaut() !== null) {
+            return $action !== ActionType::RESOLVE_JUGGERNAUT ? ['Must answer the Juggernaut question first']
+                : (isset($params['use']) && is_bool($params['use']) ? [] : ['use must be a boolean']);
+        }
+        if ($action === ActionType::RESOLVE_JUGGERNAUT) {
+            return ['No pending Juggernaut question'];
+        }
         // P272 (10.11.2026): kam hodit chycenou bombu — stejně přednostně; cíl jen z nabídnutých (legálních) polí.
         $bomba = $state->getPendingBombRethrow();
         if ($bomba !== null) {
@@ -201,6 +209,10 @@ final class RulesEngine
         // 30.10.2026: čekající otázka na Diving Catch — jen odpověď kouče (přednost před vším, viz validate)
         if ($state->getPendingDivingCatch() !== null) {
             return [['type' => ActionType::RESOLVE_DIVING_CATCH->value]];
+        }
+        // P309: Juggernaut — jen odpověď kouče
+        if ($state->getPendingJuggernaut() !== null) {
+            return [['type' => ActionType::RESOLVE_JUGGERNAUT->value]];
         }
         // P272: kam hodit chycenou bombu — jen odpověď kouče
         if ($state->getPendingBombRethrow() !== null) {

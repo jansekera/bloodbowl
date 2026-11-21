@@ -96,7 +96,7 @@ long takePushGeometryFastMAPicksInSearch() {
 
 BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
                                  bool attackerChooses,
-                                 const Player& att, const Player& def) {
+                                 const Player& att, const Player& def, bool isBlitz) {
     bool attBlock = att.hasSkill(SkillName::Block);
     bool defBlock = def.hasSkill(SkillName::Block);
     bool defDodge = def.hasSkill(SkillName::Dodge);
@@ -106,15 +106,19 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
     // konzervativne: bez mice, tj. jak to vypada ve zdi.
     bool attWrestle = att.hasSkill(SkillName::Wrestle) &&
                       (!attBlock || defBlock);
-    bool defWrestle = defenderWouldWrestle(att, def, /*isBlitz=*/false);   // SSOT 5.11.: totéž rozhodnutí jako resolver (16.10.)
+    // SSOT 5.11.: totéž rozhodnutí jako resolver (16.10.). P309: dřív vždy isBlitz=false a Both Down se oceňoval bez
+    //   Juggernautu — proti obránci s Wrestle jako „oba na zemi“, i když ho Juggernaut v blitzu ruší (ř. 8192-8194).
+    bool defWrestle = defenderWouldWrestle(att, def, isBlitz);
+    auto score = [&](BlockDiceFace f) {
+        return scoreFace(aiJuggernautFace(f, att, def, isBlitz), attBlock, defBlock, defDodge, attTackle,
+                         attWrestle, defWrestle);
+    };
 
     int bestIdx = 0;
-    int bestScore = scoreFace(faces[0], attBlock, defBlock, defDodge, attTackle,
-                              attWrestle, defWrestle);
+    int bestScore = score(faces[0]);
 
     for (int i = 1; i < count; i++) {
-        int s = scoreFace(faces[i], attBlock, defBlock, defDodge, attTackle,
-                          attWrestle, defWrestle);
+        int s = score(faces[i]);
         if (attackerChooses) {
             if (s > bestScore) { bestScore = s; bestIdx = i; }
         } else {
@@ -122,6 +126,24 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
         }
     }
     return faces[bestIdx];
+}
+
+// P309 (uživatel 20.11.2026: „ano“). rules_bb2016.txt ř. 8191-8195 (Juggernaut): "If this player takes a Blitz Action,
+// then opposing players may not use their Fend, Stand Firm or Wrestle skills against blocks, and he MAY CHOOSE to treat
+// a 'Both Down' result as if a 'Pushed' result has been rolled instead." OPRAVENO 20.11. — dřív převod vždy (4 místa
+// v resolveBlock a blockFaceDownsOrStrips), po volbě kostky koučem obránce vůbec. Volba AI: s Blockem proti obránci
+// bez Blocku Both Down srazí jen obránce (Wrestle obránce je zrušen) ⇒ nechat; jinak převést.
+BlockDiceFace aiJuggernautFace(BlockDiceFace face, const Player& att, const Player& def, bool isBlitz) {
+    if (face != BlockDiceFace::BOTH_DOWN || !isBlitz || !att.hasSkill(SkillName::Juggernaut)) return face;
+    const bool keep = att.hasSkill(SkillName::Block) && !def.hasSkill(SkillName::Block);
+    return keep ? BlockDiceFace::BOTH_DOWN : BlockDiceFace::PUSHED;
+}
+
+thread_local JuggernautBothDowns g_juggernautBothDowns;
+JuggernautBothDowns takeJuggernautBothDowns() {
+    const JuggernautBothDowns v = g_juggernautBothDowns;
+    g_juggernautBothDowns = {};
+    return v;
 }
 
 // Útočník: bez Blocku ho Both Down složí tak jako tak, takže Wrestle je lepší vždy (složí i soupeře a nikdo nehází
@@ -143,14 +165,13 @@ bool defenderWouldWrestle(const Player& att, const Player& def, bool isBlitz) {
 }
 
 // Defender Down vždy; Stumbles — ne, když má Dodge a útočník nemá Tackle (ř. 8566-8571), leda Strip Ball; Pushed — jen
-// Strip Ball na nosiče bez Sure Hands (ř. 8517-8521); Both Down — Juggernaut na blitzu z něj dělá Pushed, jinak Wrestle
+// Strip Ball na nosiče bez Sure Hands (ř. 8517-8521); Both Down — Juggernaut na blitzu podle volby AI (P309) Pushed, jinak Wrestle
 // kohokoli (oba k zemi, ř. 8670-8676), jinak obránce padá, nemá-li Block; Attacker Down nikdy.
 bool blockFaceDownsOrStrips(const GameState& state, BlockDiceFace face, const Player& att, const Player& def,
                             bool isBlitz) {
     const bool carrier = state.ball.isHeld && state.ball.carrierId == def.id;
     const bool strip = carrier && att.hasSkill(SkillName::StripBall) && !def.hasSkill(SkillName::SureHands);
-    if (face == BlockDiceFace::BOTH_DOWN && isBlitz && att.hasSkill(SkillName::Juggernaut)) face = BlockDiceFace::PUSHED;
-    switch (face) {
+    switch (aiJuggernautFace(face, att, def, isBlitz)) {
         case BlockDiceFace::DEFENDER_DOWN: return true;
         case BlockDiceFace::DEFENDER_STUMBLES:
             return strip || !(def.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle));
@@ -163,7 +184,9 @@ bool blockFaceDownsOrStrips(const GameState& state, BlockDiceFace face, const Pl
     return false;
 }
 
-static bool shouldRerollBlock(BlockDiceFace face, const Player& att) {
+// `face` jak ji AI vyhodnotí (P309: Both Down s Juggernautem v blitzu podle aiJuggernautFace).
+static bool shouldRerollBlock(BlockDiceFace face, const Player& att, const Player& def, bool isBlitz) {
+    face = aiJuggernautFace(face, att, def, isBlitz);
     if (face == BlockDiceFace::ATTACKER_DOWN) return true;
     if (face == BlockDiceFace::BOTH_DOWN && !att.hasSkill(SkillName::Block)) return true;
     return false;
@@ -1215,15 +1238,9 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         faces[i] = dice.rollBlockDie();
     }
 
-    // Choose best die
+    // Choose best die (Juggernaut se rozhoduje až nad zvolenou kostkou, níž — P309)
     BlockDiceFace chosen = autoChooseBlockDie(faces, diceInfo.count,
-                                               diceInfo.attackerChooses, att, def);
-
-    // Juggernaut: BD → PUSHED on blitz
-    if (chosen == BlockDiceFace::BOTH_DOWN && params.isBlitz &&
-        att.hasSkill(SkillName::Juggernaut)) {
-        chosen = BlockDiceFace::PUSHED;
-    }
+                                               diceInfo.attackerChooses, att, def, params.isBlitz);
 
     // P130: v živé partii se kouč útočníka ptá PO KAŽDÉM hodu kostek, ještě
     // před výběrem kostky a před push/follow -- co je u bloku "neúspěch", ví
@@ -1244,7 +1261,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             emitEvent(events, {GameEvent::Type::REROLL, att.id, def.id, {}, {}, 0,
                               true, before, packFaces()});
         }
-        chosen = autoChooseBlockDie(faces, diceInfo.count, diceInfo.attackerChooses, att, def);
+        chosen = autoChooseBlockDie(faces, diceInfo.count, diceInfo.attackerChooses, att, def, params.isBlitz);
         // Výběr kostky: kouč vidí hozené kostky a vybere (jen když vybírá útočník
         // a je z čeho). Starší příkaz `kostka` (g_manualFace) má přednost.
         bool differ = false;
@@ -1255,10 +1272,6 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             chosen = static_cast<BlockDiceFace>(
                 askCoach(CoachQuestion::BLOCK_FACE, att.id, def.id, packFaces(), diceInfo.count, opts));
         }
-        if (chosen == BlockDiceFace::BOTH_DOWN && params.isBlitz &&
-            att.hasSkill(SkillName::Juggernaut)) {
-            chosen = BlockDiceFace::PUSHED;
-        }
     }
 
     // Pro/team reroll on bad result
@@ -1266,9 +1279,10 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     const bool onOppCarrier = extraFeatureOn(kP249cCarrierReroll) && def.teamSide != att.teamSide &&
                               state.ball.isHeld && state.ball.carrierId == def.id;
     auto wantsReroll = [&](BlockDiceFace f) {
-        return shouldRerollBlock(f, att) || (onOppCarrier && !blockFaceDownsOrStrips(state, f, att, def, params.isBlitz));
+        return shouldRerollBlock(f, att, def, params.isBlitz) || (onOppCarrier && !blockFaceDownsOrStrips(state, f, att, def, params.isBlitz));
     };
-    if (!coachAttacker && onOppCarrier && !shouldRerollBlock(chosen, att) && wantsReroll(chosen)) noteP249Extra(1);
+    if (!coachAttacker && onOppCarrier && !shouldRerollBlock(chosen, att, def, params.isBlitz) && wantsReroll(chosen))
+        noteP249Extra(1);
     if (!coachAttacker && wantsReroll(chosen)) {
         bool rerolled = false;
 
@@ -1298,11 +1312,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             if (proRoll >= 4) {
                 for (int i = 0; i < diceInfo.count; i++) faces[i] = dice.rollBlockDie();
                 chosen = autoChooseBlockDie(faces, diceInfo.count,
-                                             diceInfo.attackerChooses, att, def);
-                if (chosen == BlockDiceFace::BOTH_DOWN && params.isBlitz &&
-                    att.hasSkill(SkillName::Juggernaut)) {
-                    chosen = BlockDiceFace::PUSHED;
-                }
+                                             diceInfo.attackerChooses, att, def, params.isBlitz);
                 rerolled = true;
             }
         }
@@ -1317,11 +1327,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 if (lonerAllowsTeamReroll(att, dice, events)) {
                     for (int i = 0; i < diceInfo.count; i++) faces[i] = dice.rollBlockDie();
                     chosen = autoChooseBlockDie(faces, diceInfo.count,
-                                                 diceInfo.attackerChooses, att, def);
-                    if (chosen == BlockDiceFace::BOTH_DOWN && params.isBlitz &&
-                        att.hasSkill(SkillName::Juggernaut)) {
-                        chosen = BlockDiceFace::PUSHED;
-                    }
+                                                 diceInfo.attackerChooses, att, def, params.isBlitz);
                 }
             }
         }
@@ -1346,6 +1352,21 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         for (int i = 0; i < diceInfo.count; i++)
             if (static_cast<int>(faces[i]) == g_manualFace) { chosen = faces[i]; break; }
         g_manualFace = -1;
+    }
+    // P309: Juggernaut v blitzu — Both Down jako Pushed je volba útočníka (ř. 8191-8195 "may choose"), jedno místo
+    //   nad definitivně zvolenou kostkou (i když ji vybral kouč obránce nebo příkaz `kostka`). Kouč-člověk otázkou.
+    if (chosen == BlockDiceFace::BOTH_DOWN && params.isBlitz && att.hasSkill(SkillName::Juggernaut)) {
+        const bool push = coachAttacker
+                              ? askCoach(CoachQuestion::USE_JUGGERNAUT, att.id, def.id, 0, 0, 3) == CoachAnswer::TEAM
+                              : aiJuggernautFace(chosen, att, def, true) == BlockDiceFace::PUSHED;
+        ++g_juggernautBothDowns.total;
+        if (push) {
+            chosen = BlockDiceFace::PUSHED;
+            emitEvent(events, {GameEvent::Type::SKILL_USED, att.id, def.id, {}, {},
+                              static_cast<int>(SkillName::Juggernaut), true});
+        } else {
+            ++g_juggernautBothDowns.kept;
+        }
     }
     ++g_blocksThrown;
     // 02.10.2026 (uživatel: „zkus do logu doplnit všechny kostky hodu"): die1 nese VŠECHNY hozené

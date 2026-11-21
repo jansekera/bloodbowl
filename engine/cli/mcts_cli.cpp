@@ -170,6 +170,9 @@ int main(int argc, char* argv[]) {
               << (opts.games / totalSec) << " games/sec)\n";
     // P225: pozitivní kontrola mechanismu (u mcts tiká i v simulacích hledání, u greedy jen v partiích).
     std::cout << "P225 Stand Firm odmítnut (past na Frenzy): " << takeStandFirmDeclinedForFrenzy() << "\n";
+    // P309: četnost volby Juggernautu (Both Down útočníka s Juggernautem v blitzu; ponecháno = nepřevedeno na Pushed).
+    const JuggernautBothDowns jugg = takeJuggernautBothDowns();
+    std::cout << "P309 Juggernaut Both Down v blitzu: " << jugg.total << ", ponecháno: " << jugg.kept << "\n";
 
     return 0;
 }

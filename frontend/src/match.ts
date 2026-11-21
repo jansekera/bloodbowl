@@ -21,6 +21,7 @@ import { ApothecaryModal } from './ui/ApothecaryModal';
 import { GrabModal } from './ui/GrabModal';
 import { StandFirmModal } from './ui/StandFirmModal';
 import { DivingCatchModal } from './ui/DivingCatchModal';
+import { JuggernautModal } from './ui/JuggernautModal';
 import { RefereeModal } from './ui/RefereeModal';
 import { answerQuestion } from './ui/answerQuestion';
 import { MovePlanBar, type MovePlanChoice } from './ui/MovePlanBar';
@@ -93,6 +94,7 @@ const apothecaryModal = new ApothecaryModal(container);
 const grabModal = new GrabModal(container);
 const standFirmModal = new StandFirmModal(container);
 const divingCatchModal = new DivingCatchModal(container);
+const juggernautModal = new JuggernautModal(container);
 const refereeModal = new RefereeModal(container);
 
 // Animation queue
@@ -235,6 +237,11 @@ async function handleActionResult(result: ActionResult): Promise<void> {
         showDivingCatchModal(result.state);
         return;
     }
+    // P309: Juggernaut v blitzu — Both Down brát jako Pushed? Stejně přednostně (stav nese i volbu kostky).
+    if (result.state.pendingJuggernaut) {
+        showJuggernautModal(result.state);
+        return;
+    }
     // P272: kam hodit chycenou bombu — stejně přednostně (i uprostřed tahu AI)
     if (result.state.pendingBombRethrow) {
         enterBombRethrow(result.state);
@@ -359,6 +366,15 @@ async function submitBomb(playerId: number, targetX: number, targetY: number): P
     } finally {
         isProcessing = false;
     }
+}
+
+function showJuggernautModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingJuggernaut;
+    if (!pending) return;
+    const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
+    juggernautModal.show(nameOf(pending.playerId), nameOf(pending.defenderId), async (params: Record<string, unknown>) => {
+        await answerCoachQuestion('resolve_juggernaut', params, 'Juggernaut choice failed', () => showJuggernautModal(state));
+    });
 }
 
 function showDivingCatchModal(state: import('./api/types').GameState): void {
@@ -1315,6 +1331,8 @@ async function init(): Promise<void> {
         // 30.10.2026: čekající otázka na Diving Catch i po obnovení stránky — přednost před vším (viz handleActionResult)
         if (state.pendingDivingCatch) {
             showDivingCatchModal(state);
+        } else if (state.pendingJuggernaut) {
+            showJuggernautModal(state); // P309: i po obnovení stránky
         } else if (state.pendingBombRethrow) {
             enterBombRethrow(state); // P272: i po obnovení stránky
         } else if (state.pendingReferee) {

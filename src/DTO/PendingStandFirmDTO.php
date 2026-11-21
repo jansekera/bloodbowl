@@ -50,6 +50,8 @@ final class PendingStandFirmDTO
         private readonly int $index = 0,
         private readonly bool $grabPossible = false,
         private readonly array $pushToDependsOn = [],
+        // P309 review (1): odpověď útočníka na Juggernaut (true = Pushed), ať ji RESOLVE_STAND_FIRM nepoloží znovu
+        private readonly ?bool $juggernaut = null,
     ) {}
 
     public function getPlayerId(): int
@@ -103,6 +105,11 @@ final class PendingStandFirmDTO
         return $this->grab;
     }
 
+    public function getJuggernaut(): ?bool
+    {
+        return $this->juggernaut;
+    }
+
     public function getStep(): int
     {
         return $this->step;
@@ -154,6 +161,7 @@ final class PendingStandFirmDTO
             'index' => $this->index,
             'grabPossible' => $this->grabPossible,
             'pushToDependsOn' => $this->pushToDependsOn,
+            'juggernaut' => $this->juggernaut,
         ];
     }
 
@@ -192,6 +200,7 @@ final class PendingStandFirmDTO
             (int) ($data['index'] ?? 0),
             (bool) ($data['grabPossible'] ?? false),
             array_values(array_map('intval', (array) ($data['pushToDependsOn'] ?? []))),
+            isset($data['juggernaut']) ? (bool) $data['juggernaut'] : null,
         );
     }
 }

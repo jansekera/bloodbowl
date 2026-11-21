@@ -525,7 +525,9 @@ def kostky_str(packed):
 PREHOZ = {"ne": 0, "tym": 1, "tým": 1, "pro": 2}
 ANO_NE = {"ne": 0, "ano": 1}
 SKILL_OTAZKY = {"USE_DODGE": "Dodge", "USE_WRESTLE": "Wrestle", "USE_STAND_FIRM": "Stand Firm",
-                "USE_SIDE_STEP": "Side Step", "USE_GRAB": "Grab", "USE_DIVING_CATCH": "Diving Catch"}
+                "USE_SIDE_STEP": "Side Step", "USE_GRAB": "Grab", "USE_DIVING_CATCH": "Diving Catch",
+                # P309: Juggernaut v blitzu (ř. 8191-8195 "may choose"): ano = Both Down brát jako Pushed
+                "USE_JUGGERNAUT": "Juggernaut (Both Down brát jako Pushed)"}
 
 
 def moznosti_prehozu(q):
@@ -712,6 +714,8 @@ def event_str(e):
             return f"MIGHTY BLOW: +1 na {'brnění' if e['die1'] == 1 else 'zranění'} {who}"
         if jm == "StandFirm":   # P201 (4)
             return f"STAND FIRM {who}: zůstává stát, odtlačen není"
+        if jm == "Juggernaut":   # P309: Both Down v blitzu vzat jako Pushed
+            return f"JUGGERNAUT {who}: Both Down bere jako Pushed"
         if jm == "KickOffReturn":
             return f"SKILL Kick-Off Return {who}: {e['from']} -> {e['to']}"
         hod = f" hod {e['die1']}" if e["die1"] else ""

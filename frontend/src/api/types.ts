@@ -166,6 +166,15 @@ export interface PendingBlockDie {
     isFrenzy: boolean;
 }
 
+/**
+ * P309 (20.11.2026): útočník kouče-člověka s Juggernautem hodil v blitzu Both Down — brát jako Pushed?
+ * (`rules_bb2016.txt` ř. 8191-8195 „may choose“). Stav je okamžik otázky; po odpovědi server akci přehraje.
+ */
+export interface PendingJuggernaut {
+    playerId: number;
+    defenderId: number;
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -193,6 +202,7 @@ export interface GameState {
     pendingBombRethrow?: PendingBombRethrow | null;
     pendingReferee?: PendingReferee | null;
     pendingBlockDie?: PendingBlockDie | null;
+    pendingJuggernaut?: PendingJuggernaut | null;
 }
 
 export interface TeamState {
