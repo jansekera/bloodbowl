@@ -21,30 +21,30 @@ const RACE_ROSTERS = [
     'Human' => [
         ['Blitzer',  4, [7, 3, 3, 8], [SkillName::Block]],
         ['Catcher',  2, [8, 2, 3, 7], [SkillName::Dodge, SkillName::Catch]],
-        ['Thrower',  1, [6, 3, 3, 8], [SkillName::SureHands]],
+        ['Thrower',  1, [6, 3, 3, 8], [SkillName::SureHands, SkillName::Pass]],  // P321: + Pass (rules ř. 8880)
         ['Lineman',  4, [6, 3, 3, 8], []],
     ],
     'Orc' => [
         ['Blitzer',   4, [6, 3, 3, 9], [SkillName::Block]],
         ['Black Orc', 4, [4, 4, 2, 9], []],
-        ['Thrower',   1, [5, 3, 3, 8], [SkillName::SureHands]],
+        ['Thrower',   1, [5, 3, 3, 8], [SkillName::SureHands, SkillName::Pass]],  // P321: + Pass (ř. 9070)
         ['Lineman',   2, [5, 3, 3, 9], []],
     ],
     'Skaven' => [
         ['Blitzer',       2, [7, 3, 3, 8], [SkillName::Block]],
         ['Gutter Runner', 4, [9, 2, 4, 7], [SkillName::Dodge]],
-        ['Thrower',       1, [7, 3, 3, 7], [SkillName::SureHands]],
+        ['Thrower',       1, [7, 3, 3, 7], [SkillName::SureHands, SkillName::Pass]],  // P321: + Pass (ř. 9038)
         ['Lineman',       4, [7, 3, 3, 7], []],
     ],
     'Dwarf' => [
         ['Blitzer',      2, [5, 3, 3, 9], [SkillName::Block, SkillName::ThickSkull]],
-        ['Troll Slayer',  2, [5, 3, 2, 8], [SkillName::Frenzy, SkillName::Dauntless, SkillName::ThickSkull]],
+        ['Troll Slayer',  2, [5, 3, 2, 8], [SkillName::Block, SkillName::Frenzy, SkillName::Dauntless, SkillName::ThickSkull]],  // P321: + Block (ř. 8773)
         ['Runner',       2, [6, 3, 3, 8], [SkillName::SureHands, SkillName::ThickSkull]],
         ['Blocker',      5, [4, 3, 2, 9], [SkillName::Block, SkillName::Tackle, SkillName::ThickSkull]],
     ],
     'Wood Elf' => [
-        ['Wardancer', 2, [8, 3, 4, 7], [SkillName::Block, SkillName::Dodge]],
-        ['Catcher',   4, [8, 2, 4, 7], [SkillName::Dodge, SkillName::Catch]],
+        ['Wardancer', 2, [8, 3, 4, 7], [SkillName::Block, SkillName::Dodge, SkillName::Leap]],  // P321: + Leap (ř. 9104)
+        ['Catcher',   4, [8, 2, 4, 7], [SkillName::Dodge, SkillName::Catch, SkillName::Sprint]],  // P321: + Sprint (ř. 9102)
         ['Thrower',   1, [7, 3, 4, 7], [SkillName::Pass]],
         ['Lineman',   4, [7, 3, 4, 7], []],
     ],
@@ -69,8 +69,8 @@ const RACE_ROSTERS = [
         ['Lineman',   3, [6, 3, 4, 8], []],
     ],
     'Halfling' => [
-        ['Treeman',  2, [2, 6, 1, 10], [SkillName::Loner, SkillName::MightyBlow, SkillName::StandFirm, SkillName::ThickSkull, SkillName::TakeRoot, SkillName::ThrowTeamMate]],
-        ['Halfling', 9, [6, 2, 3, 6],  [SkillName::Dodge, SkillName::Stunty, SkillName::RightStuff]],
+        ['Treeman',  2, [2, 6, 1, 10], [SkillName::StrongArm, SkillName::MightyBlow, SkillName::StandFirm, SkillName::ThickSkull, SkillName::TakeRoot, SkillName::ThrowTeamMate]],  // P321: bez Loner, + Strong Arm (ř. 8862-8864)
+        ['Halfling', 9, [5, 2, 3, 6],  [SkillName::Dodge, SkillName::Stunty, SkillName::RightStuff]],  // P321: MA5 (ř. 8861)
     ],
     'Norse' => [
         ['Berserker', 2, [6, 3, 3, 7], [SkillName::Block, SkillName::Frenzy, SkillName::JumpUp]],
@@ -96,15 +96,15 @@ const RACE_ROSTERS = [
     ],
     'Necromantic' => [
         ['Werewolf',    2, [8, 3, 3, 8], [SkillName::Claw, SkillName::Frenzy, SkillName::Regeneration]],
-        ['Flesh Golem', 2, [4, 4, 2, 9], [SkillName::Regeneration, SkillName::StandFirm]],
+        ['Flesh Golem', 2, [4, 4, 2, 9], [SkillName::Regeneration, SkillName::StandFirm, SkillName::ThickSkull]],  // P321: + Thick Skull (ř. 8941)
         ['Wight',       2, [6, 3, 3, 8], [SkillName::Block, SkillName::Regeneration]],
         ['Ghoul',       2, [7, 3, 3, 7], [SkillName::Dodge]],
         ['Zombie',      3, [4, 3, 2, 8], [SkillName::Regeneration]],
     ],
     'Bretonnian' => [
         ['Blitzer',          4, [7, 3, 3, 8], [SkillName::Block, SkillName::Catch, SkillName::Dauntless]],
-        ['Blocker',          4, [6, 3, 3, 8], [SkillName::Wrestle, SkillName::Fend]],
-        ['Peasant Lineman',  3, [6, 3, 3, 7], [SkillName::Fend]],
+        ['Blocker',          4, [6, 3, 3, 8], [SkillName::Wrestle]],  // P321: bez Fend (ř. 8701)
+        ['Peasant Lineman',  3, [6, 3, 2, 7], [SkillName::Fend]],  // P321: AG2 (ř. 8700)
     ],
     'Khemri' => [
         ['Tomb Guardian', 4, [4, 5, 1, 9], [SkillName::Decay, SkillName::Regeneration]],
@@ -127,38 +127,38 @@ const RACE_ROSTERS = [
         ['Hobgoblin',     4, [6, 3, 3, 7], []],
     ],
     'Ogre' => [
-        ['Ogre',     6, [5, 5, 2, 9], [SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow, SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::AlwaysHungry]],
-        ['Snotling', 5, [5, 1, 3, 5], [SkillName::Dodge, SkillName::RightStuff, SkillName::SideStep, SkillName::Stunty]],
+        ['Ogre',     6, [5, 5, 2, 9], [SkillName::BoneHead, SkillName::MightyBlow, SkillName::ThickSkull, SkillName::ThrowTeamMate]],  // P321: bez Loner a Always Hungry (ř. 8994-8995)
+        ['Snotling', 5, [5, 1, 3, 5], [SkillName::Dodge, SkillName::RightStuff, SkillName::SideStep, SkillName::Stunty, SkillName::Titchy]],  // P321: + Titchy (ř. 8991-8992)
     ],
     'Nurgle' => [
-        ['Beast of Nurgle', 1, [4, 5, 1, 9], [SkillName::Loner, SkillName::DisturbingPresence, SkillName::FoulAppearance, SkillName::MightyBlow, SkillName::Regeneration, SkillName::ReallyStupid, SkillName::Tentacles]],
-        ['Nurgle Warrior',  4, [4, 4, 2, 9], [SkillName::DisturbingPresence, SkillName::FoulAppearance, SkillName::Regeneration]],
-        ['Pestigor',        4, [6, 3, 3, 8], [SkillName::Horns, SkillName::Regeneration, SkillName::DisturbingPresence, SkillName::NurglesRot]],
+        ['Beast of Nurgle', 1, [4, 5, 1, 9], [SkillName::Loner, SkillName::DisturbingPresence, SkillName::FoulAppearance, SkillName::MightyBlow, SkillName::Regeneration, SkillName::ReallyStupid, SkillName::Tentacles, SkillName::NurglesRot]],  // P321: + Nurgle's Rot (ř. 8975-8977)
+        ['Nurgle Warrior',  4, [4, 4, 2, 9], [SkillName::DisturbingPresence, SkillName::FoulAppearance, SkillName::Regeneration, SkillName::NurglesRot]],  // P321: + Nurgle's Rot (ř. 8972-8973)
+        ['Pestigor',        4, [6, 3, 3, 8], [SkillName::Horns, SkillName::Regeneration, SkillName::NurglesRot]],  // P321: bez Disturbing Presence (ř. 8971)
         ['Rotter',          2, [5, 3, 3, 8], [SkillName::Decay, SkillName::NurglesRot]],
     ],
     'Pro Elf' => [
         ['Blitzer',  2, [7, 3, 4, 8], [SkillName::Block, SkillName::SideStep]],
         ['Catcher',  4, [8, 3, 4, 7], [SkillName::Catch, SkillName::NervesOfSteel]],
-        ['Thrower',  2, [6, 3, 4, 7], [SkillName::Pass, SkillName::SafeThrow]],
+        ['Thrower',  2, [6, 3, 4, 7], [SkillName::Pass]],  // P321: jen Pass (ř. 8803)
         ['Lineman',  3, [6, 3, 4, 7], []],
     ],
     'Slann' => [
         ['Kroxigor', 1, [6, 5, 1, 9], [SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow, SkillName::PrehensileTail, SkillName::ThickSkull]],
-        ['Blitzer',  4, [7, 3, 3, 8], [SkillName::Leap, SkillName::VeryLongLegs, SkillName::DivingTackle]],
-        ['Catcher',  4, [7, 3, 4, 7], [SkillName::Leap, SkillName::VeryLongLegs, SkillName::DivingCatch]],
+        ['Blitzer',  4, [7, 3, 3, 8], [SkillName::Leap, SkillName::VeryLongLegs, SkillName::DivingTackle, SkillName::JumpUp]],  // P321: + Jump Up (ř. 9160-9162)
+        ['Catcher',  4, [7, 2, 4, 7], [SkillName::Leap, SkillName::VeryLongLegs, SkillName::DivingCatch]],  // P321: ST2 (ř. 9159)
         ['Lineman',  2, [6, 3, 3, 8], [SkillName::Leap, SkillName::VeryLongLegs]],
     ],
     'Underworld' => [
         ['Troll',              1, [4, 5, 1, 9], [SkillName::Loner, SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::AlwaysHungry], 'Troll'],
         ['Skaven Blitzer',     2, [7, 3, 3, 8], [SkillName::Animosity, SkillName::Block], 'Skaven'],
         ['Skaven Thrower',     2, [7, 3, 3, 7], [SkillName::Animosity, SkillName::Pass, SkillName::SureHands], 'Skaven'],
-        ['Underworld Goblin',  2, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::Animosity], 'Goblin'],
+        ['Underworld Goblin',  2, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty], 'Goblin'],  // P321: bez Animosity (ř. 9137-9139)
         ['Skaven Lineman',     4, [7, 3, 3, 7], [SkillName::Animosity], 'Skaven'],
     ],
     'Khorne' => [
         ['Bloodthirster',  1, [6, 5, 1, 9], [SkillName::Loner, SkillName::WildAnimal, SkillName::Claw, SkillName::Frenzy, SkillName::Horns, SkillName::Juggernaut, SkillName::Regeneration]],
         ['Khorne Herald',  2, [6, 3, 3, 8], [SkillName::Frenzy, SkillName::Horns, SkillName::Juggernaut]],
-        ['Bloodletter',    4, [6, 3, 3, 8], [SkillName::Horns, SkillName::Juggernaut, SkillName::Regeneration]],
+        ['Bloodletter',    4, [6, 3, 3, 7], [SkillName::Horns, SkillName::Juggernaut, SkillName::Regeneration]],  // P321: AV7 (ř. 8953)
         ['Pit Fighter',    4, [6, 3, 3, 8], [SkillName::Frenzy]],
     ],
     'Chaos Pact' => [

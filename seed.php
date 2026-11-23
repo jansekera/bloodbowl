@@ -135,22 +135,22 @@ foreach ($stmt->fetchAll() as $row) {
 
 // ========== RACES ==========
 $races = [
-    ['Human', 60000, true],
+    ['Human', 50000, true], // P321: přehoz 50k (ř. 8885)
     ['Orc', 60000, true],
     ['Skaven', 60000, true],
     ['Dwarf', 50000, true],
     ['Wood Elf', 50000, true],
-    ['Chaos', 70000, true],
+    ['Chaos', 60000, true], // P321: přehoz 60k (ř. 8692)
     ['Undead', 70000, false],
     ['Lizardmen', 60000, true],
-    ['Dark Elf', 50000, true],
+    ['Dark Elf', 60000, true], // P321: přehoz 60k (ř. 8761)
     ['Halfling', 60000, true],
     ['Norse', 60000, true],
     ['High Elf', 50000, true],
     ['Vampire', 70000, true],
-    ['Amazon', 50000, true],
+    ['Amazon', 60000, true], // P321: přehoz 60k (ř. 8727)
     ['Necromantic', 70000, false],
-    ['Bretonnian', 60000, true],
+    ['Bretonnian', 70000, true], // P321: přehoz 70k (ř. 8703)
     ['Khemri', 70000, false],
     ['Goblin', 60000, true],
     ['Chaos Dwarf', 70000, true],
@@ -165,7 +165,7 @@ $races = [
     ['Chaos Pact', 70000, true],
 ];
 
-$raceStmt = $pdo->prepare('INSERT INTO races (name, reroll_cost, has_apothecary) VALUES (:name, :reroll_cost, :has_apothecary) ON CONFLICT (name) DO NOTHING');
+$raceStmt = $pdo->prepare('INSERT INTO races (name, reroll_cost, has_apothecary) VALUES (:name, :reroll_cost, :has_apothecary) ON CONFLICT (name) DO UPDATE SET reroll_cost = EXCLUDED.reroll_cost, has_apothecary = EXCLUDED.has_apothecary');  // P321: opravy se propíší i do založené DB
 
 foreach ($races as [$name, $rerollCost, $hasApothecary]) {
     $raceStmt->execute([
@@ -189,40 +189,41 @@ foreach ($stmt->fetchAll() as $row) {
 $positionals = [
     // Human
     [$raceIds['Human'], 'Lineman',  16, 50000,  6, 3, 3, 8, 'G', 'ASP',    []],
-    [$raceIds['Human'], 'Catcher',   4, 70000,  8, 2, 3, 7, 'GA', 'SP',    ['Dodge', 'Catch']],
-    [$raceIds['Human'], 'Thrower',   2, 70000,  6, 3, 3, 8, 'GP', 'AS',    ['Sure Hands']],
+    [$raceIds['Human'], 'Catcher',   4, 60000,  8, 2, 3, 7, 'GA', 'SP',    ['Dodge', 'Catch']],  // P321: 60k (rules ř. 8879; oficiální kniha BB2016, evidence/p321_20261123/zdroj OCR ř. 2410)
+    [$raceIds['Human'], 'Thrower', 2, 70000, 6, 3, 3, 8, 'GP', 'AS', ['Sure Hands', 'Pass']], // P321: + Pass (ř. 8880)
     [$raceIds['Human'], 'Blitzer',   4, 90000,  7, 3, 3, 8, 'GS', 'AP',    ['Block']],
     [$raceIds['Human'], 'Ogre',      1, 140000, 5, 5, 2, 9, 'S', 'GAP',    ['Loner', 'Bone-head', 'Mighty Blow', 'Thick Skull', 'Throw Team-Mate']],
 
     // Orc
     [$raceIds['Orc'], 'Lineman',    16, 50000,  5, 3, 3, 9, 'G', 'ASP',    []],
     [$raceIds['Orc'], 'Goblin',      4, 40000,  6, 2, 3, 7, 'A', 'GSP',    ['Dodge', 'Stunty', 'Right Stuff']],
-    [$raceIds['Orc'], 'Thrower',     2, 70000,  5, 3, 3, 8, 'GP', 'AS',    ['Sure Hands']],
+    [$raceIds['Orc'], 'Thrower', 2, 70000, 5, 3, 3, 8, 'GP', 'AS', ['Sure Hands', 'Pass']], // P321: + Pass (ř. 9070)
     [$raceIds['Orc'], 'Black Orc',   4, 80000,  4, 4, 2, 9, 'GS', 'AP',    []],
     [$raceIds['Orc'], 'Blitzer',     4, 80000,  6, 3, 3, 9, 'GS', 'AP',    ['Block']],
-    [$raceIds['Orc'], 'Troll',       1, 110000, 4, 5, 1, 9, 'S', 'GAP',    ['Loner', 'Really Stupid', 'Regeneration', 'Mighty Blow', 'Throw Team-Mate']],
+    [$raceIds['Orc'], 'Troll', 1, 110000, 4, 5, 1, 9, 'S', 'GAP', ['Loner', 'Really Stupid', 'Regeneration', 'Mighty Blow', 'Throw Team-Mate', 'Always Hungry']], // P321: + Always Hungry (ř. 9073)
 
     // Skaven
     [$raceIds['Skaven'], 'Lineman',     16, 50000,  7, 3, 3, 7, 'G', 'ASPM',   []],
-    [$raceIds['Skaven'], 'Thrower',      2, 70000,  7, 3, 3, 7, 'GP', 'ASM',   ['Sure Hands']],
+    [$raceIds['Skaven'], 'Thrower', 2, 70000, 7, 3, 3, 7, 'GP', 'ASM', ['Sure Hands', 'Pass']], // P321: + Pass (ř. 9038)
     [$raceIds['Skaven'], 'Gutter Runner', 4, 80000, 9, 2, 4, 7, 'GA', 'SPM',   ['Dodge']],
     [$raceIds['Skaven'], 'Blitzer',      2, 90000,  7, 3, 3, 8, 'GS', 'APM',   ['Block']],
-    [$raceIds['Skaven'], 'Storm Vermin', 2, 90000,  7, 3, 3, 8, 'GS', 'APM',   ['Block']],
-    [$raceIds['Skaven'], 'Rat Ogre',     1, 150000, 6, 5, 1, 8, 'S', 'GAPM',   ['Loner', 'Wild Animal', 'Mighty Blow', 'Prehensile Tail', 'Frenzy']],
+    // P321: Storm Vermin = Skaven Blitzer (uživatel 23.11.) — duplicitní řádek k „Blitzer“ (spolu by dovolily 4 blitzery místo 0-2, ř. 9040) — vyřazeno
+    // [$raceIds['Skaven'], 'Storm Vermin', 2, 90000,  7, 3, 3, 8, 'GS', 'APM',   ['Block']],
+    [$raceIds['Skaven'], 'Rat Ogre', 1, 150000, 6, 5, 2, 8, 'S', 'GAPM', ['Loner', 'Wild Animal', 'Mighty Blow', 'Prehensile Tail', 'Frenzy']], // P321: AG2 (ř. 9041)
 
     // Dwarf
     [$raceIds['Dwarf'], 'Blocker',      16, 70000,  4, 3, 2, 9, 'GS', 'AP',    ['Block', 'Tackle', 'Thick Skull']],
     [$raceIds['Dwarf'], 'Runner',        2, 80000,  6, 3, 3, 8, 'GP', 'AS',    ['Sure Hands', 'Thick Skull']],
     [$raceIds['Dwarf'], 'Blitzer',       2, 80000,  5, 3, 3, 9, 'GS', 'AP',    ['Block', 'Thick Skull']],
-    [$raceIds['Dwarf'], 'Troll Slayer',  2, 90000,  5, 3, 2, 8, 'GS', 'AP',    ['Frenzy', 'Dauntless', 'Thick Skull']],
-    [$raceIds['Dwarf'], 'Deathroller',   1, 160000, 4, 7, 1, 10, 'S', 'GAP',   ['Loner', 'Break Tackle', 'Mighty Blow', 'Stand Firm', 'Secret Weapon']],
+    [$raceIds['Dwarf'], 'Troll Slayer', 2, 90000, 5, 3, 2, 8, 'GS', 'AP', ['Frenzy', 'Dauntless', 'Thick Skull', 'Block']], // P321: + Block (ř. 8773)
+    [$raceIds['Dwarf'], 'Deathroller', 1, 160000, 4, 7, 1, 10, 'S', 'GAP', ['Loner', 'Break Tackle', 'Mighty Blow', 'Stand Firm', 'Secret Weapon', 'Dirty Player', 'Juggernaut', 'No Hands']], // P321: + Dirty Player, Juggernaut, No Hands (ř. 8774-8776)
 
     // Wood Elf
     [$raceIds['Wood Elf'], 'Lineman',   16, 70000,  7, 3, 4, 7, 'GA', 'SP',    []],
-    [$raceIds['Wood Elf'], 'Catcher',    4, 90000,  8, 2, 4, 7, 'GA', 'SP',    ['Dodge', 'Catch']],
+    [$raceIds['Wood Elf'], 'Catcher', 4, 90000, 8, 2, 4, 7, 'GA', 'SP', ['Dodge', 'Catch', 'Sprint']], // P321: + Sprint (ř. 9102)
     [$raceIds['Wood Elf'], 'Thrower',    2, 90000,  7, 3, 4, 7, 'GAP', 'S',    ['Pass']],
-    [$raceIds['Wood Elf'], 'Wardancer',  2, 120000, 8, 3, 4, 7, 'GA', 'SP',    ['Block', 'Dodge']],
-    [$raceIds['Wood Elf'], 'Treeman',    1, 120000, 2, 6, 1, 10, 'S', 'GAP',   ['Loner', 'Mighty Blow', 'Stand Firm', 'Thick Skull', 'Throw Team-Mate']],
+    [$raceIds['Wood Elf'], 'Wardancer', 2, 120000, 8, 3, 4, 7, 'GA', 'SP', ['Block', 'Dodge', 'Leap']], // P321: + Leap (ř. 9104)
+    [$raceIds['Wood Elf'], 'Treeman', 1, 120000, 2, 6, 1, 10, 'S', 'GAP', ['Loner', 'Mighty Blow', 'Stand Firm', 'Thick Skull', 'Throw Team-Mate', 'Strong Arm', 'Take Root']], // P321: + Strong Arm, Take Root (ř. 9105-9107)
 
     // Chaos
     [$raceIds['Chaos'], 'Beastman',       16, 60000,  6, 3, 3, 8, 'GSM', 'AP',   ['Horns']],
@@ -244,30 +245,31 @@ $positionals = [
     // Dark Elf
     [$raceIds['Dark Elf'], 'Lineman',     16, 70000,  6, 3, 4, 8, 'GA', 'SP',    []],
     [$raceIds['Dark Elf'], 'Runner',       2, 80000,  7, 3, 4, 7, 'GAP', 'S',    ['Dump-Off']],
-    [$raceIds['Dark Elf'], 'Assassin',     2, 90000,  6, 3, 4, 8, 'GA', 'SP',    ['Shadowing', 'Stab']],
+    [$raceIds['Dark Elf'], 'Assassin', 2, 90000, 6, 3, 4, 7, 'GA', 'SP', ['Shadowing', 'Stab']], // P321: AV7 (ř. 8756)
     [$raceIds['Dark Elf'], 'Blitzer',      4, 100000, 7, 3, 4, 8, 'GA', 'SP',    ['Block']],
     [$raceIds['Dark Elf'], 'Witch Elf',    2, 110000, 7, 3, 4, 7, 'GA', 'SP',    ['Dodge', 'Frenzy', 'Jump Up']],
 
     // Halfling
-    [$raceIds['Halfling'], 'Halfling',   16, 30000,  6, 2, 3, 6, 'A', 'GSP',    ['Dodge', 'Stunty', 'Right Stuff']],
-    [$raceIds['Halfling'], 'Treeman',     2, 120000, 2, 6, 1, 10, 'S', 'GAP',   ['Loner', 'Mighty Blow', 'Stand Firm', 'Thick Skull', 'Take Root', 'Throw Team-Mate']],
+    [$raceIds['Halfling'], 'Halfling', 16, 30000, 5, 2, 3, 6, 'A', 'GSP', ['Dodge', 'Stunty', 'Right Stuff']], // P321: MA5 (ř. 8861)
+    [$raceIds['Halfling'], 'Treeman', 2, 120000, 2, 6, 1, 10, 'S', 'GAP', ['Mighty Blow', 'Stand Firm', 'Thick Skull', 'Take Root', 'Throw Team-Mate', 'Strong Arm']], // P321: bez Loner, + Strong Arm (ř. 8862-8864); Timmm-ber! engine nezná
 
     // Norse
     [$raceIds['Norse'], 'Lineman',       16, 50000,  6, 3, 3, 7, 'G', 'ASP',    ['Block']],
     [$raceIds['Norse'], 'Thrower',        2, 70000,  6, 3, 3, 7, 'GP', 'AS',    ['Block', 'Pass']],
     [$raceIds['Norse'], 'Runner',         2, 90000,  7, 3, 3, 7, 'GA', 'SP',    ['Block', 'Dauntless']],
     [$raceIds['Norse'], 'Berserker',      2, 90000,  6, 3, 3, 7, 'GS', 'AP',    ['Block', 'Frenzy', 'Jump Up']],
+    [$raceIds['Norse'], 'Ulfwerener', 2, 110000, 6, 4, 2, 8, 'GS', 'AP', ['Frenzy']], // P321: doplněno (ř. 9009)
     [$raceIds['Norse'], 'Yhetee',         1, 140000, 5, 5, 1, 8, 'S', 'GAP',    ['Loner', 'Wild Animal', 'Claw', 'Frenzy', 'Disturbing Presence']],
 
     // High Elf
     [$raceIds['High Elf'], 'Lineman',    16, 70000,  6, 3, 4, 8, 'GA', 'SP',    []],
     [$raceIds['High Elf'], 'Catcher',     4, 90000,  8, 3, 4, 7, 'GA', 'SP',    ['Catch']],
     [$raceIds['High Elf'], 'Thrower',     2, 90000,  6, 3, 4, 8, 'GAP', 'S',    ['Pass', 'Safe Throw']],
-    [$raceIds['High Elf'], 'Blitzer',     4, 100000, 7, 3, 4, 8, 'GA', 'SP',    ['Block']],
+    [$raceIds['High Elf'], 'Blitzer', 2, 100000, 7, 3, 4, 8, 'GA', 'SP', ['Block']], // P321: 0-2 (ř. 8849)
 
     // Vampire
     [$raceIds['Vampire'], 'Thrall',     16, 40000,  6, 3, 3, 7, 'G', 'ASP',    []],
-    [$raceIds['Vampire'], 'Vampire',     4, 110000, 6, 4, 4, 8, 'GA', 'SP',    ['Hypnotic Gaze', 'Regeneration', 'Bloodlust']],
+    [$raceIds['Vampire'], 'Vampire', 6, 110000, 6, 4, 4, 8, 'GAS', 'P', ['Hypnotic Gaze', 'Regeneration', 'Bloodlust']], // P321: 0-6, přístup GAS/P (ř. 9088)
 
     // Amazon
     [$raceIds['Amazon'], 'Linewoman',  16, 50000,  6, 3, 3, 7, 'G', 'ASP',    ['Dodge']],
@@ -279,13 +281,13 @@ $positionals = [
     [$raceIds['Necromantic'], 'Zombie',      16, 40000,  4, 3, 2, 8, 'G', 'ASP',    ['Regeneration']],
     [$raceIds['Necromantic'], 'Ghoul',        2, 70000,  7, 3, 3, 7, 'GA', 'SP',    ['Dodge']],
     [$raceIds['Necromantic'], 'Wight',        2, 90000,  6, 3, 3, 8, 'GS', 'AP',    ['Block', 'Regeneration']],
-    [$raceIds['Necromantic'], 'Flesh Golem',  2, 110000, 4, 4, 2, 9, 'GS', 'AP',    ['Regeneration', 'Stand Firm']],
+    [$raceIds['Necromantic'], 'Flesh Golem', 2, 110000, 4, 4, 2, 9, 'GS', 'AP', ['Regeneration', 'Stand Firm', 'Thick Skull']], // P321: + Thick Skull (ř. 8941)
     [$raceIds['Necromantic'], 'Werewolf',     2, 120000, 8, 3, 3, 8, 'GA', 'SP',    ['Claw', 'Frenzy', 'Regeneration']],
 
     // Bretonnian
-    [$raceIds['Bretonnian'], 'Peasant Lineman', 16, 40000,  6, 3, 3, 7, 'G', 'ASP',    ['Fend']],
-    [$raceIds['Bretonnian'], 'Blocker',          4, 70000,  6, 3, 3, 8, 'GS', 'AP',    ['Wrestle', 'Fend']],
-    [$raceIds['Bretonnian'], 'Blitzer',          4, 110000, 7, 3, 3, 8, 'GA', 'SP',    ['Block', 'Catch', 'Dauntless']],
+    [$raceIds['Bretonnian'], 'Peasant Lineman', 16, 40000, 6, 3, 2, 7, 'G', 'ASP', ['Fend']], // P321: AG2 (ř. 8700)
+    [$raceIds['Bretonnian'], 'Blocker', 4, 70000, 6, 3, 3, 8, 'GS', 'AP', ['Wrestle']], // P321: bez Fend (ř. 8701)
+    [$raceIds['Bretonnian'], 'Blitzer', 4, 110000, 7, 3, 3, 8, 'GAP', 'S', ['Block', 'Catch', 'Dauntless']], // P321: přístup GAP/S (ř. 8702)
 
     // Khemri
     [$raceIds['Khemri'], 'Skeleton',       16, 40000,  5, 3, 2, 7, 'G', 'ASP',    ['Regeneration', 'Thick Skull']],
@@ -303,61 +305,66 @@ $positionals = [
 
     // Chaos Dwarf
     [$raceIds['Chaos Dwarf'], 'Hobgoblin',    16, 40000,  6, 3, 3, 7, 'G', 'ASP',    []],
-    [$raceIds['Chaos Dwarf'], 'Blocker',        6, 70000,  4, 3, 2, 9, 'GS', 'AP',    ['Block', 'Thick Skull', 'Tackle']],
+    [$raceIds['Chaos Dwarf'], 'Blocker', 6, 70000, 4, 3, 2, 9, 'GS', 'APM', ['Block', 'Thick Skull', 'Tackle']], // P321: přístup GS/APM (ř. 8740)
     [$raceIds['Chaos Dwarf'], 'Bull Centaur',   2, 130000, 6, 4, 2, 9, 'GS', 'AP',    ['Sprint', 'Sure Feet', 'Thick Skull']],
-    [$raceIds['Chaos Dwarf'], 'Minotaur',       1, 150000, 5, 5, 2, 8, 'SM', 'GAP',   ['Loner', 'Frenzy', 'Horns', 'Mighty Blow', 'Thick Skull', 'Wild Animal']],
+    [$raceIds['Chaos Dwarf'], 'Minotaur', 1, 150000, 5, 5, 2, 8, 'S', 'GAPM', ['Loner', 'Frenzy', 'Horns', 'Mighty Blow', 'Thick Skull', 'Wild Animal']], // P321: přístup S/GAPM (ř. 8742-8744)
 
     // Ogre
-    [$raceIds['Ogre'], 'Snotling', 16, 20000,  5, 1, 3, 5, 'A', 'GSP',    ['Dodge', 'Right Stuff', 'Side Step', 'Stunty']],
-    [$raceIds['Ogre'], 'Ogre',      6, 140000, 5, 5, 2, 9, 'S', 'GAP',    ['Loner', 'Bone-head', 'Mighty Blow', 'Thick Skull', 'Throw Team-Mate', 'Always Hungry']],
+    [$raceIds['Ogre'], 'Snotling', 16, 20000, 5, 1, 3, 5, 'A', 'GSP', ['Dodge', 'Right Stuff', 'Side Step', 'Stunty', 'Titchy']], // P321: + Titchy (ř. 8991-8992)
+    [$raceIds['Ogre'], 'Ogre', 6, 140000, 5, 5, 2, 9, 'S', 'GAP', ['Bone-head', 'Mighty Blow', 'Thick Skull', 'Throw Team-Mate']], // P321: bez Loner a Always Hungry (ř. 8994-8995)
 
     // Nurgle
-    [$raceIds['Nurgle'], 'Rotter',            16, 40000,  5, 3, 3, 8, 'G', 'ASPM',   ['Decay', "Nurgle's Rot"]],
-    [$raceIds['Nurgle'], 'Pestigor',           4, 80000,  6, 3, 3, 8, 'GSM', 'AP',    ['Horns', 'Regeneration', 'Disturbing Presence', "Nurgle's Rot"]],
-    [$raceIds['Nurgle'], 'Nurgle Warrior',     4, 110000, 4, 4, 2, 9, 'GSM', 'AP',    ['Disturbing Presence', 'Foul Appearance', 'Regeneration']],
-    [$raceIds['Nurgle'], 'Beast of Nurgle',    1, 140000, 4, 5, 1, 9, 'S', 'GAP',     ['Loner', 'Disturbing Presence', 'Foul Appearance', 'Mighty Blow', 'Regeneration', 'Really Stupid', 'Tentacles']],
+    [$raceIds['Nurgle'], 'Rotter', 16, 40000, 5, 3, 3, 8, 'GM', 'ASP', ['Decay', "Nurgle's Rot"]], // P321: přístup GM/ASP (ř. 8970)
+    [$raceIds['Nurgle'], 'Pestigor', 4, 80000, 6, 3, 3, 8, 'GSM', 'AP', ['Horns', 'Regeneration', "Nurgle's Rot"]], // P321: bez Disturbing Presence (ř. 8971)
+    [$raceIds['Nurgle'], 'Nurgle Warrior', 4, 110000, 4, 4, 2, 9, 'GSM', 'AP', ['Disturbing Presence', 'Foul Appearance', 'Regeneration', "Nurgle's Rot"]], // P321: + Nurgle's Rot (ř. 8972-8973)
+    [$raceIds['Nurgle'], 'Beast of Nurgle', 1, 140000, 4, 5, 1, 9, 'S', 'GAPM', ['Loner', 'Disturbing Presence', 'Foul Appearance', 'Mighty Blow', 'Regeneration', 'Really Stupid', 'Tentacles', "Nurgle's Rot"]], // P321: + Nurgle's Rot, přístup S/GAPM (ř. 8975-8978); Mighty Blow ponechán — text ho vynechává, vada dokumentu (uživatel 23.11.)
 
     // Pro Elf
     [$raceIds['Pro Elf'], 'Lineman',  16, 60000,  6, 3, 4, 7, 'GA', 'SP',    []],
     [$raceIds['Pro Elf'], 'Catcher',   4, 100000, 8, 3, 4, 7, 'GA', 'SP',    ['Catch', 'Nerves of Steel']],
-    [$raceIds['Pro Elf'], 'Thrower',   2, 70000,  6, 3, 4, 7, 'GAP', 'S',    ['Pass', 'Safe Throw']],
+    [$raceIds['Pro Elf'], 'Thrower', 2, 70000, 6, 3, 4, 7, 'GAP', 'S', ['Pass']], // P321: jen Pass (ř. 8803)
     [$raceIds['Pro Elf'], 'Blitzer',   2, 110000, 7, 3, 4, 8, 'GA', 'SP',    ['Block', 'Side Step']],
 
     // Slann
     [$raceIds['Slann'], 'Lineman',   16, 60000,  6, 3, 3, 8, 'G', 'ASP',    ['Leap', 'Very Long Legs']],
-    [$raceIds['Slann'], 'Catcher',    4, 80000,  7, 3, 4, 7, 'GA', 'SP',    ['Leap', 'Very Long Legs', 'Diving Catch']],
-    [$raceIds['Slann'], 'Blitzer',    4, 110000, 7, 3, 3, 8, 'GS', 'AP',    ['Leap', 'Very Long Legs', 'Diving Tackle']],
+    [$raceIds['Slann'], 'Catcher', 4, 80000, 7, 2, 4, 7, 'GA', 'SP', ['Leap', 'Very Long Legs', 'Diving Catch']], // P321: ST2 (ř. 9159)
+    [$raceIds['Slann'], 'Blitzer', 4, 110000, 7, 3, 3, 8, 'GAS', 'P', ['Leap', 'Very Long Legs', 'Diving Tackle', 'Jump Up']], // P321: + Jump Up, přístup GAS/P (ř. 9160-9162)
     [$raceIds['Slann'], 'Kroxigor',   1, 140000, 6, 5, 1, 9, 'S', 'GAP',    ['Loner', 'Bone-head', 'Mighty Blow', 'Prehensile Tail', 'Thick Skull']],
 
     // Underworld
-    [$raceIds['Underworld'], 'Underworld Goblin', 12, 40000,  6, 2, 3, 7, 'AM', 'GSP',   ['Dodge', 'Right Stuff', 'Stunty', 'Animosity']],
-    [$raceIds['Underworld'], 'Skaven Lineman',    12, 50000,  7, 3, 3, 7, 'GM', 'ASP',    ['Animosity']],
+    [$raceIds['Underworld'], 'Underworld Goblin', 12, 40000, 6, 2, 3, 7, 'AM', 'GSP', ['Dodge', 'Right Stuff', 'Stunty']], // P321: 0-12 (Teams of Legend v4; uživatel 23.11.), bez Animosity (ř. 9137-9139)
+    [$raceIds['Underworld'], 'Skaven Lineman', 2, 50000, 7, 3, 3, 7, 'GM', 'ASP', ['Animosity']], // P321: 0-2 (ř. 9140)
     [$raceIds['Underworld'], 'Skaven Thrower',     2, 70000,  7, 3, 3, 7, 'GMP', 'AS',    ['Animosity', 'Pass', 'Sure Hands']],
     [$raceIds['Underworld'], 'Skaven Blitzer',     2, 90000,  7, 3, 3, 8, 'GSM', 'AP',    ['Animosity', 'Block']],
-    [$raceIds['Underworld'], 'Troll',              1, 110000, 4, 5, 1, 9, 'S', 'GAP',     ['Loner', 'Mighty Blow', 'Really Stupid', 'Regeneration', 'Throw Team-Mate', 'Always Hungry']],
-    [$raceIds['Underworld'], 'Warpstone Troll',    1, 110000, 4, 5, 1, 9, 'SM', 'GAP',    ['Loner', 'Mighty Blow', 'Really Stupid', 'Regeneration', 'Secret Weapon']],
+    // P321: pravidla ř. 9143 znají jen Warpstone Troll — vyřazeno z výchozí soupisky
+    // [$raceIds['Underworld'], 'Troll',              1, 110000, 4, 5, 1, 9, 'S', 'GAP',     ['Loner', 'Mighty Blow', 'Really Stupid', 'Regeneration', 'Throw Team-Mate', 'Always Hungry']],
+    [$raceIds['Underworld'], 'Warpstone Troll', 1, 110000, 4, 5, 1, 9, 'SM', 'GAP', ['Loner', 'Mighty Blow', 'Really Stupid', 'Regeneration', 'Always Hungry', 'Throw Team-Mate']], // P321: podle ř. 9143-9146 (bez Secret Weapon, + Always Hungry, Throw Team-Mate)
 
     // Khorne
-    [$raceIds['Khorne'], 'Pit Fighter',     16, 60000,  6, 3, 3, 8, 'GS', 'AP',    ['Frenzy']],
-    [$raceIds['Khorne'], 'Bloodletter',      4, 70000,  6, 3, 3, 8, 'GS', 'AP',    ['Horns', 'Juggernaut', 'Regeneration']],
+    [$raceIds['Khorne'], 'Pit Fighter', 16, 60000, 6, 3, 3, 8, 'GP', 'AS', ['Frenzy']], // P321: přístup GP/AS (ř. 8952)
+    [$raceIds['Khorne'], 'Bloodletter', 4, 80000, 6, 3, 3, 7, 'GAS', 'P', ['Horns', 'Juggernaut', 'Regeneration']], // P321: AV7, 80k, přístup GAS/P (ř. 8953)
     [$raceIds['Khorne'], 'Khorne Herald',    2, 90000,  6, 3, 3, 8, 'GS', 'AP',    ['Frenzy', 'Horns', 'Juggernaut']],
     [$raceIds['Khorne'], 'Bloodthirster',    1, 180000, 6, 5, 1, 9, 'S', 'GAP',    ['Loner', 'Wild Animal', 'Claw', 'Frenzy', 'Horns', 'Juggernaut', 'Regeneration']],
 
     // Chaos Pact
-    [$raceIds['Chaos Pact'], 'Marauder',            12, 50000,  6, 3, 3, 8, 'GS', 'APM',    []],
-    [$raceIds['Chaos Pact'], 'Dark Elf Renegade',    1, 70000,  6, 3, 4, 8, 'GA', 'SPM',    ['Animosity']],
-    [$raceIds['Chaos Pact'], 'Goblin Renegade',      1, 40000,  6, 2, 3, 7, 'A', 'GSPM',    ['Animosity', 'Dodge', 'Right Stuff', 'Stunty']],
+    [$raceIds['Chaos Pact'], 'Marauder', 12, 50000, 6, 3, 3, 8, 'GSPM', 'A', []], // P321: přístup GSPM/A (ř. 9175)
+    [$raceIds['Chaos Pact'], 'Dark Elf Renegade', 1, 70000, 6, 3, 4, 8, 'GAM', 'SP', ['Animosity']], // P321: přístup GAM/SP (ř. 9179)
+    [$raceIds['Chaos Pact'], 'Goblin Renegade', 1, 40000, 6, 2, 3, 7, 'AM', 'GSP', ['Animosity', 'Dodge', 'Right Stuff', 'Stunty']], // P321: přístup AM/GSP (ř. 9176)
     [$raceIds['Chaos Pact'], 'Skaven Renegade',      1, 50000,  7, 3, 3, 7, 'GM', 'ASP',    ['Animosity']],
-    [$raceIds['Chaos Pact'], 'Troll',                1, 110000, 4, 5, 1, 9, 'S', 'GAP',     ['Loner', 'Always Hungry', 'Mighty Blow', 'Really Stupid', 'Regeneration', 'Throw Team-Mate']],
-    [$raceIds['Chaos Pact'], 'Ogre',                 1, 140000, 5, 5, 2, 9, 'S', 'GAP',     ['Loner', 'Bone-head', 'Mighty Blow', 'Thick Skull', 'Throw Team-Mate']],
-    [$raceIds['Chaos Pact'], 'Minotaur',             1, 150000, 5, 5, 2, 8, 'S', 'GAP',     ['Loner', 'Frenzy', 'Horns', 'Mighty Blow', 'Thick Skull', 'Wild Animal']],
+    [$raceIds['Chaos Pact'], 'Orc Renegade', 1, 50000, 5, 3, 3, 9, 'GM', 'ASP', ['Animosity']], // P321: doplněno (ř. 9177)
+    [$raceIds['Chaos Pact'], 'Troll', 1, 110000, 4, 5, 1, 9, 'S', 'GAPM', ['Loner', 'Always Hungry', 'Mighty Blow', 'Really Stupid', 'Regeneration', 'Throw Team-Mate']], // P321: přístup S/GAPM (ř. 9180-9183)
+    [$raceIds['Chaos Pact'], 'Ogre', 1, 140000, 5, 5, 2, 9, 'S', 'GAPM', ['Loner', 'Bone-head', 'Mighty Blow', 'Thick Skull', 'Throw Team-Mate']], // P321: přístup S/GAPM (ř. 9184-9186)
+    [$raceIds['Chaos Pact'], 'Minotaur', 1, 150000, 5, 5, 2, 8, 'S', 'GAPM', ['Loner', 'Frenzy', 'Horns', 'Mighty Blow', 'Thick Skull', 'Wild Animal']], // P321: přístup S/GAPM (ř. 9187-9189)
 ];
 
 $posStmt = $pdo->prepare(
     'INSERT INTO positional_templates (race_id, name, max_count, cost, ma, st, ag, av, normal_access, double_access)
      VALUES (:race_id, :name, :max_count, :cost, :ma, :st, :ag, :av, :normal_access, :double_access)
-     ON CONFLICT (race_id, name) DO NOTHING
-     RETURNING id',
+     ON CONFLICT (race_id, name) DO UPDATE SET
+         max_count = EXCLUDED.max_count, cost = EXCLUDED.cost,
+         ma = EXCLUDED.ma, st = EXCLUDED.st, ag = EXCLUDED.ag, av = EXCLUDED.av,
+         normal_access = EXCLUDED.normal_access, double_access = EXCLUDED.double_access
+     RETURNING id',  // P321 (uživatel 23.11.): přepsat i existující řádky podle pravidel
 );
 
 $posSkillStmt = $pdo->prepare(
@@ -385,6 +392,18 @@ foreach ($positionals as [$raceId, $name, $max, $cost, $ma, $st, $ag, $av, $norm
     if ($templateRow !== false) {
         $templateId = (int) $templateRow['id'];
         $posCount++;
+
+        // P321: schopnosti šablony srovnat se seznamem — co v seznamu není, se odebere
+        $keepIds = [];
+        foreach ($startSkills as $skillName) {
+            if (isset($skillIds[$skillName])) {
+                $keepIds[] = $skillIds[$skillName];
+            }
+        }
+        $pdo->prepare(
+            'DELETE FROM positional_template_skills WHERE positional_template_id = ?'
+            . ($keepIds === [] ? '' : ' AND skill_id NOT IN (' . implode(',', array_fill(0, count($keepIds), '?')) . ')'),
+        )->execute([$templateId, ...$keepIds]);
 
         foreach ($startSkills as $skillName) {
             if (isset($skillIds[$skillName])) {

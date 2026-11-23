@@ -29,7 +29,7 @@ final class NewRaceSeedTest extends TestCase
         }
 
         $this->assertNotNull($chaos, 'Chaos race should be seeded');
-        $this->assertSame(70000, $chaos->getRerollCost());
+        $this->assertSame(60000, $chaos->getRerollCost());  // P321: ř. 8692
         $this->assertTrue($chaos->hasApothecary());
 
         $names = array_map(fn($p) => $p->getName(), $chaos->getPositionals());
@@ -250,7 +250,7 @@ final class NewRaceSeedTest extends TestCase
         }
 
         $this->assertNotNull($darkElf, 'Dark Elf race should be seeded');
-        $this->assertSame(50000, $darkElf->getRerollCost());
+        $this->assertSame(60000, $darkElf->getRerollCost());  // P321: ř. 8761
         $this->assertTrue($darkElf->hasApothecary());
 
         $names = array_map(fn($p) => $p->getName(), $darkElf->getPositionals());
@@ -297,11 +297,11 @@ final class NewRaceSeedTest extends TestCase
         $runnerSkills = array_map(fn($s) => $s->getName(), $runner->getStartingSkills());
         $this->assertContains('Dump-Off', $runnerSkills);
 
-        // Assassin: 6/3/4/8, Shadowing+Stab
+        // Assassin: 6/3/4/7, Shadowing+Stab (P321: AV7, ř. 8756)
         $this->assertNotNull($assassin);
         $this->assertSame(6, $assassin->getStats()->getMovement());
         $this->assertSame(4, $assassin->getStats()->getAgility());
-        $this->assertSame(8, $assassin->getStats()->getArmour());
+        $this->assertSame(7, $assassin->getStats()->getArmour());
         $assassinSkills = array_map(fn($s) => $s->getName(), $assassin->getStartingSkills());
         $this->assertContains('Shadowing', $assassinSkills);
         $this->assertContains('Stab', $assassinSkills);

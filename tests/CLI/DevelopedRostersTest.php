@@ -71,11 +71,12 @@ final class DevelopedRostersTest extends TestCase
         $this->assertCount(2, $wardancers);
 
         foreach ($wardancers as $wd) {
-            // Base: Block + Dodge
+            // Base: Block + Dodge + Leap (P321: rules_bb2016.txt ř. 9104)
             $this->assertTrue($wd->hasSkill(SkillName::Block));
             $this->assertTrue($wd->hasSkill(SkillName::Dodge));
+            $this->assertTrue($wd->hasSkill(SkillName::Leap));
             // +1 extra: StripBall or Tackle
-            $this->assertCount(3, $wd->getSkills());
+            $this->assertCount(4, $wd->getSkills());
             $hasExtra = $wd->hasSkill(SkillName::StripBall) || $wd->hasSkill(SkillName::Tackle);
             $this->assertTrue($hasExtra, 'Wardancer should have StripBall or Tackle');
         }

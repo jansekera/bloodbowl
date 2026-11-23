@@ -88,7 +88,7 @@ const TeamRoster& getDwarfRoster() {
                 SkillName::DirtyPlayer, SkillName::Juggernaut, SkillName::MightyBlow,
                 SkillName::NoHands, SkillName::SecretWeapon, SkillName::StandFirm}), 1},
         },
-        5, 40, true
+        5, 50, true  // P321: přehoz 50k (rules_bb2016.txt ř. 8778)
     };
     return roster;
 }
@@ -102,8 +102,10 @@ const TeamRoster& getWoodElfRoster() {
             {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint}), 4},
             {{7, 3, 4, 7}, makeSkills({SkillName::Pass}), 2},
             {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap}), 2},
+            // P321: + Strong Arm, Throw Team-Mate (ř. 9105-9107)
             {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot,
-                SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull}), 1},
+                SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull,
+                SkillName::StrongArm, SkillName::ThrowTeamMate}), 1},
         },
         5, 50, true
     };
@@ -117,10 +119,12 @@ const TeamRoster& getChaosRoster() {
         {
             {{6, 3, 3, 8}, makeSkills({SkillName::Horns}), 16},
             {{5, 4, 3, 9}, {}, 4},
+            // P321: + Thick Skull (ř. 8689-8690); přehoz 60k (ř. 8692)
             {{5, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Horns,
-                SkillName::Frenzy, SkillName::WildAnimal, SkillName::MightyBlow}), 1},
+                SkillName::Frenzy, SkillName::WildAnimal, SkillName::MightyBlow,
+                SkillName::ThickSkull}), 1},
         },
-        3, 70, true
+        3, 60, true
     };
     return roster;
 }
@@ -148,6 +152,7 @@ const TeamRoster& getLizardmenRoster() {
         {
             {{8, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Stunty}), 16},
             {{6, 4, 1, 9}, {}, 6},
+            // Kroxigor ST5 — text ř. 8925 má ST6, vada; Teams of Legend v4 a CRP mají ST5 (uživatel 23.11.)
             {{6, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead,
                 SkillName::MightyBlow, SkillName::PrehensileTail, SkillName::ThickSkull}), 1},
         },
@@ -167,7 +172,7 @@ const TeamRoster& getDarkElfRoster() {
             {{7, 3, 4, 8}, makeSkills({SkillName::Block}), 4},
             {{7, 3, 4, 7}, makeSkills({SkillName::Dodge, SkillName::Frenzy, SkillName::JumpUp}), 2},
         },
-        5, 50, true
+        5, 60, true  // P321: přehoz 60k (ř. 8761)
     };
     return roster;
 }
@@ -178,9 +183,10 @@ const TeamRoster& getHalflingRoster() {
         "Halfling",
         {
             {{5, 2, 3, 6}, makeSkills({SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty}), 16},
-            {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot,
+            // P321: bez Loner, + Strong Arm (ř. 8862-8864); Timmm-ber! engine nezná (k rozhodnutí)
+            {{2, 6, 1, 10}, makeSkills({SkillName::TakeRoot,
                 SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull,
-                SkillName::ThrowTeamMate}), 2},
+                SkillName::ThrowTeamMate, SkillName::StrongArm}), 2},
         },
         2, 60, true
     };
@@ -212,8 +218,9 @@ const TeamRoster& getHighElfRoster() {
         {
             {{6, 3, 4, 8}, {}, 16},
             {{8, 3, 4, 7}, makeSkills({SkillName::Catch}), 4},
-            {{6, 3, 4, 8}, makeSkills({SkillName::Pass, SkillName::SureHands}), 2},
-            {{7, 3, 4, 8}, makeSkills({SkillName::Block}), 4},
+            // P321: Throwers Pass + Safe Throw (ř. 8847), Blitzers 0-2 (ř. 8849)
+            {{6, 3, 4, 8}, makeSkills({SkillName::Pass, SkillName::SafeThrow}), 2},
+            {{7, 3, 4, 8}, makeSkills({SkillName::Block}), 2},
         },
         4, 50, true
     };
@@ -227,7 +234,7 @@ const TeamRoster& getVampireRoster() {
         {
             {{6, 3, 3, 7}, {}, 16},
             {{6, 4, 4, 8}, makeSkills({SkillName::HypnoticGaze, SkillName::Regeneration,
-                SkillName::Bloodlust}), 4},
+                SkillName::Bloodlust}), 6},  // P321: 0-6 (ř. 9088)
         },
         2, 70, true
     };
@@ -244,7 +251,7 @@ const TeamRoster& getAmazonRoster() {
             {{6, 3, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Pass}), 2},
             {{6, 3, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Block}), 4},
         },
-        4, 50, true
+        4, 60, true  // P321: přehoz 60k (ř. 8727)
     };
     return roster;
 }
@@ -257,8 +264,9 @@ const TeamRoster& getNecromanticRoster() {
             {{4, 3, 2, 8}, makeSkills({SkillName::Regeneration}), 16},
             {{7, 3, 3, 7}, makeSkills({SkillName::Dodge}), 2},
             {{6, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Regeneration}), 2},
+            // P321: Thick Skull místo Decay (ř. 8941)
             {{4, 4, 2, 9}, makeSkills({SkillName::StandFirm, SkillName::Regeneration,
-                SkillName::Decay}), 2},
+                SkillName::ThickSkull}), 2},
             {{8, 3, 3, 8}, makeSkills({SkillName::Claw, SkillName::Frenzy,
                 SkillName::Regeneration}), 2},
         },
@@ -272,11 +280,12 @@ const TeamRoster& getBretonianRoster() {
     static const TeamRoster roster = {
         "Bretonnian",
         {
-            {{6, 3, 3, 7}, {}, 16},
+            // P321 (ř. 8700-8703): Linemen AG2 + Fend; Blitzers Dauntless místo Fend; přehoz 70k
+            {{6, 3, 2, 7}, makeSkills({SkillName::Fend}), 16},
             {{6, 3, 3, 8}, makeSkills({SkillName::Wrestle}), 4},
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Fend, SkillName::Catch}), 4},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Dauntless, SkillName::Catch}), 4},
         },
-        3, 60, true
+        3, 70, true
     };
     return roster;
 }
@@ -289,7 +298,7 @@ const TeamRoster& getKhemriRoster() {
             {{5, 3, 2, 7}, makeSkills({SkillName::Regeneration, SkillName::ThickSkull}), 16},
             {{6, 3, 2, 7}, makeSkills({SkillName::Pass, SkillName::Regeneration, SkillName::SureHands}), 2},
             {{6, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Regeneration}), 2},
-            {{3, 5, 1, 9}, makeSkills({SkillName::Decay, SkillName::Regeneration}), 4},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Decay, SkillName::Regeneration}), 4},  // P321: MA4 (ř. 8913)
         },
         4, 70, false
     };
@@ -326,8 +335,10 @@ const TeamRoster& getChaosDwarfRoster() {
             {{6, 3, 3, 7}, {}, 16},
             {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 6},
             {{6, 4, 2, 9}, makeSkills({SkillName::Sprint, SkillName::SureFeet, SkillName::ThickSkull}), 2},
+            // P321: + Thick Skull (ř. 8742-8743)
             {{5, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Horns,
-                SkillName::Frenzy, SkillName::WildAnimal, SkillName::MightyBlow}), 1},
+                SkillName::Frenzy, SkillName::WildAnimal, SkillName::MightyBlow,
+                SkillName::ThickSkull}), 1},
         },
         4, 70, true
     };
@@ -339,9 +350,10 @@ const TeamRoster& getOgreRoster() {
     static const TeamRoster roster = {
         "Ogre",
         {
+            // P321 (ř. 8991-8995): Snotlings + Side Step; Ogres bez Loner
             {{5, 1, 3, 5}, makeSkills({SkillName::Dodge, SkillName::RightStuff,
-                SkillName::Stunty, SkillName::Titchy}), 16},
-            {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead,
+                SkillName::Stunty, SkillName::Titchy, SkillName::SideStep}), 16},
+            {{5, 5, 2, 9}, makeSkills({SkillName::BoneHead,
                 SkillName::MightyBlow, SkillName::ThickSkull, SkillName::ThrowTeamMate}), 6},
         },
         2, 70, true
@@ -357,11 +369,13 @@ const TeamRoster& getNurgleRoster() {
             {{5, 3, 3, 8}, makeSkills({SkillName::Decay, SkillName::NurglesRot}), 16},
             {{6, 3, 3, 8}, makeSkills({SkillName::Horns, SkillName::Regeneration,
                 SkillName::NurglesRot}), 4},
+            // P321: Nurgle Warriors + Nurgle's Rot (ř. 8972-8973); Beast + Really Stupid (ř. 8975-8977)
+            // Mighty Blow u Beast: text ř. 8975 ho vynechává, CRP v2 (evidence/p321_20261123/zdroj/crp, ř. 3248-3252) ho má ⇒ podle CRP (uživatel 23.11.)
             {{4, 4, 2, 9}, makeSkills({SkillName::FoulAppearance, SkillName::Regeneration,
-                SkillName::DisturbingPresence}), 4},
+                SkillName::DisturbingPresence, SkillName::NurglesRot}), 4},
             {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::FoulAppearance,
                 SkillName::MightyBlow, SkillName::NurglesRot, SkillName::Regeneration,
-                SkillName::Tentacles, SkillName::DisturbingPresence}), 1},
+                SkillName::Tentacles, SkillName::DisturbingPresence, SkillName::ReallyStupid}), 1},
         },
         4, 70, false
     };
@@ -389,10 +403,11 @@ const TeamRoster& getSlannRoster() {
         "Slann",
         {
             {{6, 3, 3, 8}, makeSkills({SkillName::Leap, SkillName::VeryLongLegs}), 16},
-            {{7, 3, 4, 7}, makeSkills({SkillName::Leap, SkillName::VeryLongLegs,
+            // P321 (ř. 9159-9161): Catchers ST2; Blitzers + Diving Tackle
+            {{7, 2, 4, 7}, makeSkills({SkillName::Leap, SkillName::VeryLongLegs,
                 SkillName::DivingCatch}), 4},
             {{7, 3, 3, 8}, makeSkills({SkillName::Leap, SkillName::VeryLongLegs,
-                SkillName::JumpUp}), 4},
+                SkillName::JumpUp, SkillName::DivingTackle}), 4},
             {{6, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead,
                 SkillName::MightyBlow, SkillName::PrehensileTail, SkillName::ThickSkull}), 1},
         },
@@ -406,20 +421,19 @@ const TeamRoster& getUnderworldRoster() {
     static const TeamRoster roster = {
         "Underworld",
         {
-            {{6, 2, 3, 7}, makeSkills({SkillName::Animosity, SkillName::Dodge,
+            // P321 (ř. 9137-9145): Goblins bez Animosity; Skaven Linemen 0-2; jediný Warpstone Troll.
+            // Goblins 0-12 podle Teams of Legend v4 (text ř. 9137 má 0-16; uživatel 23.11. „goblinů max 12“)
+            {{6, 2, 3, 7}, makeSkills({SkillName::Dodge,
                 SkillName::RightStuff, SkillName::Stunty}), 12},
-            {{7, 3, 3, 7}, makeSkills({SkillName::Animosity}), 12},
+            {{7, 3, 3, 7}, makeSkills({SkillName::Animosity}), 2},
             {{7, 3, 3, 7}, makeSkills({SkillName::Animosity, SkillName::Pass,
                 SkillName::SureHands}), 2},
             {{7, 3, 3, 8}, makeSkills({SkillName::Animosity, SkillName::Block}), 2},
             {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry,
                 SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration,
                 SkillName::ThrowTeamMate}), 1},
-            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry,
-                SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration,
-                SkillName::ThrowTeamMate, SkillName::Tentacles}), 1},
         },
-        6, 70, true
+        5, 70, true
     };
     return roster;
 }
@@ -430,12 +444,15 @@ const TeamRoster& getKhorneRoster() {
         "Khorne",
         {
             {{6, 3, 3, 8}, makeSkills({SkillName::Frenzy}), 16},
-            {{6, 3, 3, 8}, makeSkills({SkillName::Horns, SkillName::Regeneration,
+            // P321: Bloodletters AV7 (ř. 8953)
+            {{6, 3, 3, 7}, makeSkills({SkillName::Horns, SkillName::Regeneration,
                 SkillName::Juggernaut}), 4},
             {{6, 3, 3, 8}, makeSkills({SkillName::Frenzy, SkillName::Juggernaut,
                 SkillName::Horns}), 2},
+            // P321: Bloodthirster podle ř. 8955-8956 — + Juggernaut, bez Mighty Blow a Thick Skull
+            // text ř. 8955 uvádí 0-4 — vada; 0-1 (uživatel 23.11.: Big Guy je jeden; NAF 2021, evidence/p321_20261123/zdroj/naf)
             {{6, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::Frenzy,
-                SkillName::Horns, SkillName::MightyBlow, SkillName::ThickSkull,
+                SkillName::Horns, SkillName::Juggernaut,
                 SkillName::WildAnimal, SkillName::Regeneration, SkillName::Claw}), 1},
         },
         4, 70, true
@@ -450,20 +467,23 @@ const TeamRoster& getChaosPactRoster() {
         {
             {{6, 3, 3, 8}, {}, 12},
             {{6, 3, 4, 8}, makeSkills({SkillName::Animosity}), 1},
+            // P321 (ř. 9175-9188): Goblin Renegade + Dodge; Orc Renegade doplněn;
+            // Troll, Ogre a Minotaur bez Animosity; Minotaur + Thick Skull
             {{6, 2, 3, 7}, makeSkills({SkillName::Animosity, SkillName::Stunty,
-                SkillName::RightStuff}), 1},
+                SkillName::RightStuff, SkillName::Dodge}), 1},
             {{7, 3, 3, 7}, makeSkills({SkillName::Animosity}), 1},
-            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::Animosity,
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner,
                 SkillName::AlwaysHungry, SkillName::MightyBlow, SkillName::ReallyStupid,
                 SkillName::Regeneration, SkillName::ThrowTeamMate}), 1},
-            {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::Animosity,
+            {{5, 5, 2, 9}, makeSkills({SkillName::Loner,
                 SkillName::BoneHead, SkillName::MightyBlow, SkillName::ThickSkull,
                 SkillName::ThrowTeamMate}), 1},
-            {{5, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Animosity,
+            {{5, 5, 2, 8}, makeSkills({SkillName::Loner,
                 SkillName::Horns, SkillName::Frenzy, SkillName::WildAnimal,
-                SkillName::MightyBlow}), 1},
+                SkillName::MightyBlow, SkillName::ThickSkull}), 1},
+            {{5, 3, 3, 9}, makeSkills({SkillName::Animosity}), 1},
         },
-        7, 70, true
+        8, 70, true
     };
     return roster;
 }

@@ -352,7 +352,9 @@ TEST(GameSimulator, HomeKickingUsesDefensiveFormation) {
 TEST(GameSimulator, RosterSpeedClassification) {
     EXPECT_EQ(classifyRosterSpeed(getSkavenRoster()), RosterSpeed::FAST);    // 7.64
     EXPECT_EQ(classifyRosterSpeed(getWoodElfRoster()), RosterSpeed::FAST);  // 7.09
-    EXPECT_EQ(classifyRosterSpeed(getHighElfRoster()), RosterSpeed::FAST);  // 7.09
+    // P321 (23.11.2026): High Elf Blitzers 0-2 podle rules_bb2016.txt ř. 8849 (dřív 0-4) ⇒
+    // 4×8 + 2×6 + 2×7 + 3×6 = 76 / 11 = 6.91 ≤ 7.0 ⇒ MIXED (dřív 7.09 FAST)
+    EXPECT_EQ(classifyRosterSpeed(getHighElfRoster()), RosterSpeed::MIXED); // 6.91
     EXPECT_EQ(classifyRosterSpeed(getDwarfRoster()), RosterSpeed::SLOW);    // 4.73
     EXPECT_EQ(classifyRosterSpeed(getHalflingRoster()), RosterSpeed::SLOW); // 4.45
     EXPECT_EQ(classifyRosterSpeed(getNurgleRoster()), RosterSpeed::SLOW);   // 4.91

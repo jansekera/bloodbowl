@@ -200,7 +200,7 @@ final class TeamServiceTest extends TestCase
         $updated = $this->teamRepository->findById($team->getId());
         $this->assertNotNull($updated);
         $this->assertSame(1, $updated->getRerolls());
-        $this->assertSame(940000, $updated->getTreasury()->getGold()); // 1M - 60k
+        $this->assertSame(950000, $updated->getTreasury()->getGold()); // 1M - 50k (P321: přehoz lidí 50k, ř. 8885)
     }
 
     public function testBuyApothecary(): void

@@ -91,7 +91,7 @@ final class RaceRepositoryTest extends TestCase
         }
 
         $this->assertNotNull($human);
-        $this->assertSame(60000, $human->getRerollCost());
+        $this->assertSame(50000, $human->getRerollCost());  // P321: ř. 8885
         $this->assertTrue($human->hasApothecary());
 
         $positionalNames = array_map(fn($p) => $p->getName(), $human->getPositionals());
