@@ -180,10 +180,21 @@ void resolveRiot(GameState& state, TeamSide receiving, DiceRollerBase& dice) {
 // Cheering Fans (ř. 1309-1314) a Brilliant Coaching (ř. 1321-1326): D3 + FAME + roztleskávačky /
 // asistenti (vše 0), vyšší dostane přehoz, při remíze OBA. OPRAVENO 02.10. (Ž4, P90) — dřív D6 a
 // při remíze nikdo.
+// FAME (ř. 1228-1236): fanoušky engine nevede ⇒ základ 0. P321 — Fan Favourite (ř. 8107-8112): „for each player with
+// Fan Favourite on the pitch your team receives an additional +1 FAME modifier for any Kick-Off table results, but not
+// for the Winnings roll“. Vzor PHP KickoffResolver::fame.
+int fame(const GameState& state, TeamSide side) {
+    int f = 0;
+    state.forEachOnPitch(side, [&](const Player& p) { if (p.hasSkill(SkillName::FanFavourite)) ++f; });
+    return f;
+}
+
 void resolveRerollContest(GameState& state, DiceRollerBase& dice, bool brilliantCoaching) {
-    // P287: vyhozený hlavní trenér −1 na Brilliant Coaching (ř. 1097-1099)
-    const int home = rollD3(dice) - (brilliantCoaching && state.homeTeam.headCoachEjected ? 1 : 0);
-    const int away = rollD3(dice) - (brilliantCoaching && state.awayTeam.headCoachEjected ? 1 : 0);
+    // P287: vyhozený hlavní trenér −1 na Brilliant Coaching (ř. 1097-1099); P321: + FAME
+    const int home = rollD3(dice) + fame(state, TeamSide::HOME) -
+                     (brilliantCoaching && state.homeTeam.headCoachEjected ? 1 : 0);
+    const int away = rollD3(dice) + fame(state, TeamSide::AWAY) -
+                     (brilliantCoaching && state.awayTeam.headCoachEjected ? 1 : 0);
     if (home >= away) state.homeTeam.rerolls++;
     if (away >= home) state.awayTeam.rerolls++;
 }
@@ -254,8 +265,8 @@ void openBlitzTurn(GameState& state, TeamSide kicking, Position landing) {
 // náhodný hráč na hřišti; hod na zranění bez brnění. OPRAVENO 02.10. (Ž2) — dřív stun náhodného
 // stojícího v KAŽDÉM týmu, bez souboje a bez hodu na zranění.
 void resolveThrowARock(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events) {
-    const int home = dice.rollD6();
-    const int away = dice.rollD6();
+    const int home = dice.rollD6() + fame(state, TeamSide::HOME);   // P321: + FAME
+    const int away = dice.rollD6() + fame(state, TeamSide::AWAY);
     std::vector<TeamSide> hit;
     if (home >= away) hit.push_back(TeamSide::AWAY);   // domácí fanoušci házeli na hosty
     if (away >= home) hit.push_back(TeamSide::HOME);
@@ -271,10 +282,13 @@ void resolveThrowARock(GameState& state, DiceRollerBase& dice, std::vector<GameE
 // Pitch Invasion, ř. 1351-1356: D6 + FAME za každého soupeřova hráče NA HŘIŠTI; 6+ ⇒ Stunned,
 // Ball & Chain ⇒ KO; 1 nikdy. OPRAVENO 02.10. (Ž7) — dřív jen za stojící a Ball & Chain jako ostatní.
 void resolvePitchInvasion(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    // P321: hází kouč SOUPEŘE hráče a přičte svou FAME; „a roll of 1 before adding FAME will always have no effect“
+    const int fameOf[2] = {fame(state, TeamSide::HOME), fame(state, TeamSide::AWAY)};
     for (auto& p : state.players) {
         if (!p.isOnPitch()) continue;
         const int roll = dice.rollD6();
-        if (roll < 6) continue;
+        const int f = fameOf[p.teamSide == TeamSide::HOME ? 1 : 0];
+        if (roll == 1 || roll + f < 6) continue;
         emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, p.id, -1, p.position, {}, roll, false});
         if (p.hasSkill(SkillName::BallAndChain)) {
             p.setState(PlayerState::KO);
@@ -286,8 +300,11 @@ void resolvePitchInvasion(GameState& state, DiceRollerBase& dice, std::vector<Ga
     }
 }
 
+} // anonymous namespace
+
 // Výkopová tabulka, ř. 1265-1356. `landing` je místo, kam míč dopadne (Changing Weather ho může
 // posunout). Vrací true, když padl Blitz! (pak dopad čeká na konec bonusového kola).
+// P321: mimo anonymní namespace, aby šel výsledek tabulky testovat přímo (Fan Favourite).
 bool resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receiving, Position& landing,
                          DiceRollerBase& dice, std::vector<GameEvent>* events) {
     switch (event) {
@@ -340,6 +357,8 @@ bool resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receivin
     }
     return false;
 }
+
+namespace {
 
 // Kick, ř. 8205-8213: hráč nastavený mimo lajnu a křídla smí rozptyl výkopu půlit (dolů).
 bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {

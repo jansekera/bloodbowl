@@ -61,12 +61,52 @@ final class Pathfinder
      * Šance, že hráč na začátku akce vstane (bez přehozu): 1, pokud nestojí na hodu; pod 3 pole hod 4+ (ř. 690-692).
      * Týž rozpočet jako `pohybPoVstani`. P86 (19.11.2026): nabídka pohybu dřív ukazovala vstání s jistotou.
      */
-    public static function sanceVstani(MatchPlayerDTO $player): float
+    public static function sanceVstani(MatchPlayerDTO $player, ?GameState $state = null): float
     {
         $naHod = $player->getState() === PlayerState::PRONE && !$player->hasSkill(SkillName::JumpUp)
             && $player->getMovementRemaining() < 3;
 
-        return $naHod ? (7 - self::CIL_VSTANI) / 6.0 : 1.0;
+        return $naHod ? (7 - self::cilVstani($player, $state)) / 6.0 : 1.0;
+    }
+
+    /**
+     * Cíl hodu na vstání (ř. 690-692: 4+). P321 — Timmm-ber! (ř. 8625-8636): každý spoluhráč, který s ním sousedí,
+     * stojí a není v soupeřově tackle zóně, přidá +1; „a 1 is always a failure“ ⇒ cíl nejníž 2. Bez stavu hry
+     * (odhad bez znalosti okolí) se pomocníci nepočítají.
+     */
+    public static function cilVstani(MatchPlayerDTO $player, ?GameState $state = null): int
+    {
+        if ($state === null || !$player->hasSkill(SkillName::Timmmber)) {
+            return self::CIL_VSTANI;
+        }
+
+        return max(2, self::CIL_VSTANI - self::pomocniciVstani($state, $player));
+    }
+
+    /** P321 Timmm-ber!: sousední stojící spoluhráči mimo soupeřovy tackle zóny (pomoc není akce, ř. 8634-8636). */
+    public static function pomocniciVstani(GameState $state, MatchPlayerDTO $player): int
+    {
+        $pos = $player->getPosition();
+        if ($pos === null) {
+            return 0;
+        }
+        $tz = new TacklezoneCalculator();
+        $pocet = 0;
+        foreach ($state->getPlayersOnPitch($player->getTeamSide()) as $mate) {
+            $matePos = $mate->getPosition();
+            if ($mate->getId() === $player->getId() || $matePos === null || $matePos->distanceTo($pos) !== 1) {
+                continue;
+            }
+            if ($mate->getState() !== PlayerState::STANDING) {
+                continue;
+            }
+            if ($tz->countTacklezones($state, $matePos, $mate->getTeamSide()) > 0) {
+                continue;
+            }
+            $pocet++;
+        }
+
+        return $pocet;
     }
 
     /**

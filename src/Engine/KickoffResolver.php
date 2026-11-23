@@ -299,7 +299,7 @@ final class KickoffResolver
      */
     private function resolveRerollContest(GameState $state, int $roll, string $name, bool $brilliantCoaching): array
     {
-        $d3 = fn(TeamSide $side): int => intdiv($this->dice->rollD6() + 1, 2)
+        $d3 = fn(TeamSide $side): int => intdiv($this->dice->rollD6() + 1, 2) + $this->fame($state, $side)
             - ($brilliantCoaching && $state->getTeamState($side)->isHeadCoachEjected() ? 1 : 0);
         $homeRoll = $d3(TeamSide::HOME);
         $awayRoll = $d3(TeamSide::AWAY);
@@ -420,8 +420,9 @@ final class KickoffResolver
      */
     private function resolveThrowARock(GameState $state, int $roll, TeamSide $kickingTeam): array
     {
-        $home = $this->dice->rollD6();
-        $away = $this->dice->rollD6();
+        // P321: + FAME (jen Fan Favourite, ř. 8107-8112)
+        $home = $this->dice->rollD6() + $this->fame($state, TeamSide::HOME);
+        $away = $this->dice->rollD6() + $this->fame($state, TeamSide::AWAY);
 
         $events = [];
         $results = [];
@@ -482,9 +483,12 @@ final class KickoffResolver
 
         // Both teams are affected
         foreach ([TeamSide::HOME, TeamSide::AWAY] as $side) {
+            // P321: hází kouč SOUPEŘE a přičte svou FAME (ř. 1351-1355); „a roll of 1 before adding FAME will always
+            //   have no effect“
+            $fame = $this->fame($state, $side->opponent());
             foreach ($state->getPlayersOnPitch($side) as $player) {
                 $invasionRoll = $this->dice->rollD6();
-                if ($invasionRoll === 6) {
+                if ($invasionRoll !== 1 && $invasionRoll + $fame >= 6) {
                     $state = $state->withPlayer($player->hasSkill(SkillName::BallAndChain)
                         ? $player->withState(PlayerState::KO)->withPosition(null)
                         : $player->withState(PlayerState::STUNNED));
@@ -740,4 +744,22 @@ final class KickoffResolver
 
         return new Position($x, $y);
     }
+
+    /**
+     * FAME (ř. 1228-1236). Fanoušky a jejich počet engine nevede ⇒ základ 0; P321 — Fan Favourite (ř. 8107-8112):
+     * „for each player with Fan Favourite on the pitch your team receives an additional +1 FAME modifier for any
+     * Kick-Off table results, but not for the Winnings roll“.
+     */
+    private function fame(GameState $state, TeamSide $side): int
+    {
+        $fame = 0;
+        foreach ($state->getPlayersOnPitch($side) as $player) {
+            if ($player->hasSkill(SkillName::FanFavourite)) {
+                $fame++;
+            }
+        }
+
+        return $fame;
+    }
+
 }

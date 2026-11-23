@@ -196,7 +196,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         //   a nepresny rozptyloval jen JEDNOU.
         //   ⇒ Presny i nepresny konci stejne: tri rozptyly po jednom poli,
         //   stejne jako u nepresne prihravky (`PassResolver::scatterMissedPass`).
-        [$scatterPos, $lastOnPitch] = $this->scatterThrownPlayer($landingTarget);
+        [$scatterPos, $lastOnPitch] = $this->scatterThrownPlayer($landingTarget, $projectile);
 
         return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events, $lastOnPitch);
     }
@@ -208,11 +208,11 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
      *
      * @return array{Position, Position} [kam dolet, posledni pole na hristi]
      */
-    private function scatterThrownPlayer(Position $target): array
+    private function scatterThrownPlayer(Position $target, MatchPlayerDTO $projectile): array
     {
         $pos = $target;
         for ($i = 0; $i < 3; $i++) {
-            $next = $this->scatterCalc->scatterOnce($pos, $this->dice->rollD8());
+            $next = $this->rozptylHozeneho($pos, $target, $projectile);
             if (!$next->isOnPitch()) {
                 return [$next, $pos];
             }
@@ -220,6 +220,38 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         }
 
         return [$pos, $pos];
+    }
+
+    /**
+     * Jeden rozptyl hozeného hráče. Bez Swoop 8směrná šablona (D8). P321 — Swoop (ř. 8549-8558): „the Throw-in template
+     * is used instead of the Scatter template … their coach places the Throw-in template over the player facing up or
+     * down the pitch or towards either sideline. Then they roll a D6 and move the player one square“.
+     * Natočení volí engine za kouče (i za člověka — dotaz ve webu zatím není): ten ze čtyř směrů, který dá nejmenší
+     * očekávanou vzdálenost od cíle hodu, s velkou cenou za pole mimo hřiště; při shodě dopředu na soupeřovu zónu.
+     */
+    private function rozptylHozeneho(Position $pos, Position $cil, MatchPlayerDTO $projectile): Position
+    {
+        if (!$projectile->hasSkill(SkillName::Swoop)) {
+            return $this->scatterCalc->scatterOnce($pos, $this->dice->rollD8());
+        }
+        $vpred = $projectile->getTeamSide() === \App\Enum\TeamSide::HOME ? 1 : -1;
+        $nejlepsi = null;
+        $nejCena = PHP_FLOAT_MAX;
+        foreach ([[$vpred, 0], [0, 1], [0, -1], [-$vpred, 0]] as $smer) {
+            $cena = 0.0;
+            foreach ([1, 3, 5] as $d6) {
+                [$dx, $dy] = $this->scatterCalc->templateOffset($smer, $d6);
+                $kam = new Position($pos->getX() + $dx, $pos->getY() + $dy);
+                $cena += $kam->isOnPitch() ? $kam->distanceTo($cil) : 100.0;
+            }
+            if ($cena < $nejCena) {
+                $nejCena = $cena;
+                $nejlepsi = $smer;
+            }
+        }
+        [$dx, $dy] = $this->scatterCalc->templateOffset($nejlepsi ?? [$vpred, 0], $this->dice->rollD6());
+
+        return new Position($pos->getX() + $dx, $pos->getY() + $dy);
     }
 
     /**
@@ -295,7 +327,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
                 $events[] = GameEvent::playerFell($occupant->getId());
                 [$state, $events] = $this->ballResolver->srazit($state, $occupant, $this->injuryResolver, $events);
             }
-            $newPos = $this->scatterCalc->scatterOnce($landingPos, $this->dice->rollD8());
+            $newPos = $this->rozptylHozeneho($landingPos, $landingPos, $projectile);
             return $this->resolveLanding($state, $projectile, $newPos, $hadBall, $events, $landingPos, true, $srazenSpoluhrac);
         }
 
@@ -314,7 +346,8 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         // Landing roll: 7 - AG + TZ (2+ to 6+)
         $ag = $projectile->getStats()->getAgility();
         $tz = $this->tzCalc->countTacklezones($state, $landingPos, $projectile->getTeamSide());
-        $landingTarget = max(2, min(6, 7 - $ag + $tz));
+        // P321 — Swoop (ř. 8559-8560): „when rolling to see whether the player lands on their feet … add 1 to the result“
+        $landingTarget = max(2, min(6, 7 - $ag + $tz - ($projectile->hasSkill(SkillName::Swoop) ? 1 : 0)));
 
         // Right Stuff ř. 8421-8431: na přistání se nehází, když dopadl na hráče — pak rovnou leží (P278)
         $landingSuccess = false;

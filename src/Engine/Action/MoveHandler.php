@@ -593,9 +593,11 @@ final class MoveHandler implements ActionHandlerInterface
         $playerId = $player->getId();
         $poVstani = Pathfinder::pohybPoVstani($player);
 
-        if (Pathfinder::sanceVstani($player) < 1.0) {
+        if (Pathfinder::sanceVstani($player, $state) < 1.0) {
+            // P321: Timmm-ber! snižuje cíl o pomocníky (ř. 8625-8636); 1 vždy selže (cíl ≥ 2)
+            $cilVstani = Pathfinder::cilVstani($player, $state);
             $roll = $this->dice->rollD6();
-            $success = $roll >= Pathfinder::CIL_VSTANI;
+            $success = $roll >= $cilVstani;
             $events = [GameEvent::standUp($playerId, $roll, $success)];
             // OPRAVENO 19.11.2026 (P86) -- hod šel holou kostkou bez přehozu. Ř. 929-933: týmový přehoz smí přehodit
             //   „any dice roll (other than Armour, Injury or Casualty rolls)“ ve vlastním kole ⇒ i vstání (ř. 690-695).
@@ -607,7 +609,7 @@ final class MoveHandler implements ActionHandlerInterface
                     $state,
                     $player,
                     RollType::STAND_UP,
-                    Pathfinder::CIL_VSTANI,
+                    $cilVstani,
                     $roll,
                     $player->requirePosition(),
                     $events,

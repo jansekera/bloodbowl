@@ -84,8 +84,10 @@ const TV1500_ROSTERS = [
     // pravidel“) — co nejvíc goblinních mechanik. Star playeři Ripper Bolgrot (ř. 7627-7631) a Scrappa Sorehead
     // (ř. 7637-7641). 1270 + 3 rerolly 180 + lékárník 50 = 1500 (P287: 2 rerolly + lékárník + 1 úplatek = 1490, getTv1500TeamExtras).
     'Goblin' => [
-        ['Goblin',         2, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep, SkillName::SureFeet]],
+        // P321 (23.11.2026): Doom Diver (Swoop) a 'Ooligan (Fan Favourite) místo dvou goblinů +SS+SF ⇒ TV 1460; parita C++
         ['Goblin',         1, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep, SkillName::SureHands]],
+        ['Doom Diver',     1, [6, 2, 3, 7], [SkillName::RightStuff, SkillName::Stunty, SkillName::Swoop]],
+        ["'Ooligan",       1, [6, 2, 3, 7], [SkillName::DisturbingPresence, SkillName::Dodge, SkillName::FanFavourite, SkillName::RightStuff, SkillName::Stunty]],
         ['Bombardier',     1, [6, 2, 3, 7], [SkillName::Bombardier, SkillName::Dodge, SkillName::SecretWeapon, SkillName::Stunty, SkillName::HailMaryPass]],
         ['Looney',         1, [6, 2, 3, 7], [SkillName::Chainsaw, SkillName::SecretWeapon, SkillName::Stunty]],
         ['Fanatic',        1, [3, 7, 3, 7], [SkillName::BallAndChain, SkillName::NoHands, SkillName::SecretWeapon, SkillName::Stunty]],

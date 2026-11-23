@@ -83,6 +83,7 @@ add_executable(bb_tests
     tests/test_mcts.cpp
     tests/test_game_simulator.cpp
     tests/test_ttm_handler.cpp
+    tests/test_p321_skills.cpp
     tests/test_bomb_handler.cpp
     tests/test_hail_mary_ai.cpp
     tests/test_bomb_ttm_macros.cpp

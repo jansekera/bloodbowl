@@ -128,7 +128,10 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
     // -1 proti -3.
     // OPRAVENO 9.11.2026 (T5.23, živé od goblinů TV1500) — chyběla výjimka ř. 8538-8539: „Stunties that are armed
     //   with a Secret Weapon are not allowed to ignore enemy tackle zones“ (Bomma, Looney, Fanatic).
-    if (player.hasSkill(SkillName::Stunty) && !player.hasSkill(SkillName::SecretWeapon)) {
+    // P321 — Swoop (ř. 8561-8564): se Stunty „do not ignore any modifiers for enemy tackle zones on the square they
+    //   are moving to“.
+    if (player.hasSkill(SkillName::Stunty) && !player.hasSkill(SkillName::SecretWeapon) &&
+        !player.hasSkill(SkillName::Swoop)) {
         target -= countTacklezones(state, dest, player.teamSide);
     }
     // Titchy, l. 8638-8639: "may add 1 to any Dodge roll he attempts."
@@ -204,6 +207,26 @@ bool reallyStupidHasHelper(const GameState& state, const Player& player) {
         }
     }
     return false;
+}
+
+Position throwInTemplateStep(Position from, Position dir, int d6) {
+    const int side = d6 <= 2 ? -1 : (d6 <= 4 ? 0 : 1);
+    const int dx = dir.x != 0 ? dir.x : side;
+    const int dy = dir.x != 0 ? side : dir.y;
+    return {static_cast<int8_t>(from.x + dx), static_cast<int8_t>(from.y + dy)};
+}
+
+int standUpTarget(const GameState& state, const Player& player) {
+    if (!player.hasSkill(SkillName::Timmmber)) return 4;
+    int helpers = 0;
+    for (const Position& pos : player.position.getAdjacent()) {
+        if (!pos.isOnPitch()) continue;
+        const Player* ally = state.getPlayerAtPosition(pos);
+        if (!ally || ally->teamSide != player.teamSide || ally->state != PlayerState::STANDING) continue;
+        if (countTacklezones(state, ally->position, ally->teamSide) > 0) continue;
+        ++helpers;
+    }
+    return std::max(2, 4 - helpers);
 }
 
 int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier, bool accuratePass) {

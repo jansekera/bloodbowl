@@ -106,6 +106,11 @@ $skills = [
     // Phase 23
     ["Nurgle's Rot", 'Extraordinary', 'Victim infected with Nurgle\'s Rot on casualty kill'],
     ['Titchy', 'Extraordinary', '+1 dodge (like Stunty), opponents easier to dodge away from'],
+    // P321 (23.11.2026)
+    ['Weeping Dagger', 'Extraordinary', 'Badly Hurt from his block: D6 4+ victim misses next game (league only; no effect in a single match)'],
+    ['Timmm-ber!', 'Extraordinary', '+1 to stand-up roll per adjacent standing team-mate not in an enemy tackle zone; 1 always fails'],
+    ['Swoop', 'Extraordinary', 'Thrown by TTM: scatters with the throw-in template, +1 to landing; with Stunty does not ignore TZ when dodging'],
+    ['Fan Favourite', 'Extraordinary', '+1 FAME for kick-off table results while on the pitch (not Winnings)'],
     ['Stakes', 'Extraordinary', 'Blocks Regeneration when causing a casualty'],
 
     // Phase 24
@@ -205,7 +210,7 @@ $positionals = [
     // Skaven
     [$raceIds['Skaven'], 'Lineman',     16, 50000,  7, 3, 3, 7, 'G', 'ASPM',   []],
     [$raceIds['Skaven'], 'Thrower', 2, 70000, 7, 3, 3, 7, 'GP', 'ASM', ['Sure Hands', 'Pass']], // P321: + Pass (ř. 9038)
-    [$raceIds['Skaven'], 'Gutter Runner', 4, 80000, 9, 2, 4, 7, 'GA', 'SPM',   ['Dodge']],
+    [$raceIds['Skaven'], 'Gutter Runner', 4, 80000, 9, 2, 4, 7, 'GA', 'SPM',   ['Dodge', 'Weeping Dagger']], // P321: + Weeping Dagger (ř. 9039, „Weeping Blade“)
     [$raceIds['Skaven'], 'Blitzer',      2, 90000,  7, 3, 3, 8, 'GS', 'APM',   ['Block']],
     // P321: Storm Vermin = Skaven Blitzer (uživatel 23.11.) — duplicitní řádek k „Blitzer“ (spolu by dovolily 4 blitzery místo 0-2, ř. 9040) — vyřazeno
     // [$raceIds['Skaven'], 'Storm Vermin', 2, 90000,  7, 3, 3, 8, 'GS', 'APM',   ['Block']],
@@ -251,7 +256,7 @@ $positionals = [
 
     // Halfling
     [$raceIds['Halfling'], 'Halfling', 16, 30000, 5, 2, 3, 6, 'A', 'GSP', ['Dodge', 'Stunty', 'Right Stuff']], // P321: MA5 (ř. 8861)
-    [$raceIds['Halfling'], 'Treeman', 2, 120000, 2, 6, 1, 10, 'S', 'GAP', ['Mighty Blow', 'Stand Firm', 'Thick Skull', 'Take Root', 'Throw Team-Mate', 'Strong Arm']], // P321: bez Loner, + Strong Arm (ř. 8862-8864); Timmm-ber! engine nezná
+    [$raceIds['Halfling'], 'Treeman', 2, 120000, 2, 6, 1, 10, 'S', 'GAP', ['Mighty Blow', 'Stand Firm', 'Thick Skull', 'Take Root', 'Throw Team-Mate', 'Strong Arm', 'Timmm-ber!']], // P321: bez Loner, + Strong Arm, + Timmm-ber! (ř. 8862-8864)
 
     // Norse
     [$raceIds['Norse'], 'Lineman',       16, 50000,  6, 3, 3, 7, 'G', 'ASP',    ['Block']],
@@ -301,6 +306,8 @@ $positionals = [
     [$raceIds['Goblin'], 'Looney',        1, 40000,  6, 2, 3, 7, 'A', 'GSP',    ['Chainsaw', 'Secret Weapon', 'Stunty']],
     [$raceIds['Goblin'], 'Fanatic',       1, 70000,  3, 7, 3, 7, 'S', 'GAP',    ['Ball & Chain', 'No Hands', 'Secret Weapon', 'Stunty']],
     [$raceIds['Goblin'], 'Pogoer',        1, 70000,  7, 2, 3, 7, 'A', 'GSP',    ['Dodge', 'Leap', 'Very Long Legs', 'Stunty']],
+    [$raceIds['Goblin'], 'Doom Diver',    1, 60000,  6, 2, 3, 7, 'A', 'GSP',    ['Right Stuff', 'Stunty', 'Swoop']], // P321: ř. 8826
+    [$raceIds['Goblin'], "'Ooligan",      1, 70000,  6, 2, 3, 7, 'A', 'GSP',    ['Disturbing Presence', 'Dodge', 'Fan Favourite', 'Right Stuff', 'Stunty']], // P321: ř. 8828-8830
     [$raceIds['Goblin'], 'Troll',         2, 110000, 4, 5, 1, 9, 'S', 'GAP',    ['Loner', 'Mighty Blow', 'Really Stupid', 'Regeneration', 'Throw Team-Mate', 'Always Hungry']],
 
     // Chaos Dwarf

@@ -101,4 +101,10 @@ enum SkillName: string
     case MultipleBlock = 'Multiple Block';
 
     // Phase 25 new skills:
+
+    // P321 (23.11.2026) — schopnosti ze soupisek, které engine neznal (rules_bb2016.txt):
+    case WeepingDagger = 'Weeping Dagger';   // ř. 8647-8654 (Gutter Runner; soupiska ř. 9039 píše „Weeping Blade“)
+    case Timmmber = 'Timmm-ber!';            // ř. 8625-8636 (Treemen halflingů)
+    case Swoop = 'Swoop';                    // ř. 8549-8564 (Doom Diver)
+    case FanFavourite = 'Fan Favourite';     // ř. 8107-8112 ('Ooligan)
 }

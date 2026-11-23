@@ -57,7 +57,10 @@ TEST(ActionType, RequiresPlayer) {
 TEST(SkillName, ValuesAreSequential) {
     EXPECT_EQ(static_cast<int>(SkillName::Block), 0);
     EXPECT_EQ(static_cast<int>(SkillName::MultipleBlock), 73);
-    EXPECT_EQ(static_cast<int>(SkillName::SKILL_COUNT), 74);
+    // P321: čtyři nové na konci, stejné pořadí jako PHP SkillName
+    EXPECT_EQ(static_cast<int>(SkillName::WeepingDagger), 74);
+    EXPECT_EQ(static_cast<int>(SkillName::FanFavourite), 77);
+    EXPECT_EQ(static_cast<int>(SkillName::SKILL_COUNT), 78);
 }
 
 TEST(PassRange, Modifier) {

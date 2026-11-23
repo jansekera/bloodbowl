@@ -427,7 +427,7 @@ final class RulesEngine
         $moves = $this->pathfinder->findValidMoves($state, $player);
         $targets = [];
         // P86: pod 3 pole se vstává na 4+ (ř. 690-692) -- šance cesty i vstání na místě ho zahrnuje
-        $vstani = Pathfinder::sanceVstani($player);
+        $vstani = Pathfinder::sanceVstani($player, $state);
 
         // PRONE players can always stand in place
         if ($player->getState() === PlayerState::PRONE && $player->getPosition() !== null) {

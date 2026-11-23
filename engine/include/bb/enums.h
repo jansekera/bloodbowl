@@ -141,7 +141,12 @@ enum class SkillName : uint8_t {
     Titchy,
     Stakes,
     MultipleBlock,      // 73
-    SKILL_COUNT         // 74 — not a real skill, used for bounds
+    // P321 (23.11.2026) — tytéž čtyři na konci PHP výčtu, stejné pořadí:
+    WeepingDagger,      // 74, ř. 8647-8654 (Gutter Runner; soupiska ř. 9039 „Weeping Blade“) — mimo ligu bez účinku
+    Timmmber,           // 75, ř. 8625-8636 (Treemen halflingů)
+    Swoop,              // 76, ř. 8549-8564 (Doom Diver)
+    FanFavourite,       // 77, ř. 8107-8112 ('Ooligan)
+    SKILL_COUNT         // 78 — not a real skill, used for bounds
 };
 
 // --- SkillCategory ---

@@ -97,6 +97,29 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
                           target, passTarget, !fumble, roll});
     }
 
+    // Jeden rozptyl hozeného. Bez Swoop 8směrná šablona (D8). P321 — Swoop (ř. 8549-8558): šablona vhazování natočená
+    // koučem, D6, o jedno pole. Natočení volí engine: nejmenší očekávaná vzdálenost od cíle hodu, pole mimo hřiště
+    // drahé, při shodě dopředu na soupeřovu zónu. Vzor PHP ThrowTeamMateHandler::rozptylHozeneho.
+    auto scatterStep = [&](Position from, Position aim) -> Position {
+        if (!projectile.hasSkill(SkillName::Swoop)) {
+            Position step = scatterDirection(dice.rollD8());
+            return {static_cast<int8_t>(from.x + step.x), static_cast<int8_t>(from.y + step.y)};
+        }
+        const int8_t fwd = projectile.teamSide == TeamSide::HOME ? 1 : -1;
+        const Position dirs[4] = {{fwd, 0}, {0, 1}, {0, -1}, {static_cast<int8_t>(-fwd), 0}};
+        Position best = dirs[0];
+        double bestCost = 1e18;
+        for (const Position& dir : dirs) {
+            double cost = 0.0;
+            for (int d6 : {1, 3, 5}) {
+                const Position sq = throwInTemplateStep(from, dir, d6);
+                cost += sq.isOnPitch() ? sq.distanceTo(aim) : 100.0;
+            }
+            if (cost < bestCost) { bestCost = cost; best = dir; }
+        }
+        return throwInTemplateStep(from, best, dice.rollD6());
+    };
+
     Position landPos;
     Position lastOnPitch = target;
     if (fumble) {
@@ -116,9 +139,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         landPos = target;
         for (int i = 0; i < 3; ++i) {
             lastOnPitch = landPos;
-            Position step = scatterDirection(dice.rollD8());
-            landPos.x = static_cast<int8_t>(landPos.x + step.x);
-            landPos.y = static_cast<int8_t>(landPos.y + step.y);
+            landPos = scatterStep(landPos, target);
             if (!landPos.isOnPitch()) break;
         }
     }
@@ -167,9 +188,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         // dokud neskonci v prazdnem poli nebo mimo hriste
         do {
             lastOnPitch = landPos;   // review P76: vhazuje se z pole, odkud vyletel
-            Position step = scatterDirection(dice.rollD8());
-            landPos.x = static_cast<int8_t>(landPos.x + step.x);
-            landPos.y = static_cast<int8_t>(landPos.y + step.y);
+            landPos = scatterStep(landPos, landPos);
             if (!landPos.isOnPitch()) return crowd();
         } while (state.getPlayerAtPosition(landPos) != nullptr);
     }
@@ -184,8 +203,10 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     // he is Placed Prone and must pass an Armour roll to avoid injury."
     bool landedOnFeet = false;
     if (!landedOnSomeone) {
+        // P321 — Swoop (ř. 8559-8560): k hodu na přistání +1
         int landTarget = std::clamp(
-            7 - projectile.stats.agility + countTacklezones(state, landPos, projectile.teamSide),
+            7 - projectile.stats.agility + countTacklezones(state, landPos, projectile.teamSide) -
+                (projectile.hasSkill(SkillName::Swoop) ? 1 : 0),
             2, 6);
         // P283: týmový přehoz i na hod na přistání (ř. 929-931) — přes attemptRoll (kouč / Pro / týmový, Loner).
         int landRoll = 0;

@@ -417,7 +417,8 @@ ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice
         // skill reroll -> Pro -> týmový reroll s Loner bránou. Holý hod
         // znamenal, že Treemanovi nešel použít týmový reroll -- tedy přesně
         // to selhání, které měl P45 odstranit.
-        bool ok = attemptRollLogged(state, playerId, dice, /*target=*/4, SkillName::SKILL_COUNT,
+        // P321: Timmm-ber! snižuje cíl o pomocníky (helpers.cpp standUpTarget)
+        bool ok = attemptRollLogged(state, playerId, dice, /*target=*/standUpTarget(state, player), SkillName::SKILL_COUNT,
                                     /*negated=*/false, /*canUseTeamReroll=*/true, events,
                                     GameEvent::Type::STAND_UP, player.position, player.position);
         if (!ok) {

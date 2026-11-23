@@ -9,14 +9,8 @@ namespace bb {
 
 namespace {
 
-// Sablona vhazovani natocena `dir` (jednotkovy smer), D6: 1-2 vlevo od smeru,
-// 3-4 rovne, 5-6 vpravo. Vzor PHP ScatterCalculator::templateOffset.
-Position templateStep(Position from, Position dir, int d6) {
-    const int side = d6 <= 2 ? -1 : (d6 <= 4 ? 0 : 1);
-    const int dx = dir.x != 0 ? dir.x : side;
-    const int dy = dir.x != 0 ? side : dir.y;
-    return {static_cast<int8_t>(from.x + dx), static_cast<int8_t>(from.y + dy)};
-}
+// P321: šablona je sdílená se Swoop (ttm_handler.cpp) ⇒ helpers.cpp throwInTemplateStep.
+Position templateStep(Position from, Position dir, int d6) { return throwInTemplateStep(from, dir, d6); }
 
 // Natoceni sablony -- rozhodnuti uzivatele 25.09. (znovu 30.09.): "vzdy k
 // souperi a pozor na svoje i lezici". Kazde natoceni ma tri pole po 1/3;

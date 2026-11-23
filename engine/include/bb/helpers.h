@@ -91,6 +91,13 @@ double pickupRollChance(const GameState& state, const Player& player, Position a
 // Really Stupid: stojí vedle hráče spoluhráč, který sám Really Stupid není? (+2 k hodu, ř. 8393-8396). Hod (big_guy_handler)
 // i odhad AI (P304 bod 5) jedním místem.
 bool reallyStupidHasHelper(const GameState& state, const Player& player);
+// P321 — cíl hodu na vstání (ř. 690-692: 4+). Timmm-ber! (ř. 8625-8636): +1 za každého sousedního spoluhráče, který
+// stojí a není v soupeřově tackle zóně; „a 1 is always a failure“ ⇒ cíl nejníž 2. Hod (move_handler) i odhad AI
+// (pathfinder nextTurnMoveChance) jedním místem.
+int standUpTarget(const GameState& state, const Player& player);
+// Šablona vhazování natočená `dir` (jednotkový směr podél hřiště nebo k lajně), D6: 1-2 vlevo od směru, 3-4 rovně,
+// 5-6 vpravo; posun o jedno pole. Ball & Chain (ř. 7829-7833) a Swoop (ř. 8549-8558). Vzor PHP templateOffset.
+Position throwInTemplateStep(Position from, Position dir, int d6);
 int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier = 0,
                          bool accuratePass = false);
 

@@ -64,7 +64,7 @@ const TeamRoster& getSkavenRoster() {
         {
             {{7, 3, 3, 7}, {}, 16},
             {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass}), 2},
-            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge}), 4},
+            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::WeepingDagger}), 4},  // P321: + Weeping Dagger (ř. 9039; mimo ligu bez účinku)
             {{7, 3, 3, 8}, makeSkills({SkillName::Block}), 2},
             {{6, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Frenzy,
                 SkillName::MightyBlow, SkillName::WildAnimal, SkillName::PrehensileTail}), 1},
@@ -183,10 +183,10 @@ const TeamRoster& getHalflingRoster() {
         "Halfling",
         {
             {{5, 2, 3, 6}, makeSkills({SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty}), 16},
-            // P321: bez Loner, + Strong Arm (ř. 8862-8864); Timmm-ber! engine nezná (k rozhodnutí)
+            // P321: bez Loner, + Strong Arm, + Timmm-ber! (ř. 8862-8864)
             {{2, 6, 1, 10}, makeSkills({SkillName::TakeRoot,
                 SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull,
-                SkillName::ThrowTeamMate, SkillName::StrongArm}), 2},
+                SkillName::ThrowTeamMate, SkillName::StrongArm, SkillName::Timmmber}), 2},
         },
         2, 60, true
     };
@@ -321,8 +321,12 @@ const TeamRoster& getGoblinRoster() {
             {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry,
                 SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration,
                 SkillName::ThrowTeamMate}), 2},
+            // P321 (ř. 8826-8830): Doom Diver a 'Ooligan — dřív chyběly, engine neznal Swoop a Fan Favourite
+            {{6, 2, 3, 7}, makeSkills({SkillName::RightStuff, SkillName::Stunty, SkillName::Swoop}), 1, "Doom Diver"},
+            {{6, 2, 3, 7}, makeSkills({SkillName::DisturbingPresence, SkillName::Dodge, SkillName::FanFavourite,
+                SkillName::RightStuff, SkillName::Stunty}), 1, "'Ooligan"},
         },
-        6, 60, true
+        8, 60, true
     };
     return roster;
 }
@@ -918,8 +922,8 @@ const TeamRoster& getHumanRoster1500() {
 // ověření pravidel“) ⇒ na hřišti co nejvíc goblinních mechanik: bomba s Hail Mary (P263/P266), motorová pila,
 // Ball & Chain, Very Long Legs + Leap, hod spoluhráčem s Right Stuff, Dirty Player, Grab, Regeneration, Always
 // Hungry, Really Stupid, vyloučení secret weapons. Star playeři (max 2, ř. 2899-2913; ceny ř. 8836-8838):
-// Ripper Bolgrot 270 (ř. 7627-7631) a Scrappa Sorehead 150 (ř. 7637-7641). Madcap Miggz, Doom Diver a 'Ooligan
-// ne — engine nemá Claws, Swoop ani Fan Favourite. Ceny ř. 8817-8834 (týmový reroll 60 tis.); skilly Goblinů
+// Ripper Bolgrot 270 (ř. 7627-7631) a Scrappa Sorehead 150 (ř. 7637-7641). Madcap Miggz ne — engine nemá Claws.
+// Doom Diver a 'Ooligan od P321 (23.11.) ano, viz řádky níž. Ceny ř. 8817-8834 (týmový reroll 60 tis.); skilly Goblinů
 // normal A (20), double GSP (30); Trollů normal S, double GAP.
 // Jedenáctka: Ripper 270 + Scrappa 150 + Troll +Block+Guard 170 + Troll +Block 140 + Fanatic 70
 //   + Pogoer +Sure Feet+Side Step 110 + Bomma +Hail Mary Pass 70 + Looney 40 + Goblin +Side Step+Sure Hands 90
@@ -933,6 +937,12 @@ const TeamRoster& getGoblinRoster1500() {
                 SkillName::SureFeet}), 11, "Goblin +Side Step+Sure Feet"},
             {{6, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep,
                 SkillName::SureHands}), 1, "Goblin +Side Step+Sure Hands"},
+            // P321 (uživatel 23.11.: „zvyš TV goblinů, ať se schopnost vyzkouší“): Doom Diver 60 (Swoop, ř. 8826) a
+            //   'Ooligan 70 (Fan Favourite, ř. 8828-8830) místo dvou goblinů +SS+SF (2× 80) ⇒ TV 1490 − 160 + 130 = 1460.
+            //   Jedenáctka je teď celá ze specialistů (11 řádků po 1 kuse za výplní).
+            {{6, 2, 3, 7}, makeSkills({SkillName::RightStuff, SkillName::Stunty, SkillName::Swoop}), 1, "Doom Diver"},
+            {{6, 2, 3, 7}, makeSkills({SkillName::DisturbingPresence, SkillName::Dodge, SkillName::FanFavourite,
+                SkillName::RightStuff, SkillName::Stunty}), 1, "'Ooligan"},
             {{6, 2, 3, 7}, makeSkills({SkillName::Bombardier, SkillName::Dodge, SkillName::SecretWeapon, SkillName::Stunty,
                 SkillName::HailMaryPass}), 1, "Bomma +Hail Mary Pass"},
             {{6, 2, 3, 7}, makeSkills({SkillName::Chainsaw, SkillName::SecretWeapon, SkillName::Stunty}), 1, "Looney"},
@@ -952,7 +962,7 @@ const TeamRoster& getGoblinRoster1500() {
             {{4, 6, 1, 9}, makeSkills({SkillName::Loner, SkillName::Grab, SkillName::MightyBlow, SkillName::Regeneration,
                 SkillName::ThrowTeamMate}), 1, "Ripper Bolgrot (star)"},
         },
-        10, 60, true, /*rerolls=*/2, /*bribes=*/1
+        12, 60, true, /*rerolls=*/2, /*bribes=*/1
     };
     return roster;
 }

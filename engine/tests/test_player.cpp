@@ -24,11 +24,11 @@ TEST(SkillSet, AddHasRemove) {
 
 TEST(SkillSet, AllSkills) {
     SkillSet ss;
-    // Add all 74 skills
+    // Add all 78 skills (P321: +4)
     for (int i = 0; i < static_cast<int>(SkillName::SKILL_COUNT); ++i) {
         ss.add(static_cast<SkillName>(i));
     }
-    EXPECT_EQ(ss.count(), 74);
+    EXPECT_EQ(ss.count(), 78);
     EXPECT_TRUE(ss.has(SkillName::Block));
     EXPECT_TRUE(ss.has(SkillName::MultipleBlock));
 }

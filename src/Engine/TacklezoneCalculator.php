@@ -205,7 +205,10 @@ final class TacklezoneCalculator
         //   (7-AG)-1, engine daval (7-AG)-1+3-1.
         // OPRAVENO 9.11.2026 (T5.23, živé od goblinů TV1500; parita s C++) — chyběla výjimka r. 8538-8539:
         //   „Stunties that are armed with a Secret Weapon are not allowed to ignore enemy tackle zones“.
-        if ($player->hasSkill(SkillName::Stunty) && !$player->hasSkill(SkillName::SecretWeapon)) {
+        // P321 — Swoop (ř. 8561-8564): „When a player with both the Swoop and Stunty skills dodges, they do not ignore any
+        //   modifiers for enemy tackle zones on the square they are moving to“.
+        if ($player->hasSkill(SkillName::Stunty) && !$player->hasSkill(SkillName::SecretWeapon)
+            && !$player->hasSkill(SkillName::Swoop)) {
             $target -= $tzAtDest;
         }
 

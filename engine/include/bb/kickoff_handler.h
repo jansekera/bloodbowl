@@ -13,6 +13,9 @@ namespace bb {
 // dopad (odraz / chycení / touchback). Po výsledku Blitz! skončí s kopajícím týmem na tahu a míčem
 // ve vzduchu (`GameState::kickoffBallInAir`); dopad pak dodělá `resolveKickoffLanding`.
 void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events);
+// Jeden výsledek výkopové tabulky (ř. 1265-1356); true = Blitz!. Veřejné kvůli testům (P321 Fan Favourite).
+bool resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receiving, Position& landing,
+                         DiceRollerBase& dice, std::vector<GameEvent>* events);
 
 // P200 (1): pole, kam smí hráč s Kick-Off Return jít (až 3 kroky, jen vlastní polovina, volná pole,
 // z tacklezóny soupeře dál nejde; ř. 8249-8256), seřazená od nejlepšího pro AI (nejblíž míči,

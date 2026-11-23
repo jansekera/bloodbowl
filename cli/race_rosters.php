@@ -32,7 +32,7 @@ const RACE_ROSTERS = [
     ],
     'Skaven' => [
         ['Blitzer',       2, [7, 3, 3, 8], [SkillName::Block]],
-        ['Gutter Runner', 4, [9, 2, 4, 7], [SkillName::Dodge]],
+        ['Gutter Runner', 4, [9, 2, 4, 7], [SkillName::Dodge, SkillName::WeepingDagger]],  // P321: ř. 9039
         ['Thrower',       1, [7, 3, 3, 7], [SkillName::SureHands, SkillName::Pass]],  // P321: + Pass (ř. 9038)
         ['Lineman',       4, [7, 3, 3, 7], []],
     ],
@@ -69,7 +69,7 @@ const RACE_ROSTERS = [
         ['Lineman',   3, [6, 3, 4, 8], []],
     ],
     'Halfling' => [
-        ['Treeman',  2, [2, 6, 1, 10], [SkillName::StrongArm, SkillName::MightyBlow, SkillName::StandFirm, SkillName::ThickSkull, SkillName::TakeRoot, SkillName::ThrowTeamMate]],  // P321: bez Loner, + Strong Arm (ř. 8862-8864)
+        ['Treeman',  2, [2, 6, 1, 10], [SkillName::StrongArm, SkillName::MightyBlow, SkillName::StandFirm, SkillName::ThickSkull, SkillName::TakeRoot, SkillName::ThrowTeamMate, SkillName::Timmmber]],  // P321: bez Loner, + Strong Arm (ř. 8862-8864)
         ['Halfling', 9, [5, 2, 3, 6],  [SkillName::Dodge, SkillName::Stunty, SkillName::RightStuff]],  // P321: MA5 (ř. 8861)
     ],
     'Norse' => [
@@ -118,7 +118,10 @@ const RACE_ROSTERS = [
         ['Looney',     1, [6, 2, 3, 7], [SkillName::Chainsaw, SkillName::SecretWeapon, SkillName::Stunty]],
         ['Fanatic',    1, [3, 7, 3, 7], [SkillName::BallAndChain, SkillName::NoHands, SkillName::SecretWeapon, SkillName::Stunty]],
         ['Pogoer',     1, [7, 2, 3, 7], [SkillName::Dodge, SkillName::Leap, SkillName::VeryLongLegs, SkillName::Stunty]],
-        ['Goblin',     5, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty]],
+        // P321: Doom Diver (ř. 8826) a 'Ooligan (ř. 8828-8830) místo dvou goblinů
+        ['Doom Diver', 1, [6, 2, 3, 7], [SkillName::RightStuff, SkillName::Stunty, SkillName::Swoop]],
+        ["'Ooligan",   1, [6, 2, 3, 7], [SkillName::DisturbingPresence, SkillName::Dodge, SkillName::FanFavourite, SkillName::RightStuff, SkillName::Stunty]],
+        ['Goblin',     3, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty]],
     ],
     'Chaos Dwarf' => [
         ['Minotaur',      1, [5, 5, 2, 8], [SkillName::Loner, SkillName::Frenzy, SkillName::Horns, SkillName::MightyBlow, SkillName::ThickSkull, SkillName::WildAnimal]],

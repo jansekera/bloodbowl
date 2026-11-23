@@ -781,7 +781,9 @@ static double nextTurnMoveChance(const GameState& state, const Player& w) {
     if (w.hasSkill(SkillName::ReallyStupid)) c *= reallyStupidHasHelper(state, w) ? 5.0 / 6.0 : 0.5;  // ř. 8388-8396
     if (w.hasSkill(SkillName::WildAnimal)) c *= 0.5;                                                // pohyb 4+, ř. 8662-8669
     if (w.hasSkill(SkillName::TakeRoot) && !w.rooted) c *= 5.0 / 6.0;                               // 1 ⇒ MA 0, ř. 8572-8576
-    if (w.state == PlayerState::PRONE && !w.hasSkill(SkillName::JumpUp) && w.movementRemaining < 3) c *= 0.5;
+    if (w.state == PlayerState::PRONE && !w.hasSkill(SkillName::JumpUp) && w.movementRemaining < 3)
+        c *= (7.0 - standUpTarget(state, w)) / 6.0;   // P321: 4+ ⇒ 0,5; s Timmm-ber! víc
+
     return c;
 }
 
