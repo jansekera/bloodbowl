@@ -742,6 +742,23 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 
 # CO JE TEĎ PRVNÍ
 
+## ⭐ STAV PODLE SEKCÍ — přepsáno 23.11.2026 (po N3, ověřeno proti stavům položek v knize)
+
+**Pořadí od uživatele 23.11.:** *„po měření projdi knihu a přepiš sekce — pak bude mít nejvyšší prioritu dokončení oprav nálezů podle pravidel — pak se vrať k P149 — pohyb by měl být dokončený a odzkoušený před klecí — pak se vrať ke kleci“*.
+
+| pořadí | sekce | za námi | před námi |
+|---|---|---|---|
+| **1** | **Pravidla** | vše rozpracované do 20.11. (P86, P307–P309, P313, P317–P320 PHP, P163, P182/P186); P92 (TTM, vyřešeno P278); P89 C++ (`eedd266a`) | **P321** soupisky obou enginů · **P322** AI Wrestle útočník s Blockem × nosič bez Blocku · **P323** Juggernaut + Wrestle (podmínka k upřesnění) · **P310** Piling On jako volba (oba enginy + hráči ve zkušební sestavě) · **P312** otázky Wrestle a Side Step ve webu · **P315** Take Root × blitz z lehu do C++ · **P316** ostatní akce ležícímu (oba) · **P320 v C++** (B&C `chooseFace`) · parita: ocenění Both Down PHP 90 × C++ 8 · P89 PHP jen čteno ⇒ test do auditu parity |
+| **2** | **Pohyb** | **P149** body 1 (strop úhybu 4+ v BLITZ/REPOSITION/PICKUP, 10 testů `DodgeCap`) a 2 (cena turnoveru v hledání) hotové; **P159** odklad riskantních akcí — víkendové měření (`54fd3ed2`), přímý výpočet rizika `macroDirectRisk` **zapnutý pro všechny** (`220095ce`, krátké měření `725a37ec`); ⚠️ stavová buňka řádku P159 je zastaralá („víkendové měření ve frontě“) | **P157** známé meze stropu (hledání cesty o stropu neví, …) · **P94** Break Tackle v `riskWeightedDijkstra` na každý úhyb (nízký) ⇒ *pohyb dokončit a odzkoušet před klecí* |
+| **3** | **Klec** | jedna klec ve 3 fázích; P177 rezerva; P232 riziko vpřed; P233 zeď od kraje; **P325 = N3 ✅ 23.11.** (stání bez důvodu proti orkům 14 → 0) | **N1** uvolnit cestu, pak klec (zeď = kdo brání; mlácení zdi před klecí je jediné přípustné stání; k tomu 3 elfí stání „NOT_APPLICABLE“ z A/B P325) · **N2** cíl blitzu v útoku napřed podle klece · **N4** v tísni nosič u kraje se 2 rohy · **N5** zadní roh, ke kterému soupeř zezadu nedojde, pomáhá vpředu (každý zadní roh zvlášť; až po N1) · dál P154 (klec čistá na konci tahu 47 %), P143 (přední roh se stane zadním), P138 (doprovod v dosahu blitzu) |
+| 4 | **Blitz** | P249e/f blitz na nosiče; P250 zvedání a obestoupení míče; P86 blitz z lehu; P156 C++ (nabídka bez dosahu, PHP → P210); P220 C++ | **P219** přehodnotit (vysoká priorita z 20.10.) · **P155** odhad rizika blitzu oceňuje jinou cestu |
+| 5 | **Přihrávka a hand-off** | P89 C++ (vhození a chycení vlastním) | **P311** Dump-Off jako volba (oba enginy, za pass) |
+| 6 | **Celotah** | A18 sebrat míč soupeři (P245–P250); P159 odklad riskantních akcí (viz Pohyb) | **P151** zdržení TD do posledního kola (rozhodnuto — v celotahu A16) |
+
+⚠️ Pořadí 4–6 uživatel nestanovil — jen to, že před klecí je pravidla a pohyb.
+
+## Starší obsah oddílu (do 22.11.2026)
+
 ## ⏸ K DOŘEŠENÍ — ODLOŽENO (uživatel 21.11.2026: „všechny tři odrážky zapiš k dořešení — ale samotné řešení zatím odlož“)
 *Dnes jen dokončeno rozpracované z 20.11. (P86, P307–P309, P313, P317–P320, P163, P182/P186 — vše na main). Nic z níže uvedeného nespouštět bez pokynu.*
 | pořadí | položka | stav |
