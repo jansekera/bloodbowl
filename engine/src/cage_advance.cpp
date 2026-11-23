@@ -185,6 +185,35 @@ bool teamHasTimeSlack(const GameState& state, const Player& carrier, int* needOu
     return need <= turnsLeftIncl - 2;
 }
 
+int missingSquares(const GameState& state, const Player& carrier) {
+    int need = 0, pace = 0;
+    teamHasTimeSlack(state, carrier, &need, &pace);
+    const int ma = std::max(1, static_cast<int>(carrier.stats.movement));
+    const int rest = distToEndzone(carrier.position, carrier.teamSide) - (ma + 2);
+    const int turnsLeftIncl = std::clamp(9 - state.getTeamState(carrier.teamSide).turnNumber, 0, 8);
+    return std::max(0, rest - pace * std::max(0, turnsLeftIncl - 1));
+}
+
+bool tdStillReachable(const GameState& state, const Player& carrier) {
+    const TeamSide side = carrier.teamSide;
+    std::vector<int> mas;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        if (p.id != carrier.id && p.state == PlayerState::STANDING && CageAdvancePlanner::eligibleCornerPlayer(p))
+            mas.push_back(p.stats.movement);
+    });
+    std::sort(mas.begin(), mas.end());
+    const int ma = std::max(1, static_cast<int>(carrier.stats.movement));
+    const int mateMa = mas.empty() ? ma : mas[mas.size() / 2];
+    const int turnsLeftIncl = std::clamp(9 - state.getTeamState(side).turnNumber, 0, 8);
+    if (turnsLeftIncl <= 0) return false;
+    // nejvýš: klec tempem pohybu rohů po všechny tahy kromě posledního, v posledním doběh nosiče (MA + 2 GFI)
+    return distToEndzone(carrier.position, side) <= std::min(ma, mateMa) * (turnsLeftIncl - 1) + ma + 2;
+}
+
+double forwardRiskEdge(const GameState& state, const Player& carrier) {
+    return std::min(kForwardEdgeMax, kRiskEdgeNoSlack + kForwardEdgePerSquare * missingSquares(state, carrier));
+}
+
 int blitzReachOf(const Player& o) {
     if (o.state != PlayerState::STANDING && o.state != PlayerState::PRONE) return -1;
     int ma = o.stats.movement;
@@ -849,7 +878,13 @@ CageAdvancePlan CageAdvancePlanner::riskyForward(const GameState& state, CageAdv
     const bool dbg = getenv("BB_CAGE_DEBUG") != nullptr;
     const bool forward = plan.valid && plan.step >= 1 && progress(plan) >= 1;
     if (forward && plan.blitzThreat <= kSafeBlitzThreat) return plan;          // bezpečně vpřed
-    const double edge = riskEdge(state, carrier);
+    // N3 (uživatel 23.11.2026: „vpřed s rizikem se jde pouze, pokud je šance dát TD … nesmí nastat, že bychom řekli, že
+    //   už nestihneme dát TD v poločase, kdy máme celých 8 kol“): když TD v poločase stihnout nejde (např. soupeř skóroval
+    //   ve 4. kole a trpaslíci nevyrovnají), riziko se nepodstupuje — platí dosavadní bezpečný plán (P178/P187).
+    if (!tdStillReachable(state, carrier)) return plan;
+    // N3 (uživatel 23.11.2026: „1 ano, 2 odstupňovat podle chybějících polí“): hranice kroku vpřed už nezávisí na
+    //   časové rezervě (dřív s rezervou 0,15 ⇒ klec stála), je vždy aspoň 0,30 a v nouzi roste po polích, která chybějí.
+    const double edge = forwardRiskEdge(state, carrier);
     double stay = -1.0;                                                         // počítá se, až je potřeba
     auto stayNow = [&]() {
         if (stay < 0.0) stay = stayThreat(state, reservedPlayerIds, fillOut);
@@ -900,16 +935,24 @@ CageAdvancePlan CageAdvancePlanner::riskyForward(const GameState& state, CageAdv
             return plan;
         }
     }
-    // 3) krok vpřed nad hranicí i nad stáním se nehraje — klec stojí a dostaví se na místě
-    if (forward && plan.blitzThreat > std::max(edge, stayNow())) {
-        say("krok vpřed nad hranicí i nad stáním — klec stojí", plan);
-        CageAdvancePlan stand = plan;                    // diagnostika tempa zůstane (TurnPlanRecord)
-        stand.valid = false;
-        stand.verdict = CageAdvanceVerdict::NOT_APPLICABLE;
-        stand.macros.clear();
-        stand.step = 0;
-        stand.blitzThreat = stayNow();                   // hrozba toho, co se opravdu stane (stání)
-        return stand;                                    // build() dostaví klec na místě
+    // 3) N3 (uživatel 23.11.2026: „zůstat stát je vždy horší než podstoupit riziko a jít kupředu — stejně jako předtím
+    //    AI odmítala zvednout míč, protože je to riskantnější než nedělat nic a prohrát“). Dřív se krok vpřed nad hranicí
+    //    i nad stáním nehrál a klec stála (g0035: hrozba 0,50 proti hranici 0,30). Teď vpřed i nad hranicí — po pásmech
+    //    o 0,10 nahoru, aby se z kroků vpřed vzal ten v nejnižším pásmu hrozby (v pásmu nejdál). Stání s užitkem (tah na
+    //    mlácení zdi těsně před klecí — N1) řeší řadič mimo tento plán.
+    for (double lim = edge + 0.10; lim < 1.0 + 1e-9; lim += 0.10) {
+        if (forward && plan.blitzThreat <= lim) break;   // dosavadní krok vpřed je v tomto pásmu — stačí
+        CageAdvancePlan risky = pass(std::min(1.0, lim));
+        if (risky.valid && progress(risky) >= 1) {
+            risky.riskAccepted = true;
+            say("vpřed nad hranicí", risky);
+            return risky;
+        }
+    }
+    if (forward) {
+        plan.riskAccepted = true;
+        say("vpřed nad hranicí (dosavadní plán)", plan);
+        return plan;
     }
     say(plan.valid && plan.step >= 1 ? "vpřed nejde, dosavadní plán (stranou / vzad)" : "vpřed nejde, klec stojí", plan);
     return plan;
@@ -1223,8 +1266,9 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
             int need = 0, pace = 0;
             hasSlack = teamHasTimeSlack(state, carrier, &need, &pace);
             if (getenv("BB_CAGE_DEBUG")) {
-                fprintf(stderr, "[cage] časová rezerva: potřebuje %d tahů (tempo %d), zbývá %d => %s\n", need, pace,
-                        std::clamp(9 - state.getTeamState(mySide).turnNumber, 0, 8), hasSlack ? "bezpečně" : "co nejdál");
+                fprintf(stderr, "[cage] časová rezerva: potřebuje %d tahů (tempo %d), zbývá %d => %s; chybí %d polí, hranice vpřed %.2f\n",
+                        need, pace, std::clamp(9 - state.getTeamState(mySide).turnNumber, 0, 8), hasSlack ? "rezerva" : "bez rezervy",
+                        missingSquares(state, carrier), forwardRiskEdge(state, carrier));
             }
         }
         const size_t kScreenCap = 24;
@@ -1235,10 +1279,8 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         // Zkouška kandidátů z předvýběru: seřadit a první čtyři projít draze (cesty, pořadí, hrozba).
         auto tryRanked = [&]() {
             std::stable_sort(ranked.begin(), ranked.end(), [&](const Ranked& p, const Ranked& q) {
-                if (hasSlack) {
-                    const int bp = static_cast<int>(p.threat * 20.0 + 0.5), bq = static_cast<int>(q.threat * 20.0 + 0.5);
-                    if (bp != bq) return bp < bq;                      // s rezervou: napřed bezpečí
-                }
+                // N3 (uživatel 23.11.2026: „i když není nouze postupovat co nejvíce kupředu a bankovat“): dřív se s časovou
+                //   rezervou bralo napřed nejbezpečnější pole — klec pak šla po 1–2 polích. Teď vždy nejdál vpřed.
                 return p.c->progress > q.c->progress;                  // nejdál vpřed; při shodě pořadí výš
             });
             int n = 0;
@@ -1338,12 +1380,9 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         //   není, čekáním o míč přijde („pokud hrozí blitz na nosiče a ztráta — je lepší dát TD
         //   dříve“) ⇒ pokračuje se dosavadním postupem co nejdál. První verze stála i tehdy:
         //   skaven 60 → 47 TD, soupeř skóroval první 46 → 57 (160 poločasů).
-        if (hasSlack && bb::blitzThreat(state, carrier, kSafeThreat) <= kSafeThreat) {
-            if (getenv("BB_CAGE_DEBUG")) fprintf(stderr, "[cage] rezerva a nosič je v bezpečí — klec stojí\n");
-            CageAdvancePlan stand = plan;
-            stand.verdict = CageAdvanceVerdict::NOT_APPLICABLE;
-            return stand;
-        }
+        // N3 (uživatel 23.11.2026: „1 ano“ — rezerva nesmí dovolit stání): dřív zde s časovou rezervou a nosičem v bezpečí
+        //   klec stála („rezerva a nosič je v bezpečí — klec stojí“, 11 z 19 tahů rozboru M11). Teď plán pokračuje
+        //   a P232 (riskyForward) zkusí krok vpřed do hranice forwardRiskEdge.
     }
     for (auto& d : carrier.position.getAdjacent()) {
         if (!d.isOnPitch()) continue;

@@ -1854,7 +1854,11 @@ TEST(OneCageStall, TheStallingCarrierAlsoStandsWhenTheControllerIsAskedBeforeThe
         play(b.s, m);
         playAll(cc, b);
     }
-    EXPECT_EQ(b.s.getPlayer(1).position, (Position{22, 7})) << "nosič stojí";
+    // P217 „zdržování bankuje“ + N3 (23.11.2026): nosič smí v zdržovacím tahu popojít k zóně, ale TD nedá a zůstane
+    // v bezpečí (dřív se tu čekalo stání — klec s rezervou tehdy vpřed nešla).
+    EXPECT_EQ(b.s.homeTeam.score, 0) << "TD se zdržuje";
+    EXPECT_LT(b.s.getPlayer(1).position.x, 25) << "nosič před zónou";
+    EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "a v bezpečí";
 }
 
 // P176 — hodnota rizika (uživatel 08.10.2026: „když skaven upadne na GFI daleko ode všech soupeřů

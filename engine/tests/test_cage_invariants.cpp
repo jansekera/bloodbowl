@@ -107,11 +107,19 @@ std::string invariantViolation(const GameState& s, TeamSide side, int scoreBefor
 }
 
 // Odehraje tah řadičem a vrátí porušení invariantu ("" = platí).
+// N3 (uživatel 23.11.2026: „dřívější premisa byla založena na tom, že už nejde dát TD — ta zůstává … vpřed s rizikem
+//   se jde pouze, pokud je šance dát TD“): dokud TD v poločase stihnout jde (tdStillReachable před tahem), invariant
+//   „ani-ani“ neplatí — místo něj nosič NESMÍ ZŮSTAT STÁT V RÁNĚ: padlo TD, nebo šel vpřed, nebo je po tahu v bezpečí.
 std::string playTurnAndCheck(Board b, std::vector<Macro>* ms = nullptr) {
     const int before = b.s.homeTeam.score;
+    const bool reachable = b.s.ball.isHeld && tdStillReachable(b.s, b.s.getPlayer(b.s.ball.carrierId));
+    const int x0 = b.s.ball.isHeld ? b.s.getPlayer(b.s.ball.carrierId).position.x : -1;
     CageController cc(nullptr, cfg(), 1);
     playAll(cc, b, ms);
-    return invariantViolation(b.s, TeamSide::HOME, before);
+    const std::string v = invariantViolation(b.s, TeamSide::HOME, before);
+    if (v.empty() || !reachable || !b.s.ball.isHeld) return v;
+    if (b.s.getPlayer(b.s.ball.carrierId).position.x > x0) return "";   // vpřed s rizikem, TD je stihnutelné
+    return "stojí v ráně, ač TD stihnout jde: " + v;
 }
 
 // Čtyři rohy kolem (x, 7) s pohybem `ma`.
@@ -299,6 +307,29 @@ TEST(CageInvariant, CarrierNearTheSidelineOneCornerOpponentNear) {
     b.put(13, TeamSide::AWAY, {17, 4}, 6, 4);
     b.s.ball = BallState::carried({12, 2}, 1);
     EXPECT_EQ(playTurnAndCheck(b), "");
+}
+
+// N3 (uživatel 23.11.2026): když TD v poločase stihnout nejde, platí dosavadní ochrana (P178/P187) — riziko vpřed se
+// nepodstupuje. Táž deska jako NoCageSlowTeamOpponentNear, ale v 7. kole: 2 tahy na 16 polí s pohybem 4 nestačí.
+TEST(CageInvariant, WithNoTimeLeftForATouchdownTheCarrierIsCagedOrSafe) {
+    Board b(7);
+    b.put(1, TeamSide::HOME, {9, 7}, 4);
+    b.put(2, TeamSide::HOME, {6, 4}, 4);
+    b.put(3, TeamSide::HOME, {6, 10}, 4);
+    b.put(4, TeamSide::HOME, {4, 6}, 4);
+    b.put(5, TeamSide::HOME, {4, 8}, 4);
+    b.put(13, TeamSide::AWAY, {16, 7}, 6);
+    b.s.ball = BallState::carried({9, 7}, 1);
+    ASSERT_FALSE(tdStillReachable(b.s, b.s.getPlayer(1))) << "předpoklad: TD se nestihne";
+    EXPECT_EQ(playTurnAndCheck(b), "");
+}
+
+// N3: s celými 8 koly je TD stihnutelné vždy (uživatel: „nesmí nastat, že bychom řekli, že už nestihneme“).
+TEST(CageInvariant, WithAWholeHalfLeftATouchdownIsAlwaysReachable) {
+    Board b(1);
+    b.put(1, TeamSide::HOME, {1, 7}, 4);
+    b.s.ball = BallState::carried({1, 7}, 1);
+    EXPECT_TRUE(tdStillReachable(b.s, b.s.getPlayer(1)));
 }
 
 // Pozitivní kontrola: kontrola invariantu UMÍ SPADNOUT. Deska ručně v prostřed „ani-ani“ (bez
@@ -558,30 +589,18 @@ Board standBoard(int wallX, int8_t oppSt) {
 }
 }  // namespace
 
-// P177: „dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál“. Zeď soupeřů na x = 11 vpřed
-// nepustí (každé pole vpřed leží v jejich zóně), nosič je tam, kde stojí, v bezpečí ⇒ klec stojí:
-// nosič se nehne a chybějící roh se dostaví.
-// P228 (27.10.2026): zeď stála na x = 10, přímo u předních rohů (9,6)/(9,8) — ty pak stály v zóně
-// soupeřů, hrozba přes špinavé rohy je 0,33 a předpoklad „nosič je v bezpečí“ přestal platit. Na
-// x = 11 jsou rohy čisté a pole vpřed pořád v zóně zdi (vpřed by rohy stály špinavé — i to hlídá
-// předpoklad níž; bez P228 by plán bezpečné pole vpřed našel). Bez P177 (maska 16384) test padá.
-TEST(CageStands, WithTimeToSpareAndNoSafeSquareAheadTheCarrierStaysAndTheCornerComes) {
+// N3 (uživatel 23.11.2026: „rezerva nesmí dovolit stání“; „zůstat stát je vždy horší než podstoupit riziko a jít
+// kupředu“). Dřív (P177) tu klec s časovou rezervou stála, když bezpečné pole vpřed nebylo. Zeď soupeřů na x = 11
+// bezpečný krok vpřed nepustí, nosič je tam, kde stojí, v bezpečí, tým má rezervu ⇒ klec přesto jde vpřed.
+TEST(CageStands, WithTimeToSpareAndNoSafeSquareAheadTheCageStillStepsForward) {
     Board b = standBoard(11, 3);
-
     b.s.getPlayer(3).position = {6, 9};                     // jeden roh vzadu
     ASSERT_TRUE(teamHasTimeSlack(b.s, b.s.getPlayer(1))) << "předpoklad: tým má rezervu";
     ASSERT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "předpoklad: nosič je v bezpečí tam, kde stojí";
-    ASSERT_EQ(standingCorners(b.s, b.s.getPlayer(1)), 3);
-    {   // předpoklad (review 27.10., nález 6): bezpečné pole vpřed není — plán klece nosičem dopředu nehne
-        CageAdvancePlanner planner(nullptr, cfg(), 1);
-        ASSERT_LE(planner.buildImpl(b.s, {}, false).step, 0) << "předpoklad: bezpečné pole vpřed není";
-    }
     CageController cc(nullptr, cfg(), 1);
-    std::vector<Macro> ms;
-    playAll(cc, b, &ms);
-    EXPECT_EQ(b.s.getPlayer(1).position, (Position{8, 7})) << "nosič se nehnul";
-    EXPECT_EQ(standingCorners(b.s, b.s.getPlayer(1)), 4) << "rohy se dostavěly";
-    for (const Macro& m : ms) EXPECT_NE(m.playerId, 1) << "nosič nedostal žádné makro";
+    playAll(cc, b);
+    EXPECT_GT(b.s.getPlayer(1).position.x, 8) << "klec nestojí, jde vpřed i s rizikem";
+    EXPECT_GT(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "předpoklad: bezpečně vpřed nešlo (krok s rizikem)";
 }
 
 // P228 (review 27.10.2026, nález 6): táž klec u zdi na x = 10 — přední rohy (9,6)/(9,8) stojí v zóně
@@ -624,7 +643,9 @@ TEST(CageStands, ACarrierInReachOfAGoodHitDoesNotStand) {
     // Od P187 (09.10.2026) smí klec před dobrou ranou i ustoupit ke spoluhráčům; požadavek je, že
     // nosič NEZŮSTANE STÁT v dosahu dobré rány — pohne se a po tahu je v bezpečí.
     EXPECT_NE(b.s.getPlayer(1).position, (Position{8, 7})) << "klec nestála";
-    EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "a nosič po tahu není vystaven dobré ráně";
+    // N3 (uživatel 23.11.2026): TD je stihnutelné ⇒ místo ústupu do bezpečí smí klec jít vpřed s rizikem.
+    EXPECT_TRUE(blitzThreat(b.s, b.s.getPlayer(1)) <= kSafeBlitzThreat || b.s.getPlayer(1).position.x > 8)
+        << "po tahu v bezpečí, nebo vpřed";
 }
 
 // --- Zdržování TD přes dva tahy na témže řadiči (P175) ------------------------------------------------
@@ -762,52 +783,47 @@ TEST(RiskyForward, TheEdgeFollowsTheTimeSlack) {
     EXPECT_DOUBLE_EQ(riskEdge(near.s, near.s.getPlayer(1)), kSafeBlitzThreat);
 }
 
-// Pozice vybrané sondou 28.10. tak, aby pokryly všechny větve; každá větev má pozitivní kontrolu (počet ≥ 1), takže
-// když se pozice změnou enginu rozpadnou, test spadne, místo aby tiše prošel.
-TEST(RiskyForward, ForwardUpToTheEdgeNeverAboveIt_NotWorseThanStandingOnlyWithoutASaferOption) {
-    int riskyForward = 0, cappedOldStep = 0, saferOptionKept = 0, slackBoards = 0, notWorseThanStanding = 0;
-    // pomalý tým (pohyb 4): bez rezervy; rychlý (pohyb 7): s rezervou — tam smí vpřed jen do bezpečí;
-    // „kolem“ = soupeři i vedle a za klecí (jinak je vždy bezpečný krok stranou a „není horší než stát“ nenastane)
+// N3 (uživatel 23.11.2026: „odstupňovat podle chybějících polí“): hranice kroku klece vpřed nezávisí na rezervě — je
+// 0,30, když se TD tempem klece stihne, a roste o 0,10 za každé chybějící pole (nejvýš 0,70).
+TEST(RiskyForward, TheForwardEdgeGrowsWithTheMissingSquares) {
+    Board near = riskBoard(1, 16);
+    EXPECT_EQ(missingSquares(near.s, near.s.getPlayer(1)), 0);
+    EXPECT_DOUBLE_EQ(forwardRiskEdge(near.s, near.s.getPlayer(1)), kRiskEdgeNoSlack) << "s rezervou taky 0,30, ne 0,15";
+    Board late(6);                                   // 6. kolo, nosič (pohyb 4) 15 polí před zónou: 3 tahy, tempo 2
+    late.put(1, TeamSide::HOME, {10, 7}, 4);
+    cageAround(late, 10, 4);
+    late.s.ball = BallState::carried({10, 7}, 1);
+    const int m = missingSquares(late.s, late.s.getPlayer(1));
+    ASSERT_GT(m, 0) << "předpoklad: nouze";
+    EXPECT_NEAR(forwardRiskEdge(late.s, late.s.getPlayer(1)), std::min(kForwardEdgeMax, kRiskEdgeNoSlack + 0.10 * m), 1e-9);
+}
+
+// N3 (uživatel 23.11.2026: „zůstat stát je vždy horší než podstoupit riziko a jít kupředu“). Na pozicích ze sondy 28.10.
+// (2. kolo — TD je stihnutelné): kde šel dřívější plán bez P232 vpřed, jde vpřed i teď; vpřed do hranice
+// forwardRiskEdge má přednost; nad hranicí se bere krok z nejnižšího pásma hrozby — nikdy horší než dřívější krok
+// „co nejdál bez hodu“. Pozitivní kontroly: obě větve (do hranice, nad ní) nastanou.
+TEST(RiskyForward, AlwaysForwardUpToTheEdgeFirst_AboveItInTheLowestBand) {
+    int withinEdge = 0, aboveEdge = 0;
     struct Pos { unsigned seed; int8_t ma; bool around; };
     for (const Pos& q : std::vector<Pos>{{0, 4, false}, {5, 4, false}, {9, 4, false}, {14, 4, false}, {33, 4, false},
                                          {36, 4, false}, {43, 4, false}, {73, 4, false}, {79, 4, false}, {0, 7, false},
                                          {1, 7, false}, {2, 7, false}, {36, 4, true}, {56, 4, true}, {3, 4, true}}) {
-        const unsigned seed = q.seed;
-        const int8_t ma = q.ma;
-        Board b = riskBoard(seed, 8, ma, q.around);
+        Board b = riskBoard(q.seed, 8, q.ma, q.around);
         const Player& c = b.s.getPlayer(1);
-        const double edge = riskEdge(b.s, c);
-        if (edge == kSafeBlitzThreat) ++slackBoards;
-        CageAdvancePlanner planner(nullptr, cfg(), 1);
-        const CageAdvancePlan fill = planner.buildFillOnly(b.s, {});
-        const double stay = fill.valid ? fill.blitzThreat : blitzThreat(b.s, c);
+        ASSERT_TRUE(tdStillReachable(b.s, c));
+        const double edge = forwardRiskEdge(b.s, c);
         const RiskOutcome now = planOutcome(b.s, 0), old = planOutcome(b.s, kP232RiskyForward);
-        const bool oldAltWithinEdge = old.moves && old.threat <= edge;
-        SCOPED_TRACE("seed " + std::to_string(seed) + " pohyb " + std::to_string(ma) + (q.around ? " kolem" : "") + ": vpřed o " + std::to_string(now.progress) +
-                     " hrozba " + std::to_string(now.threat) + ", dřív o " + std::to_string(old.progress) + " hrozba " +
-                     std::to_string(old.threat) + ", stát " + std::to_string(stay) + ", hranice " + std::to_string(edge));
-        if (now.moves && now.progress >= 1 && now.threat > edge) {
-            // nad hranicí jen „není horší než stát“ a jen když jiné pole do hranice není
-            EXPECT_LE(now.threat, stay + 1e-9);
-            EXPECT_FALSE(oldAltWithinEdge);
-            ++notWorseThanStanding;
+        SCOPED_TRACE("seed " + std::to_string(q.seed) + " pohyb " + std::to_string(q.ma) + (q.around ? " kolem" : "") +
+                     ": vpřed o " + std::to_string(now.progress) + " hrozba " + std::to_string(now.threat) + ", dřív o " +
+                     std::to_string(old.progress) + " hrozba " + std::to_string(old.threat) + ", hranice " + std::to_string(edge));
+        if (old.moves && old.progress >= 1) {
+            EXPECT_TRUE(now.moves && now.progress >= 1) << "klec nestojí, když vpřed jde";
+            EXPECT_LE(now.threat, std::max(edge, old.threat) + 1e-9) << "nad hranicí ne hůř než dřívější krok";
         }
-        if (now.moves && now.progress >= 1 && now.threat > kSafeBlitzThreat && now.threat <= edge) ++riskyForward;
-        if (old.moves && old.progress >= 1 && old.threat > std::max(edge, stay)) {
-            ++cappedOldStep;
-            // klec stojí a dostaví se (krok 0), nebo vpřed do hranice / ne hůř než stát
-            EXPECT_TRUE(!now.moves || (now.progress >= 1 && now.threat <= std::max(edge, stay) + 1e-9)) << "krok nad hranicí i nad stáním";
-        }
-        if (stay > edge && old.moves && old.progress <= 0 && old.threat <= kSafeBlitzThreat) {
-            ++saferOptionKept;
-            EXPECT_TRUE(now.moves && now.threat <= edge) << "bezpečný krok stranou má přednost před „není horší než stát“";
-        }
+        if (now.moves && now.progress >= 1) (now.threat <= edge ? withinEdge : aboveEdge)++;
     }
-    EXPECT_GT(riskyForward, 0) << "vpřed i přes riziko (do hranice)";
-    EXPECT_GT(cappedOldStep, 0) << "starý krok nad hranicí i nad stáním";
-    EXPECT_GT(saferOptionKept, 0) << "stát nad hranicí a bezpečný krok stranou";
-    EXPECT_GT(slackBoards, 0) << "pozice s časovou rezervou";
-    EXPECT_GT(notWorseThanStanding, 0) << "vpřed nad hranicí, protože není horší než stát a jiné pole do hranice není";
+    EXPECT_GT(withinEdge, 0) << "vpřed do hranice";
+    EXPECT_GT(aboveEdge, 0) << "vpřed nad hranicí (dřív by klec stála)";
 }
 
 // Ručně postavené pozice se známým výsledkem, odehrané celým řadičem klece (review P232: řadič nesmí přijatý krok
@@ -839,9 +855,11 @@ TEST(RiskyForward, NoSlackTheCageStepsForwardDespiteRisk) {
     EXPECT_LE(t, kRiskEdgeNoSlack);
 }
 
-// Krok vpřed by měl hrozbu 0,49 (nad hranicí i nad stáním 0,02) ⇒ klec stojí. Bez P232 tam šla.
-TEST(RiskyForward, AStepAboveTheEdgeAndAboveStandingIsNotPlayed) {
-    for (unsigned off : {0u, static_cast<unsigned>(kP232RiskyForward)}) {
+// N3 (uživatel 23.11.2026): krok vpřed s hrozbou 0,49 (nad hranicí i nad stáním 0,02) se dřív nehrál a klec stála.
+// Teď jde klec vpřed — a ne do vyšší hrozby, než měl krok „co nejdál bez hodu“ (bez P232).
+TEST(RiskyForward, AStepAboveTheEdgeAndAboveStandingIsPlayedInTheLowestBand) {
+    double offThreat = -1.0;
+    for (unsigned off : {static_cast<unsigned>(kP232RiskyForward), 0u}) {
         setExtraFeaturesOff(off);
         Board b = wallAhead(8, 11, 4, 3);
         CageController cc(nullptr, cfg(), 1);
@@ -849,21 +867,23 @@ TEST(RiskyForward, AStepAboveTheEdgeAndAboveStandingIsNotPlayed) {
         setExtraFeaturesOff(0);
         const Player& c = b.s.getPlayer(1);
         if (off) {
-            EXPECT_GT(blitzThreat(b.s, c), kRiskEdgeNoSlack) << "pozitivní kontrola: bez P232 krok do rány";
+            offThreat = blitzThreat(b.s, c);
+            EXPECT_GT(offThreat, kRiskEdgeNoSlack) << "pozitivní kontrola: krok co nejdál je do rány";
         } else {
-            EXPECT_EQ(c.position, (Position{8, 7})) << "klec stojí";
-            EXPECT_LE(blitzThreat(b.s, c), kSafeBlitzThreat);
+            EXPECT_GT(c.position.x, 8) << "klec nestojí";
+            EXPECT_LE(blitzThreat(b.s, c), offThreat + 1e-9);
         }
     }
 }
 
-// Táž zeď, ale tým má časovou rezervu (nosič blíž zóně) ⇒ hranice 0,15: vpřed jen do bezpečí.
-TEST(RiskyForward, WithTimeSlackOnlyASafeStep) {
+// Táž zeď, tým s časovou rezervou (nosič blíž zóně): dřív hranice 0,15 a vpřed jen do bezpečí; teď (N3) jde klec
+// vpřed i s rizikem — rezerva už krok vpřed nebrzdí.
+TEST(RiskyForward, WithTimeSlackTheCageStillStepsForward) {
     Board b = wallAhead(16, 19, 3, 3);
-    ASSERT_EQ(riskEdge(b.s, b.s.getPlayer(1)), kSafeBlitzThreat);
+    ASSERT_TRUE(teamHasTimeSlack(b.s, b.s.getPlayer(1)));
     CageController cc(nullptr, cfg(), 1);
     playAll(cc, b);
-    EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat);
+    EXPECT_GT(b.s.getPlayer(1).position.x, 16) << "vpřed";
 }
 // P232 + sonda 28.10.: plán klece přijal krok vpřed s hrozbou 0,24, ale zaostalec pak odešel soupeři z cesty
 // k nosiči a po tahu byla hrozba 0,55. Hrozba, se kterou se tah rozhodl, musí platit i po tahu — zaostalec ani
@@ -949,16 +969,17 @@ TEST(RiskyForward, TheMoveFilterDropsOnlyThreatRaisingMovesAndBlockedBackups) {
     }
 }
 
-// Krok vpřed nad hranicí i nad stáním se zahodí: plán „klec stojí“ nese hrozbu toho, co se stane — stání (review 2).
-TEST(RiskyForward, TheStandPlanCarriesTheStandingThreat) {
+// N3: krok vpřed nad hranicí i nad stáním se dřív zahodil (plán „klec stojí“). Teď riskyForward vrátí krok vpřed
+// z nejnižšího pásma hrozby — ne horší než původní krok.
+TEST(RiskyForward, AStepAboveTheEdgeIsReplacedByTheLowestBandStep) {
     Board b = wallAhead(8, 11, 4, 3);
     CageAdvancePlanner planner(nullptr, cfg(), 1);
     const CageAdvancePlan old = planner.buildImpl(b.s, {});
     ASSERT_TRUE(old.valid && old.step >= 1);
     ASSERT_GT(old.blitzThreat, kRiskEdgeNoSlack) << "předpoklad: starý krok nad hranicí";
     const CageAdvancePlan r = planner.riskyForward(b.s, old, {}, false);
-    EXPECT_FALSE(r.valid);
-    EXPECT_DOUBLE_EQ(r.blitzThreat, planner.stayThreat(b.s, {}));
+    EXPECT_TRUE(r.valid && r.step >= 1) << "vpřed";
+    EXPECT_LE(r.blitzThreat, old.blitzThreat + 1e-9);
 }
 
 // Ani Wild Animal zaostalec před koncem tahu nezvedne hrozbu na nosiče (review 2 P232). Pozice ze sondy 28.10.:

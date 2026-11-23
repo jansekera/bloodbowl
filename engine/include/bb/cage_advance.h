@@ -270,6 +270,16 @@ constexpr double kSafeBlitzThreat = 0.15;
 //   Čísla zpřesní kalibrace evidence/p230_20261027 (skutečná ztráta míče podle hrozby).
 constexpr double kRiskEdgeNoSlack = 0.30;
 double riskEdge(const GameState& state, const Player& carrier);
+// N3 (uživatel 23.11.2026): kolik polí chybí do zóny, když klec půjde tempem teamHasTimeSlack po zbylé tahy (bez
+//   posledního na doběh nosiče MA + 2). 0 = stihne se. Hranice kroku klece vpřed (P232) roste o kForwardEdgePerSquare
+//   za každé chybějící pole od kRiskEdgeNoSlack do kForwardEdgeMax — „odstupňovat podle chybějících polí“.
+int missingSquares(const GameState& state, const Player& carrier);
+constexpr double kForwardEdgePerSquare = 0.10;
+constexpr double kForwardEdgeMax = 0.70;
+double forwardRiskEdge(const GameState& state, const Player& carrier);
+// N3 (uživatel 23.11.2026): stihne se v poločase ještě TD? Optimisticky — klec tempem pohybu rohů (ne poloviny) po
+//   zbylé tahy, poslední tah doběh nosiče MA + 2. S celými 8 koly vždy ano. Jen když ne, platí ochrana P178/P187.
+bool tdStillReachable(const GameState& state, const Player& carrier);
 // Kolik polí pohybu má soupeř na cestu k ráně na nosiče (pohyb + 2 GFI − 1 pole za ránu; ležící
 // vstává za 3 pole, s pohybem pod 3 bez Jump Up se nepočítá) — nebo −1, když hrát nemůže.
 int blitzReachOf(const Player& opp);
