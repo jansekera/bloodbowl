@@ -96,7 +96,8 @@ long takePushGeometryFastMAPicksInSearch() {
 
 BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
                                  bool attackerChooses,
-                                 const Player& att, const Player& def, bool isBlitz) {
+                                 const Player& att, const Player& def, bool isBlitz,
+                                 const GameState* st) {
     bool attBlock = att.hasSkill(SkillName::Block);
     bool defBlock = def.hasSkill(SkillName::Block);
     bool defDodge = def.hasSkill(SkillName::Dodge);
@@ -110,7 +111,7 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
     //   Juggernautu — proti obránci s Wrestle jako „oba na zemi“, i když ho Juggernaut v blitzu ruší (ř. 8192-8194).
     bool defWrestle = defenderWouldWrestle(att, def, isBlitz);
     auto score = [&](BlockDiceFace f) {
-        return scoreFace(aiJuggernautFace(f, att, def, isBlitz), attBlock, defBlock, defDodge, attTackle,
+        return scoreFace(aiJuggernautFace(f, att, def, isBlitz, st), attBlock, defBlock, defDodge, attTackle,
                          attWrestle, defWrestle);
     };
 
@@ -133,10 +134,29 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
 // a 'Both Down' result as if a 'Pushed' result has been rolled instead." OPRAVENO 20.11. — dřív převod vždy (4 místa
 // v resolveBlock a blockFaceDownsOrStrips), po volbě kostky koučem obránce vůbec. Volba AI: s Blockem proti obránci
 // bez Blocku Both Down srazí jen obránce (Wrestle obránce je zrušen) ⇒ nechat; jinak převést.
-BlockDiceFace aiJuggernautFace(BlockDiceFace face, const Player& att, const Player& def, bool isBlitz) {
+// P323 (uživatel 23.11.2026: „sedí, neber v úvahu kdo vstane dříve“): útočník s Wrestle, kterému by Both Down sám
+// nic nedal (nemá Block, nebo má obránce Block), volí mezi Pushed (Juggernaut) a Wrestle (oba leží, bez brnění):
+//   1) odtlačení by obránce poslalo do davu (surf) ⇒ Pushed;  2) obránce nese míč ⇒ Wrestle (míč padá);
+//   3) jinak Wrestle, jen když je obránce rychlejší (vyšší MA) než útočník; jinak Pushed (útočník stojí).
+// Útočník s míčem vždy Pushed (položený nosič = turnover). Bez stavu hry (`st` == nullptr) se surf a míč nepočítají.
+static bool juggernautWrestleKeepsBothDown(const GameState* st, const Player& att, const Player& def) {
+    if (st) {
+        if (st->ball.isHeld && st->ball.carrierId == att.id) return false;
+        // přehrání odtlačení se nesmí ptát kouče (previewPushBack) ⇒ v režimu kouče-člověka bez kontroly surfu
+        bool surf = false;
+        if (!coachModeOn()) previewPushBack(*st, att.id, def.id, att.position, /*isBlitz=*/true, surf);
+        if (surf) return false;
+        if (st->ball.isHeld && st->ball.carrierId == def.id) return true;
+    }
+    return def.stats.movement > att.stats.movement;
+}
+
+BlockDiceFace aiJuggernautFace(BlockDiceFace face, const Player& att, const Player& def, bool isBlitz,
+                               const GameState* st) {
     if (face != BlockDiceFace::BOTH_DOWN || !isBlitz || !att.hasSkill(SkillName::Juggernaut)) return face;
-    const bool keep = att.hasSkill(SkillName::Block) && !def.hasSkill(SkillName::Block);
-    return keep ? BlockDiceFace::BOTH_DOWN : BlockDiceFace::PUSHED;
+    if (att.hasSkill(SkillName::Block) && !def.hasSkill(SkillName::Block)) return BlockDiceFace::BOTH_DOWN;
+    if (att.hasSkill(SkillName::Wrestle) && juggernautWrestleKeepsBothDown(st, att, def)) return BlockDiceFace::BOTH_DOWN;
+    return BlockDiceFace::PUSHED;
 }
 
 thread_local JuggernautBothDowns g_juggernautBothDowns;
@@ -148,12 +168,13 @@ JuggernautBothDowns takeJuggernautBothDowns() {
 
 // Útočník: bez Blocku ho Both Down složí tak jako tak, takže Wrestle je lepší vždy (složí i soupeře a nikdo nehází
 // na zbroj). S Blockem by zůstal stát, takže Wrestle stojí za to jen když je co získat: soupeř má Block (jinak by
-// se NESTALO NIC), nebo drží míč.
+// se NESTALO NIC). OPRAVENO 23.11.2026 (P322, uživatel 21.11. „ano oprav“) — dřív i proti NOSIČI bez Blocku; jenže
+// běžný Both Down nosiče bez Blocku srazí (míč padá, hod na brnění) a útočník s Blockem stojí, kdežto Wrestle položí
+// oba bez brnění ⇒ horší. Na nosiče s Blockem Wrestle dál ano (bez něj by se nestalo nic). PHP BlockHandler::wrestleUsed.
 bool attackerWouldWrestle(const GameState& state, const Player& att, const Player& def) {
     const bool attHasBall = state.ball.isHeld && state.ball.carrierId == att.id;
-    const bool defHasBall = state.ball.isHeld && state.ball.carrierId == def.id;
     return att.hasSkill(SkillName::Wrestle) &&
-           (!att.hasSkill(SkillName::Block) || (!attHasBall && (def.hasSkill(SkillName::Block) || defHasBall)));
+           (!att.hasSkill(SkillName::Block) || (!attHasBall && def.hasSkill(SkillName::Block)));
 }
 
 // Obránce (ROZHODL UŽIVATEL 16.10.2026, audit parity 08.10. bod (a)): „pokud má obránce wrestle a útočník block —
@@ -171,7 +192,7 @@ bool blockFaceDownsOrStrips(const GameState& state, BlockDiceFace face, const Pl
                             bool isBlitz) {
     const bool carrier = state.ball.isHeld && state.ball.carrierId == def.id;
     const bool strip = carrier && att.hasSkill(SkillName::StripBall) && !def.hasSkill(SkillName::SureHands);
-    switch (aiJuggernautFace(face, att, def, isBlitz)) {
+    switch (aiJuggernautFace(face, att, def, isBlitz, &state)) {
         case BlockDiceFace::DEFENDER_DOWN: return true;
         case BlockDiceFace::DEFENDER_STUMBLES:
             return strip || !(def.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle));
@@ -185,8 +206,9 @@ bool blockFaceDownsOrStrips(const GameState& state, BlockDiceFace face, const Pl
 }
 
 // `face` jak ji AI vyhodnotí (P309: Both Down s Juggernautem v blitzu podle aiJuggernautFace).
-static bool shouldRerollBlock(BlockDiceFace face, const Player& att, const Player& def, bool isBlitz) {
-    face = aiJuggernautFace(face, att, def, isBlitz);
+static bool shouldRerollBlock(const GameState& state, BlockDiceFace face, const Player& att, const Player& def,
+                              bool isBlitz) {
+    face = aiJuggernautFace(face, att, def, isBlitz, &state);
     if (face == BlockDiceFace::ATTACKER_DOWN) return true;
     if (face == BlockDiceFace::BOTH_DOWN && !att.hasSkill(SkillName::Block)) return true;
     return false;
@@ -1240,7 +1262,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
     // Choose best die (Juggernaut se rozhoduje až nad zvolenou kostkou, níž — P309)
     BlockDiceFace chosen = autoChooseBlockDie(faces, diceInfo.count,
-                                               diceInfo.attackerChooses, att, def, params.isBlitz);
+                                               diceInfo.attackerChooses, att, def, params.isBlitz, &state);
 
     // P130: v živé partii se kouč útočníka ptá PO KAŽDÉM hodu kostek, ještě
     // před výběrem kostky a před push/follow -- co je u bloku "neúspěch", ví
@@ -1261,7 +1283,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             emitEvent(events, {GameEvent::Type::REROLL, att.id, def.id, {}, {}, 0,
                               true, before, packFaces()});
         }
-        chosen = autoChooseBlockDie(faces, diceInfo.count, diceInfo.attackerChooses, att, def, params.isBlitz);
+        chosen = autoChooseBlockDie(faces, diceInfo.count, diceInfo.attackerChooses, att, def, params.isBlitz, &state);
         // Výběr kostky: kouč vidí hozené kostky a vybere (jen když vybírá útočník
         // a je z čeho). Starší příkaz `kostka` (g_manualFace) má přednost.
         bool differ = false;
@@ -1279,9 +1301,9 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     const bool onOppCarrier = extraFeatureOn(kP249cCarrierReroll) && def.teamSide != att.teamSide &&
                               state.ball.isHeld && state.ball.carrierId == def.id;
     auto wantsReroll = [&](BlockDiceFace f) {
-        return shouldRerollBlock(f, att, def, params.isBlitz) || (onOppCarrier && !blockFaceDownsOrStrips(state, f, att, def, params.isBlitz));
+        return shouldRerollBlock(state, f, att, def, params.isBlitz) || (onOppCarrier && !blockFaceDownsOrStrips(state, f, att, def, params.isBlitz));
     };
-    if (!coachAttacker && onOppCarrier && !shouldRerollBlock(chosen, att, def, params.isBlitz) && wantsReroll(chosen))
+    if (!coachAttacker && onOppCarrier && !shouldRerollBlock(state, chosen, att, def, params.isBlitz) && wantsReroll(chosen))
         noteP249Extra(1);
     if (!coachAttacker && wantsReroll(chosen)) {
         bool rerolled = false;
@@ -1312,7 +1334,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             if (proRoll >= 4) {
                 for (int i = 0; i < diceInfo.count; i++) faces[i] = dice.rollBlockDie();
                 chosen = autoChooseBlockDie(faces, diceInfo.count,
-                                             diceInfo.attackerChooses, att, def, params.isBlitz);
+                                             diceInfo.attackerChooses, att, def, params.isBlitz, &state);
                 rerolled = true;
             }
         }
@@ -1327,7 +1349,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 if (lonerAllowsTeamReroll(att, dice, events)) {
                     for (int i = 0; i < diceInfo.count; i++) faces[i] = dice.rollBlockDie();
                     chosen = autoChooseBlockDie(faces, diceInfo.count,
-                                                 diceInfo.attackerChooses, att, def, params.isBlitz);
+                                                 diceInfo.attackerChooses, att, def, params.isBlitz, &state);
                 }
             }
         }
@@ -1358,7 +1380,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     if (chosen == BlockDiceFace::BOTH_DOWN && params.isBlitz && att.hasSkill(SkillName::Juggernaut)) {
         const bool push = coachAttacker
                               ? askCoach(CoachQuestion::USE_JUGGERNAUT, att.id, def.id, 0, 0, 3) == CoachAnswer::TEAM
-                              : aiJuggernautFace(chosen, att, def, true) == BlockDiceFace::PUSHED;
+                              : aiJuggernautFace(chosen, att, def, true, &state) == BlockDiceFace::PUSHED;
         ++g_juggernautBothDowns.total;
         if (push) {
             chosen = BlockDiceFace::PUSHED;

@@ -84,6 +84,18 @@ final class WrestleIsAChoiceTest extends TestCase
         $this->assertTrue($r->isTurnover(), 'sražený útočník = turnover (ř. 603-607)');
     }
 
+    public function testP322UtocnikSBlockemWrestleNepouzijeNaNosiceBezBlocku(): void
+    {
+        // P322 (uživatel 21.11. „ano oprav“): nosiče bez Blocku běžný Both Down srazí sám (míč padá, brnění),
+        //   útočník s Blockem stojí. Dřív AI volila Wrestle a položila i útočníka.
+        $r = $this->blokBothDown([SkillName::Block, SkillName::Wrestle], [], nosic: 2);
+
+        $this->assertNotContains('wrestle', $this->typy($r));
+        $this->assertSame(PlayerState::STANDING, $this->stav($r, 1));
+        $this->assertSame(PlayerState::PRONE, $this->stav($r, 2));
+        $this->assertNull($r->getNewState()->getBall()->getCarrierId(), 'nosič sražen, míč pustil');
+    }
+
     public function testUtocnikBezBlockuWrestlePouzijeProtiBlocku(): void
     {
         // Kontrola opačným směrem (skill se nesmí vypnout úplně): útočník Wrestle bez Blocku

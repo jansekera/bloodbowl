@@ -171,3 +171,68 @@ TEST(P321FanFavourite, PitchInvasionUsesTheOtherTeamsFameAndNeverOnAOne) {
     resolveKickoffEvent(gs2, KickoffEvent::PITCH_INVASION, TeamSide::HOME, landing, dice2, nullptr);
     EXPECT_EQ(gs2.getPlayer(GameState::squadId(TeamSide::AWAY, 0)).state, PlayerState::STANDING);
 }
+
+// --- P322 (uživatel 21.11. „ano oprav“): AI Wrestle útočníka s Blockem proti nosiči ---
+#include "bb/block_handler.h"
+
+TEST(P322AttackerWrestle, NotAgainstACarrierWithoutBlock) {
+    auto gs = emptyState();
+    Player& a = put(gs, TeamSide::HOME, 0, {10, 7});
+    a.skills.add(SkillName::Block);
+    a.skills.add(SkillName::Wrestle);
+    Player& d = put(gs, TeamSide::AWAY, 0, {11, 7});
+    gs.ball = BallState::carried(d.position, d.id);
+    EXPECT_FALSE(attackerWouldWrestle(gs, a, d));   // běžný Both Down nosiče srazí sám, útočník stojí
+    d.skills.add(SkillName::Block);                 // pozitivní kontrola: nosič s Blockem by stál ⇒ Wrestle
+    EXPECT_TRUE(attackerWouldWrestle(gs, a, d));
+}
+
+// --- P323 (uživatel 23.11. „sedí, neber v úvahu kdo vstane dříve“): Juggernaut + Wrestle bez Blocku na blitzu ---
+namespace {
+struct JW { GameState gs; Player* a; Player* d; };
+JW juggWrestle(int attMa, int defMa, Position attPos = {10, 7}, Position defPos = {11, 7}) {
+    JW r{emptyState(), nullptr, nullptr};
+    r.a = &put(r.gs, TeamSide::HOME, 0, attPos, attMa);
+    r.a->skills.add(SkillName::Juggernaut);
+    r.a->skills.add(SkillName::Wrestle);
+    r.d = &put(r.gs, TeamSide::AWAY, 0, defPos, defMa);
+    r.gs.ball = BallState::onGround({-1, -1});
+    return r;
+}
+BlockDiceFace jf(JW& r) { return aiJuggernautFace(BlockDiceFace::BOTH_DOWN, *r.a, *r.d, true, &r.gs); }
+}  // namespace
+
+TEST(P323JuggernautWrestle, AFasterDefenderIsWrestledDown) {
+    auto r = juggWrestle(5, 7);
+    EXPECT_EQ(jf(r), BlockDiceFace::BOTH_DOWN);
+}
+
+TEST(P323JuggernautWrestle, ANotFasterDefenderIsPushed) {
+    auto r = juggWrestle(6, 6);
+    EXPECT_EQ(jf(r), BlockDiceFace::PUSHED);
+}
+
+TEST(P323JuggernautWrestle, ASlowCarrierIsWrestledSoTheBallDrops) {
+    auto r = juggWrestle(6, 4);
+    r.gs.ball = BallState::carried(r.d->position, r.d->id);
+    EXPECT_EQ(jf(r), BlockDiceFace::BOTH_DOWN);
+}
+
+TEST(P323JuggernautWrestle, ASurfBeatsEverything) {
+    // obránce u horní lajny (y = 0), útočník pod ním ⇒ odtlačení vede mimo hřiště
+    auto r = juggWrestle(5, 8, {10, 1}, {10, 0});
+    r.gs.ball = BallState::carried(r.d->position, r.d->id);
+    EXPECT_EQ(jf(r), BlockDiceFace::PUSHED);
+}
+
+TEST(P323JuggernautWrestle, TheAttackerWithTheBallStaysUp) {
+    auto r = juggWrestle(5, 8);
+    r.gs.ball = BallState::carried(r.a->position, r.a->id);
+    EXPECT_EQ(jf(r), BlockDiceFace::PUSHED);
+}
+
+TEST(P323JuggernautWrestle, WithoutWrestleTheOldRuleHolds) {   // pozitivní kontrola: bez Wrestle vždy Pushed
+    auto r = juggWrestle(5, 8);
+    r.a->skills.remove(SkillName::Wrestle);
+    EXPECT_EQ(jf(r), BlockDiceFace::PUSHED);
+}

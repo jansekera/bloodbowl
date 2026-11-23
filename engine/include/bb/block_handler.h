@@ -69,7 +69,9 @@ bool blockFaceDownsOrStrips(const GameState& state, BlockDiceFace face, const Pl
 // P309 (uživatel 20.11.2026): Juggernaut v blitzu „may choose to treat a 'Both Down' result as if a 'Pushed' result
 //   has been rolled instead" (ř. 8191-8195). Volba AI na jednom místě: Both Down nechá, má-li útočník Block a obránce
 //   ne (srazí jen obránce; Wrestle obránce Juggernaut ruší), jinak převede. Vrací stěnu, jak ji AI vyhodnotí.
-BlockDiceFace aiJuggernautFace(BlockDiceFace face, const Player& att, const Player& def, bool isBlitz);
+// P323: `st` (volitelný) = stav hry pro surf a míč v rozhodnutí Juggernaut × Wrestle; bez něj jen srovnání MA.
+BlockDiceFace aiJuggernautFace(BlockDiceFace face, const Player& att, const Player& def, bool isBlitz,
+                               const GameState* st = nullptr);
 // Čítač (mcts_cli, sonda četnosti): Both Down útočníka s Juggernautem v blitzu a z nich ponechané (nepřevedené).
 struct JuggernautBothDowns { long total = 0; long kept = 0; };
 JuggernautBothDowns takeJuggernautBothDowns();
@@ -77,7 +79,8 @@ JuggernautBothDowns takeJuggernautBothDowns();
 // `isBlitz`: stěna se oceňuje tak, jak ji resolver vyhodnotí (P309: Both Down s Juggernautem podle aiJuggernautFace).
 BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
                                  bool attackerChooses,
-                                 const Player& att, const Player& def, bool isBlitz);
+                                 const Player& att, const Player& def, bool isBlitz,
+                                 const GameState* st = nullptr);
 
 
 // ⛔ TENHLE KOMENTÁŘ TVRDIL „kolikrát se OPRAVDU hodil Dauntless" A BYLA TO

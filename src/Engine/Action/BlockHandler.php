@@ -780,7 +780,7 @@ final class BlockHandler implements ActionHandlerInterface
         //   Vybírá-li strana, kterou vede AI, volí její kouč (`autoChooseBlockDie`) a
         //   `faceIndex` se nečte. Jinak vybírá člověk v dialogu.
         if ($state->getPendingBlockChooserSide() === $state->getAiTeam()) {
-            $index = $this->autoChooseBlockDie($faces, $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz());
+            $index = $this->autoChooseBlockDie($faces, $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz(), $state);
         } else {
             $faceIndex = (int) ($params['faceIndex'] ?? -1);
             if ($faceIndex < 0 || $faceIndex >= count($faces)) {
@@ -806,7 +806,7 @@ final class BlockHandler implements ActionHandlerInterface
             $attacker->getTeamSide(),
             $attacker->getId(),
             $defender->getId(),
-            $this->aiJuggernautFace($chosenFace, $attacker, $defender, true) === BlockDiceFace::PUSHED,
+            $this->aiJuggernautFace($chosenFace, $attacker, $defender, true, $state) === BlockDiceFace::PUSHED,
             $state->withPendingBlock(null),
         ));
         $juggernautOdpoved = $mozno ? $juggernaut : null;
@@ -1049,10 +1049,10 @@ final class BlockHandler implements ActionHandlerInterface
 
         // ⛔ 15.09.2026: tady byl nejdriv pokus o Brawler -- skill z BB2020, v BB2016
         //   neexistuje (`evidence/audit_pravidla_20260915.md`). Odstranen na pokyn uzivatele.
-        $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz());
+        $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz(), $state);
 
         // Try Pro if result is bad
-        $bestScore = $this->scoreBlockFace($pending->getFaces()[$bestIdx], $attacker, $defender, $pending->isBlitz());
+        $bestScore = $this->scoreBlockFace($pending->getFaces()[$bestIdx], $attacker, $defender, $pending->isBlitz(), $state);
         if ($bestScore < 0 && $pending->isProAvailable()) {
             $result = $this->resolveBlockReroll($state, ['type' => 'pro']);
             $accumulatedEvents = array_merge($accumulatedEvents, $result->getEvents());
@@ -1066,7 +1066,7 @@ final class BlockHandler implements ActionHandlerInterface
             if ($attacker === null || $defender === null) {
                 return $result;
             }
-            $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz());
+            $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz(), $state);
         }
 
         // Note: team rerolls are NOT auto-used on blocks (available through interactive dialog only)
@@ -2237,10 +2237,11 @@ final class BlockHandler implements ActionHandlerInterface
         MatchPlayerDTO $attacker,
         MatchPlayerDTO $defender,
         bool $isBlitz,
+        ?GameState $state = null,
     ): int {
         $scored = [];
         foreach ($faces as $i => $face) {
-            $scored[] = [$i, $this->scoreBlockFace($face, $attacker, $defender, $isBlitz)];
+            $scored[] = [$i, $this->scoreBlockFace($face, $attacker, $defender, $isBlitz, $state)];
         }
 
         // Attacker wants highest score, defender wants lowest
@@ -2260,8 +2261,9 @@ final class BlockHandler implements ActionHandlerInterface
      * Volba je automatická pro obě strany (dialog na ni web nemá), vzor C++
      * `block_handler.cpp:931-947`:
      * - útočník bez Blocku by padl sám (turnover) ⇒ Wrestle vždy; s Blockem jen když je co
-     *   získat (soupeř má Block, takže by se nestalo nic, nebo drží míč) a sám míč nenese
-     *   -- položený nosič týmu na tahu je turnover (ř. 8677-8678);
+     *   získat (soupeř má Block, takže by se nestalo nic) a sám míč nenese -- položený nosič
+     *   týmu na tahu je turnover (ř. 8677-8678). OPRAVENO 23.11.2026 (P322): dřív i proti nosiči
+     *   BEZ Blocku, kterého běžný Both Down srazí sám (útočník s Blockem stojí);
      * - obránce bez Blocku padá tak jako tak ⇒ Wrestle (padne i útočník a nehází se na
      *   brnění); s Blockem by zůstal stát a útočník bez Blocku padl ⇒ Wrestle jen na
      *   nosiče míče, kterého Block drží na nohou (jeho položení je turnover).
@@ -2270,12 +2272,11 @@ final class BlockHandler implements ActionHandlerInterface
     {
         $carrierId = $state->getBall()->getCarrierId();
         $attHasBall = $carrierId === $attacker->getId();
-        $defHasBall = $carrierId === $defender->getId();
         $attHasBlock = $attacker->hasSkill(SkillName::Block);
         $defHasBlock = $defender->hasSkill(SkillName::Block);
 
         $attWants = $attacker->hasSkill(SkillName::Wrestle)
-            && (!$attHasBlock || (!$attHasBall && ($defHasBlock || $defHasBall)));
+            && (!$attHasBlock || (!$attHasBall && $defHasBlock));
         // ROZHODL UZIVATEL 16.10.2026: obrance s Wrestle ho pouzije, ma-li utocnik Block (jinak by
         //   Both Down ustal); ma-li Block obrance a utocnik ne, Wrestle nevoli (utocnik pada sam).
         //   Drive jen proti nosici s Blockem. Tataz podminka v C++ (`block_handler.cpp`).
@@ -2300,19 +2301,53 @@ final class BlockHandler implements ActionHandlerInterface
      * smí brát jako Pushed (ř. 8191-8195 "may choose"); AI ho nechá, má-li útočník Block a obránce ne (srazí jen
      * obránce, jeho Wrestle je zrušen), jinak převede. Vrací stěnu, jak ji AI vyhodnotí.
      */
-    private function aiJuggernautFace(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz): BlockDiceFace
+    private function aiJuggernautFace(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz, ?GameState $state = null): BlockDiceFace
     {
         if ($face !== BlockDiceFace::BOTH_DOWN || !$isBlitz || !$attacker->hasSkill(SkillName::Juggernaut)) {
             return $face;
         }
+        if ($attacker->hasSkill(SkillName::Block) && !$defender->hasSkill(SkillName::Block)) {
+            return BlockDiceFace::BOTH_DOWN;
+        }
+        if ($attacker->hasSkill(SkillName::Wrestle) && $this->juggernautWrestleNechaBothDown($state, $attacker, $defender)) {
+            return BlockDiceFace::BOTH_DOWN;
+        }
 
-        return $attacker->hasSkill(SkillName::Block) && !$defender->hasSkill(SkillName::Block) ? BlockDiceFace::BOTH_DOWN : BlockDiceFace::PUSHED;
+        return BlockDiceFace::PUSHED;
+    }
+
+    /**
+     * P323 (uživatel 23.11.2026: „sedí, neber v úvahu kdo vstane dříve“): útočník s Wrestle, kterému by Both Down sám
+     * nic nedal, volí mezi Pushed (Juggernaut) a Wrestle (oba leží, bez brnění): 1) odtlačení by obránce poslalo do
+     * davu ⇒ Pushed; 2) obránce nese míč ⇒ Wrestle; 3) jinak Wrestle, jen je-li obránce rychlejší (vyšší MA).
+     * Útočník s míčem vždy Pushed. Bez stavu (nebo uvnitř odtlačení) se surf a míč nepočítají. C++ juggernautWrestleKeepsBothDown.
+     */
+    private function juggernautWrestleNechaBothDown(?GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender): bool
+    {
+        if ($state !== null) {
+            $nosic = $state->getBall()->getCarrierId();
+            if ($nosic === $attacker->getId()) {
+                return false;
+            }
+            if (!$this->odlozitPoFollowUp && !$this->nanecisto) {
+                $po = $this->odtlacitNanecisto($state, $attacker, $defender, true, null, null);
+                $odtlaceny = $po->getPlayer($defender->getId());
+                if ($odtlaceny === null || $odtlaceny->getPosition() === null) {
+                    return false;   // surf
+                }
+            }
+            if ($nosic === $defender->getId()) {
+                return true;
+            }
+        }
+
+        return $defender->getStats()->getMovement() > $attacker->getStats()->getMovement();
     }
 
     /** `$isBlitz`: stěna se oceňuje tak, jak se vyhodnotí (P309: Both Down s Juggernautem podle `aiJuggernautFace`). */
-    private function scoreBlockFace(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz): int
+    private function scoreBlockFace(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz, ?GameState $state = null): int
     {
-        $face = $this->aiJuggernautFace($face, $attacker, $defender, $isBlitz);
+        $face = $this->aiJuggernautFace($face, $attacker, $defender, $isBlitz, $state);
         $attackerHasBlock = $attacker->hasSkill(SkillName::Block);
         $attackerHasWrestle = $attacker->hasSkill(SkillName::Wrestle);
         $defenderHasBlock = $defender->hasSkill(SkillName::Block);
