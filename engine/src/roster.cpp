@@ -626,7 +626,7 @@ const TeamRoster& getDwarfRoster1200() {
             {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull,
                 SkillName::Wrestle}), 2, "Longbeard +Wrestle"},  // Longbeard +Wrestle
         },
-        6, 40, true
+        6, 50, true  // P321 bod 4: přehoz 50k jako základ (ř. 8778)
     };
     return roster;
 }
@@ -663,7 +663,7 @@ const TeamRoster& getDwarfRoster1200NoWrestle() {
             {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2, "Runner +Block"},
             // ⛔ ZDE ŽÁDNÝ `Longbeard +Wrestle` -- v tom je celý smysl.
         },
-        5, 40, true
+        5, 50, true  // P321 bod 4: přehoz 50k jako základ (ř. 8778)
     };
     return roster;
 }
@@ -698,8 +698,10 @@ const TeamRoster& getWoodElfRoster1200() {
             {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint,
                 SkillName::Block}), 2, "Catcher +Block"},  // Catcher +Block
             {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
+            // P321 bod 4: + Strong Arm, Throw Team-Mate jako základní soupiska (ř. 9105-9107)
             {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm,
-                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard}), 1, "Treeman +Guard"},  // Treeman +Guard
+                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard,
+                SkillName::StrongArm, SkillName::ThrowTeamMate}), 1, "Treeman +Guard"},  // Treeman +Guard
             // 2026-08-27 (uživatel): DVA linemani s `Wrestle` KAŽDÉMU týmu, symetricky.
             // Do dneška ho měl JEN skaven (2/11), takže rameno B2 (cena bloku proti
             // Wrestle) šlo měřit jen na matchupu dw-sk -- jinde by delta vyšla NULA
@@ -730,8 +732,10 @@ const TeamRoster& getWoodElfRoster1200Agile() {
             {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint,
                 SkillName::Block}), 2, "Catcher +Block"},  // Catcher +Block
             {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
+            // P321 bod 4: + Strong Arm, Throw Team-Mate jako základní soupiska (ř. 9105-9107)
             {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm,
-                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard}), 1, "Treeman +Guard"},  // Treeman +Guard
+                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard,
+                SkillName::StrongArm, SkillName::ThrowTeamMate}), 1, "Treeman +Guard"},  // Treeman +Guard
             {{7, 3, 4, 7}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},  // Lineman +Wrestle
         },
         7, 50, true
@@ -809,8 +813,9 @@ const TeamRoster& getWoodElfRoster1500() {
             {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint, SkillName::Block,
                 SkillName::NervesOfSteel}), 1, "Catcher +Block+Nerves of Steel"},
             {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block, SkillName::Accurate}), 1, "Thrower +Block+Accurate"},
+            // P321 bod 4: + Strong Arm, Throw Team-Mate jako základní soupiska (ř. 9105-9107)
             {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm, SkillName::MightyBlow,
-                SkillName::ThickSkull, SkillName::Guard}), 1, "Treeman +Guard"},
+                SkillName::ThickSkull, SkillName::Guard, SkillName::StrongArm, SkillName::ThrowTeamMate}), 1, "Treeman +Guard"},
             // 16.10.2026 (uživatel: „odeber třeba wrestle linemana — ať zůstane aspoň jedno wrestle“;
             // „sidestep wardancera neodebírej“) ⇒ jeden Lineman jen Dodge, TV 1510.
             {{7, 3, 4, 7}, makeSkills({SkillName::Dodge}), 1, "Lineman +Dodge"},
