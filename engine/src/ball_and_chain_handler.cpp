@@ -97,8 +97,24 @@ bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dic
     for (int i = 0; i < info.count; ++i) faces[i] = dice.rollBlockDie();
     const bool ownTarget = target.teamSide == bcp.teamSide;
     const bool mb = !ownTarget && bcp.hasSkill(SkillName::MightyBlow);   // P284
-    const BlockDiceFace face = chooseFace(faces, info.count, ownTarget,
-                                          info.attackerChooses);
+    BlockDiceFace face = chooseFace(faces, info.count, ownTarget, info.attackerChooses);
+    // P320 (uživatel 21.11.: „ano“, parita s PHP `BlockHandler::kostkaKouce`): blok B&C „following normal blocking
+    //   rules“ (ř. 7819-7822) ⇒ kostku vybírá kouč silnějšího (ř. 633-634); proti spoluhráči kouč B&C. OPRAVENO
+    //   24.11.2026 -- dřív `chooseFace` volil i za kouče-člověka (živá partie se neptala, běžný blok ano).
+    const bool bncChooses = ownTarget || info.attackerChooses;
+    const Player& chooser = bncChooses ? bcp : target;
+    if (coachDecides(chooser.teamSide)) {
+        bool differ = false;
+        int opts = 0, packed = 0;
+        for (int i = 0; i < info.count; ++i) {
+            differ = differ || faces[i] != faces[0];
+            opts |= 1 << static_cast<int>(faces[i]);
+            packed |= (static_cast<int>(faces[i]) + 1) << (3 * i);
+        }
+        if (differ)
+            face = static_cast<BlockDiceFace>(askCoach(CoachQuestion::BLOCK_FACE, chooser.id,
+                                                       bncChooses ? target.id : bcp.id, packed, info.count, opts));
+    }
     emitEvent(events, {GameEvent::Type::BLOCK, bcp.id, target.id, bcp.position,
                       target.position, static_cast<int>(face), true});
 

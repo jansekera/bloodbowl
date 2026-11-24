@@ -109,6 +109,54 @@ TEST(BallAndChainHandler, P72BlocksWithStrengthDiceAndMustFollowUp) {
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "povinny follow-up";
 }
 
+// P320 (uživatel 21.11.: „ano“): blok B&C „following normal blocking rules“ (ř. 7819-7822) ⇒ stranu kostky volí
+// kouč silnějšího (ř. 633-634). Dřív C++ `chooseFace` volil sám i v živé partii.
+TEST(BallAndChainHandler, P320LiveGameAsksTheStrongerSidesCoachForTheFace) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 7);                  // ST7 proti ST3 = 3 kostky, volí B&C
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({3, 1, 1, 6, 1, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try {
+        resolveBallAndChain(gs, 1, dice, nullptr);
+        FAIL() << "otázka BLOCK_FACE nepřišla";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::BLOCK_FACE);
+        EXPECT_EQ(p.playerId, 1);
+        EXPECT_EQ(p.otherId, 12);
+        EXPECT_EQ(p.target, 3);
+    }
+}
+
+// Kouč zvolí lebku (index ATTACKER_DOWN), ač by AI vzala Defender Down ⇒ platí jeho volba.
+TEST(BallAndChainHandler, P320CoachsFaceIsApplied) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 7);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({3, 1, 1, 6, 1, 1, 1, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {static_cast<int>(BlockDiceFace::ATTACKER_DOWN)});
+    auto r = resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_TRUE(r.turnover) << "sražený B&C při bloku = turnover (ř. 368)";
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+}
+
+// Soupeř-člověk je silnější (dvě asistence) ⇒ volí on.
+TEST(BallAndChainHandler, P320StrongerHumanDefenderPicksTheFace) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 3);                  // ST3
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 4);
+    placePlayer(gs, 13, {10, 6}, TeamSide::AWAY);   // asistence obránci (vedle B&C)
+    FixedDiceRoller dice({3, 1, 6, 1, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::AWAY, {});
+    try {
+        resolveBallAndChain(gs, 1, dice, nullptr);
+        FAIL() << "otázka BLOCK_FACE obránci nepřišla";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::BLOCK_FACE);
+        EXPECT_EQ(p.playerId, 12);
+    }
+}
+
 TEST(BallAndChainHandler, P72AProneOrStunnedPlayerInTheWayIsPushedAndArmourRolled) {
     auto gs = bncState();
     makeBnC(gs, 1, {10, 7}, 1, 5);
