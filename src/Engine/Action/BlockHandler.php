@@ -1067,8 +1067,7 @@ final class BlockHandler implements ActionHandlerInterface
         $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz(), $state);
 
         // Try Pro if result is bad
-        $bestScore = $this->scoreBlockFace($pending->getFaces()[$bestIdx], $attacker, $defender, $pending->isBlitz(), $state);
-        if ($bestScore < 0 && $pending->isProAvailable()) {
+        if ($this->spatnaKostka($pending->getFaces()[$bestIdx], $attacker, $defender, $pending->isBlitz(), $state) && $pending->isProAvailable()) {
             $result = $this->resolveBlockReroll($state, ['type' => 'pro']);
             $accumulatedEvents = array_merge($accumulatedEvents, $result->getEvents());
             $state = $result->getNewState();
@@ -1304,8 +1303,7 @@ final class BlockHandler implements ActionHandlerInterface
 
         // Pro reroll on bad block result
         if ($attacker->hasSkill(SkillName::Pro) && !$attacker->isProUsedThisTurn()) {
-            $chosenScore = $this->scoreBlockFace($faces[$chosenIdx], $attacker, $defender, false);
-            if ($chosenScore < 0) {
+            if ($this->spatnaKostka($faces[$chosenIdx], $attacker, $defender, false)) {
                 $proRoll = $this->dice->rollD6();
                 $attacker = $attacker->withProUsedThisTurn(true);
                 $state = $state->withPlayer($attacker);
@@ -2397,25 +2395,47 @@ final class BlockHandler implements ActionHandlerInterface
         return $defender->getStats()->getMovement() > $attacker->getStats()->getMovement();
     }
 
-    /** `$isBlitz`: stěna se oceňuje tak, jak se vyhodnotí (P309: Both Down s Juggernautem podle `aiJuggernautFace`). */
+    /**
+     * `$isBlitz`: stěna se oceňuje tak, jak se vyhodnotí (P309: Both Down s Juggernautem podle `aiJuggernautFace`).
+     *
+     * OPRAVENO 24.11.2026 (audit parity „ocenění Both Down PHP 90 × C++ 8“) -- pořadí stěn teď jako C++ `scoreFace`
+     *   (×10): dřív PHP bralo Both Down útočníka s Blockem proti obránci bez Blocku (90) před Defender Stumbles (80)
+     *   — C++ naopak (srazit A odtlačit je víc než srazit na místě) — a Wrestle útočníka s Blockem vůbec neznalo
+     *   (Both Down 20 < Pushed 30, C++ 7 > 5: prolomení zdi proti Blocku). Wrestle útočníka jako C++ ve zdi (bez
+     *   míče), obránce jako resolver (`wrestleUsed`).
+     */
     private function scoreBlockFace(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz, ?GameState $state = null): int
     {
         $face = $this->aiJuggernautFace($face, $attacker, $defender, $isBlitz, $state);
-        $attackerHasBlock = $attacker->hasSkill(SkillName::Block);
-        $attackerHasWrestle = $attacker->hasSkill(SkillName::Wrestle);
-        $defenderHasBlock = $defender->hasSkill(SkillName::Block);
-        $defenderHasDodge = $defender->hasSkill(SkillName::Dodge);
-        $attackerHasTackle = $attacker->hasSkill(SkillName::Tackle);
+        $attBlock = $attacker->hasSkill(SkillName::Block);
+        $defBlock = $defender->hasSkill(SkillName::Block);
+        $attWrestle = $attacker->hasSkill(SkillName::Wrestle) && (!$attBlock || $defBlock);
+        $defWrestle = $this->obranceSmiWrestle($attacker, $defender, $isBlitz) && (!$defBlock || $attBlock);
 
         return match ($face) {
             BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW => 100,
-            BlockDiceFace::DEFENDER_STUMBLES => ($defenderHasDodge && !$attackerHasTackle) ? 30 : 80,
-            BlockDiceFace::PUSHED => 30,
-            // 16.10.2026: obránce s Wrestle útočníka s Blockem položí (viz wrestleUsed) ⇒ oba na zemi.
-            BlockDiceFace::BOTH_DOWN => $attackerHasBlock
-                ? ($this->obranceSmiWrestle($attacker, $defender, $isBlitz) ? 10 : ($defenderHasBlock ? 20 : 90))
-                : ($attackerHasWrestle ? 25 : -50),
-            BlockDiceFace::ATTACKER_DOWN => -100,
+            BlockDiceFace::DEFENDER_STUMBLES => ($defender->hasSkill(SkillName::Dodge) && !$attacker->hasSkill(SkillName::Tackle)) ? 50 : 90,
+            BlockDiceFace::PUSHED => 50,
+            BlockDiceFace::BOTH_DOWN => match (true) {
+                $attWrestle => $defBlock ? 70 : 60,   // obránce složen, útočník leží taky
+                $defWrestle => 10,                    // obránce nás položí taky
+                $attBlock && !$defBlock => 80,        // padne jen obránce
+                $attBlock && $defBlock => 40,         // nestane se nic
+                $defBlock => 10,                      // padne jen útočník
+                default => 30,                        // padnou oba
+            },
+            BlockDiceFace::ATTACKER_DOWN => 0,
         };
+    }
+
+    /**
+     * Špatná kostka pro AI (přehoz Pro): lebka, nebo Both Down útočníka bez Blocku. Parita s C++ `shouldRerollBlock`
+     * (dřív PHP `scoreBlockFace < 0` — Both Down útočníka s Wrestle nebralo jako špatnou).
+     */
+    private function spatnaKostka(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz, ?GameState $state = null): bool
+    {
+        $face = $this->aiJuggernautFace($face, $attacker, $defender, $isBlitz, $state);
+
+        return $face === BlockDiceFace::ATTACKER_DOWN || ($face === BlockDiceFace::BOTH_DOWN && !$attacker->hasSkill(SkillName::Block));
     }
 }
