@@ -36,11 +36,22 @@ final class Coach
     private array $juggernaut = [];
     /** @var list<bool> */
     private array $pilingOn = [];
+    /** @var list<bool> */
+    private array $wrestle = [];
+    /** @var list<array{x: int, y: int}|null> */
+    private array $sideStep = [];
+    /**
+     * P312: odpovědi, které akce už spotřebovala (i předřazené) — nese je čekající otázka Stand Firm / Grab
+     * (`ActionResolver::resolveSPrehranim`), aby se po jejím zodpovězení na ně kouče neptal znovu (dřív pole
+     * `juggernaut` v obou DTO, review P309 (1)).
+     */
+    private ReplayAnswers $pouzite;
 
     /** @param list<TeamSide> $sides strany kouče-člověka */
     public function __construct(array $sides = [])
     {
         $this->sides = $sides;
+        $this->pouzite = new ReplayAnswers();
     }
 
     /** @param list<TeamSide> $sides strany kouče-člověka */
@@ -64,11 +75,38 @@ final class Coach
         $this->blockDice = $answers->blockDice;
         $this->juggernaut = $answers->juggernaut;
         $this->pilingOn = $answers->pilingOn;
+        $this->wrestle = $answers->wrestle;
+        $this->sideStep = $answers->sideStep;
+        $this->pouzite = new ReplayAnswers();
+    }
+
+    /**
+     * P312: pokračování akce přerušené otázkou Stand Firm / Grab — odpovědi z přerušené akce jdou před odpovědi
+     * pokračování (padly dřív, blok se vyhodnotí znovu od téže kostky ve stejném pořadí otázek).
+     */
+    public function predradit(?ReplayAnswers $a): void
+    {
+        if ($a !== null) {
+            $this->begin($a->predradit($this->zbyva()));
+        }
+    }
+
+    /** Odpovědi, které ještě čekají ve frontách (bez spotřebovaných). */
+    private function zbyva(): ReplayAnswers
+    {
+        return new ReplayAnswers($this->divingCatch, $this->bombTargets, $this->referee, $this->rerolls, $this->blockDice, $this->juggernaut, $this->pilingOn, $this->wrestle, $this->sideStep);
+    }
+
+    /** P312: odpovědi spotřebované akcí do teď (viz `$pouzite`). */
+    public function pouzite(): ReplayAnswers
+    {
+        return $this->pouzite;
     }
 
     public function end(): void
     {
-        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = $this->blockDice = $this->juggernaut = $this->pilingOn = [];
+        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = $this->blockDice = $this->juggernaut = $this->pilingOn = $this->wrestle = $this->sideStep = [];
+        $this->pouzite = new ReplayAnswers();
     }
 
     /**
@@ -81,7 +119,10 @@ final class Coach
             return $aiPush;
         }
 
-        return array_shift($this->juggernaut) ?? throw (new JuggernautQuestion($attackerId, $defenderId))->naStavu($stav);
+        $a = array_shift($this->juggernaut) ?? throw (new JuggernautQuestion($attackerId, $defenderId))->naStavu($stav);
+        $this->pouzite = $this->pouzite->withJuggernaut($a);
+
+        return $a;
     }
 
     /**
@@ -94,14 +135,64 @@ final class Coach
             return $ai;
         }
 
-        return array_shift($this->pilingOn) ?? throw (new PilingOnQuestion($attackerId, $defenderId, $armour))->naStavu($stav);
+        $a = array_shift($this->pilingOn) ?? throw (new PilingOnQuestion($attackerId, $defenderId, $armour))->naStavu($stav);
+        $this->pouzite = $this->pouzite->withPilingOn($a);
+
+        return $a;
+    }
+
+    /**
+     * P312: použije hráč `$playerId` Wrestle proti `$opponentId` (ř. 8670-8676 "may use")? AI = `$ai`
+     * (`BlockHandler::wrestleUsed`). Parita s C++ `CoachQuestion::USE_WRESTLE`.
+     */
+    public function wrestle(TeamSide $strana, int $playerId, int $opponentId, bool $ai, GameState $stav): bool
+    {
+        if (!$this->decides($strana)) {
+            return $ai;
+        }
+        $a = array_shift($this->wrestle) ?? throw (new WrestleQuestion($playerId, $opponentId))->naStavu($stav);
+        $this->pouzite = $this->pouzite->withWrestle($a);
+
+        return $a;
+    }
+
+    /**
+     * P312: kam Side Step odtlačeného `$playerId` (ř. 8474-8478 "may choose to move the player to any adjacent
+     * square") — jedno z `$squares`, nebo false = skill nepoužít (běžné odtlačení). AI = `$ai`. Parita s C++
+     * `CoachQuestion::USE_SIDE_STEP`.
+     *
+     * @param list<Position> $squares
+     */
+    public function sideStep(TeamSide $strana, int $playerId, array $squares, Position $ai, GameState $stav): Position|false
+    {
+        if (!$this->decides($strana)) {
+            return $ai;
+        }
+        if ($this->sideStep === []) {
+            throw (new SideStepQuestion($playerId, $squares, $ai))->naStavu($stav);
+        }
+        $a = array_shift($this->sideStep);
+        $this->pouzite = $this->pouzite->withSideStep($a);
+        if ($a === null) {
+            return false;
+        }
+        foreach ($squares as $p) {
+            if ($p->getX() === $a['x'] && $p->getY() === $a['y']) {
+                return $p;
+            }
+        }
+
+        throw new \InvalidArgumentException("Side Step square ({$a['x']}, {$a['y']}) not offered");
     }
 
     /** Skočí hráč pro míč? (ř. 8065 "can attempt") */
     public function divingCatch(int $playerId, Position $landing, int $otherCandidates, ?int $attemptingId, GameState $stav): bool
     {
-        return array_shift($this->divingCatch)
+        $a = array_shift($this->divingCatch)
             ?? throw (new DivingCatchQuestion($playerId, $landing, $otherCandidates, $attemptingId))->naStavu($stav);
+        $this->pouzite = $this->pouzite->withDivingCatch($a);
+
+        return $a;
     }
 
     /**
@@ -117,7 +208,10 @@ final class Coach
             return $suggested;   // P306 A5: AI hodí, kam radí engine
         }
 
-        return array_shift($this->bombTargets) ?? throw (new BombRethrowQuestion($playerId, $targets(), $suggested))->naStavu($stav);
+        $a = array_shift($this->bombTargets) ?? throw (new BombRethrowQuestion($playerId, $targets(), $suggested))->naStavu($stav);
+        $this->pouzite = $this->pouzite->withBombTarget($a);
+
+        return $a;
     }
 
     /**
@@ -131,7 +225,10 @@ final class Coach
             return ['bribe' => true, 'argue' => true];   // P306 A5: AI použije, co jde
         }
 
-        return array_shift($this->referee) ?? throw (new RefereeQuestion($playerId, $canBribe, $canArgue))->naStavu($stav);
+        $a = array_shift($this->referee) ?? throw (new RefereeQuestion($playerId, $canBribe, $canArgue))->naStavu($stav);
+        $this->pouzite = $this->pouzite->withReferee($a);
+
+        return $a;
     }
 
     /**
@@ -144,6 +241,7 @@ final class Coach
     {
         $i = array_shift($this->blockDice)
             ?? throw (new BlockDieQuestion($attackerId, $defenderId, $faces, $isFrenzy, $attackerChooses))->naStavu($stav->withPendingBlock(null));
+        $this->pouzite = $this->pouzite->withBlockDie($i);
 
         return isset($faces[$i]) ? $i : throw new \InvalidArgumentException("Block die {$i} not rolled");
     }
@@ -177,6 +275,7 @@ final class Coach
         }
         $a = array_shift($this->rerolls)
             ?? throw (new RerollQuestion($playerId, $rollType, $roll, $target, $pro, $team, $proFailed, $kam))->naStavu($stav);
+        $this->pouzite = $this->pouzite->withReroll($a);
 
         return match (true) {
             $a === 'decline' => 'decline',

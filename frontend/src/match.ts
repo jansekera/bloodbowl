@@ -23,6 +23,8 @@ import { StandFirmModal } from './ui/StandFirmModal';
 import { DivingCatchModal } from './ui/DivingCatchModal';
 import { JuggernautModal } from './ui/JuggernautModal';
 import { PilingOnModal } from './ui/PilingOnModal';
+import { WrestleModal } from './ui/WrestleModal';
+import { SideStepModal } from './ui/SideStepModal';
 import { RefereeModal } from './ui/RefereeModal';
 import { answerQuestion } from './ui/answerQuestion';
 import { MovePlanBar, type MovePlanChoice } from './ui/MovePlanBar';
@@ -97,6 +99,8 @@ const standFirmModal = new StandFirmModal(container);
 const divingCatchModal = new DivingCatchModal(container);
 const juggernautModal = new JuggernautModal(container);
 const pilingOnModal = new PilingOnModal(container);
+const wrestleModal = new WrestleModal(container);
+const sideStepModal = new SideStepModal(container);
 const refereeModal = new RefereeModal(container);
 
 // Animation queue
@@ -249,6 +253,15 @@ async function handleActionResult(result: ActionResult): Promise<void> {
         showPilingOnModal(result.state);
         return;
     }
+    // P312: Wrestle a Side Step — stejně přednostně (i v tahu AI, když blokuje hráče kouče)
+    if (result.state.pendingWrestle) {
+        showWrestleModal(result.state);
+        return;
+    }
+    if (result.state.pendingSideStep) {
+        showSideStepModal(result.state);
+        return;
+    }
     // P272: kam hodit chycenou bombu — stejně přednostně (i uprostřed tahu AI)
     if (result.state.pendingBombRethrow) {
         enterBombRethrow(result.state);
@@ -390,6 +403,24 @@ function showPilingOnModal(state: import('./api/types').GameState): void {
     const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
     pilingOnModal.show(nameOf(pending.playerId), nameOf(pending.defenderId), pending.armour, async (params: Record<string, unknown>) => {
         await answerCoachQuestion('resolve_piling_on', params, 'Piling On choice failed', () => showPilingOnModal(state));
+    });
+}
+
+function showWrestleModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingWrestle;
+    if (!pending) return;
+    const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
+    wrestleModal.show(nameOf(pending.playerId), nameOf(pending.opponentId), async (params: Record<string, unknown>) => {
+        await answerCoachQuestion('resolve_wrestle', params, 'Wrestle choice failed', () => showWrestleModal(state));
+    });
+}
+
+function showSideStepModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingSideStep;
+    if (!pending) return;
+    const name = state.players.find(p => p.id === pending.playerId)?.name ?? `#${pending.playerId}`;
+    sideStepModal.show(pending, name, async (params: Record<string, unknown>) => {
+        await answerCoachQuestion('resolve_side_step', params, 'Side Step choice failed', () => showSideStepModal(state));
     });
 }
 
@@ -1351,6 +1382,10 @@ async function init(): Promise<void> {
             showJuggernautModal(state); // P309: i po obnovení stránky
         } else if (state.pendingPilingOn) {
             showPilingOnModal(state); // P310: i po obnovení stránky
+        } else if (state.pendingWrestle) {
+            showWrestleModal(state); // P312: i po obnovení stránky
+        } else if (state.pendingSideStep) {
+            showSideStepModal(state); // P312
         } else if (state.pendingBombRethrow) {
             enterBombRethrow(state); // P272: i po obnovení stránky
         } else if (state.pendingReferee) {

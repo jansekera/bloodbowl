@@ -427,6 +427,24 @@ final class BlockHandler implements ActionHandlerInterface
         return $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
     }
 
+    /**
+     * Side Step (i v řetězu): AI volí nejbezpečnější sousední pole (nejméně zón soupeře); kouč-člověk odtlačeného
+     * volí sám, i „nepoužít“ (P312, `Coach::sideStep`; ř. 8474-8478 "his coach may choose"). Při odtlačení
+     * nanečisto (náhled pro otázku Stand Firm, ocenění AI) se neptá — počítá s volbou AI.
+     *
+     * @param list<Position> $squares
+     * @param \Closure(Position): int $zonySoupere
+     */
+    private function sideStepPole(GameState $state, MatchPlayerDTO $kdo, array $squares, \Closure $zonySoupere): Position|false
+    {
+        usort($squares, static fn(Position $a, Position $b): int => $zonySoupere($a) <=> $zonySoupere($b));
+        if ($this->nanecisto) {
+            return $squares[0];
+        }
+
+        return $this->coach->sideStep($kdo->getTeamSide(), $kdo->getId(), $squares, $squares[0], $state);
+    }
+
     private function maSideStep(MatchPlayerDTO $obrance): bool
     {
         return $obrance->hasSkill(SkillName::SideStep) && $obrance->getState()->canAct();
@@ -758,7 +776,6 @@ final class BlockHandler implements ActionHandlerInterface
         array $params,
         Position|false|null $grabVolba = null,
         ?array $standFirm = null,
-        ?bool $juggernautVolba = null,
     ): ActionResult {
         $pending = $state->getPendingBlock();
         if ($pending === null) {
@@ -800,17 +817,16 @@ final class BlockHandler implements ActionHandlerInterface
         // P309 (uživatel 20.11.2026): Juggernaut v blitzu "may choose to treat a 'Both Down' result as if a 'Pushed'
         //   result has been rolled instead" (ř. 8191-8195). OPRAVENO 20.11. -- dřív převod vždy (`applyBlockResult`).
         //   Rozhoduje útočník: kouč-člověk otázkou (`Coach::juggernaut`, přehrání), AI podle `aiJuggernautFace`.
-        //   Jedno místo nad definitivně zvolenou kostkou (i když ji vybral obránce). `$juggernautVolba` = odpověď
-        //   z dřívějšího přerušení téhož bloku otázkou na Stand Firm / Grab (vnitřní argument, review P309 (1)).
+        //   Jedno místo nad definitivně zvolenou kostkou (i když ji vybral obránce). Odpověď z dřívějšího přerušení
+        //   téhož bloku otázkou na Stand Firm / Grab vrátí kouč sám (P312 `Coach::predradit`, dřív `$juggernautVolba`).
         $mozno = $chosenFace === BlockDiceFace::BOTH_DOWN && $isBlitz && $attacker->hasSkill(SkillName::Juggernaut);
-        $juggernaut = $mozno && ($juggernautVolba ?? $this->coach->juggernaut(
+        $juggernaut = $mozno && $this->coach->juggernaut(
             $attacker->getTeamSide(),
             $attacker->getId(),
             $defender->getId(),
             $this->aiJuggernautFace($chosenFace, $attacker, $defender, true, $state) === BlockDiceFace::PUSHED,
             $state->withPendingBlock(null),
-        ));
-        $juggernautOdpoved = $mozno ? $juggernaut : null;
+        );
         $ucinek = $juggernaut ? BlockDiceFace::PUSHED : $chosenFace;   // jak se kostka vyhodnotí
         // P81 krok 3: follow-up je volba -- clovek ji posila spolu s kostkou,
         //   bez parametru rozhodne pravidlo AI (`wantsFollowUp`).
@@ -820,7 +836,7 @@ final class BlockHandler implements ActionHandlerInterface
         //   hodí nebo pohne (odtlačení je až do rozhodnutí čisté) -- stav se vrací s čekajícím blokem
         //   a po odpovědi se blok vyhodnotí znovu od téže kostky se všemi odpověďmi.
         $odpovedi = $standFirm ?? [];
-        [$result, $kdo] = $this->sOtazkouNaStandFirm($odpovedi, function () use ($state, $attacker, $defender, $chosenFace, $ucinek, $juggernaut, $juggernautOdpoved, $isBlitz, $grabVolba, $index, $odpovedi, $faces, $pending, $followUpChoice): ActionResult {
+        [$result, $kdo] = $this->sOtazkouNaStandFirm($odpovedi, function () use ($state, $attacker, $defender, $chosenFace, $ucinek, $juggernaut, $isBlitz, $grabVolba, $index, $odpovedi, $faces, $pending, $followUpChoice): ActionResult {
             if ($grabVolba === null) {
                 $squares = $this->grabQuestionSquares($state, $attacker, $defender, $ucinek, $isBlitz);
                 if ($squares !== []) {
@@ -831,7 +847,6 @@ final class BlockHandler implements ActionHandlerInterface
                         $squares,
                         faceIndex: (int) $index,
                         standFirm: $odpovedi,
-                        juggernaut: $juggernautOdpoved,
                     )), []);
                 }
             }
@@ -864,7 +879,6 @@ final class BlockHandler implements ActionHandlerInterface
                 answers: $odpovedi,
                 followUp: $followUpChoice,
                 grab: $grabVolba,
-                juggernaut: $juggernautOdpoved,
             )), []);
         }
         assert($result instanceof ActionResult);
@@ -1987,10 +2001,8 @@ final class BlockHandler implements ActionHandlerInterface
         if ($grabSquares !== []) {
             usort($grabSquares, $nejhorsiPrvni);
             $pushTo = $grabSquares[0];
-        } elseif ($sideStepSquares !== []) {
-            // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi sousedni pole (nejmin zon)
-            usort($sideStepSquares, fn(Position $a, Position $b) => $zonySoupere($a) <=> $zonySoupere($b));
-            $pushTo = $sideStepSquares[0];
+        } elseif ($sideStepSquares !== [] && ($sideStepPole = $this->sideStepPole($state, $kdo, $sideStepSquares, $zonySoupere)) !== false) {
+            $pushTo = $sideStepPole;
         } elseif ($emptySquares !== []) {
             // OPRAVENO 08.10.2026 (audit parity, nález 3a) -- před touhle větví stálo
             //   `elseif ($offPitchAvailable)` ("dav má přednost"): bylo-li kterékoli ze tří
@@ -2270,8 +2282,7 @@ final class BlockHandler implements ActionHandlerInterface
     /**
      * Použije některý z dvojice Wrestle na výsledek Both Down? (`rules_bb2016.txt`
      * ř. 8671-8678: "may use", ř. 1820: "Skill use is not mandatory".)
-     * Volba je automatická pro obě strany (dialog na ni web nemá), vzor C++
-     * `block_handler.cpp:931-947`:
+     * Kouč-člověk volí otázkou (P312), AI podle pravidla (vzor C++ `block_handler.cpp`):
      * - útočník bez Blocku by padl sám (turnover) ⇒ Wrestle vždy; s Blockem jen když je co
      *   získat (soupeř má Block, takže by se nestalo nic) a sám míč nenese -- položený nosič
      *   týmu na tahu je turnover (ř. 8677-8678). OPRAVENO 23.11.2026 (P322): dřív i proti nosiči
@@ -2287,15 +2298,16 @@ final class BlockHandler implements ActionHandlerInterface
         $attHasBlock = $attacker->hasSkill(SkillName::Block);
         $defHasBlock = $defender->hasSkill(SkillName::Block);
 
-        $attWants = $attacker->hasSkill(SkillName::Wrestle)
-            && (!$attHasBlock || (!$attHasBall && $defHasBlock));
         // ROZHODL UZIVATEL 16.10.2026: obrance s Wrestle ho pouzije, ma-li utocnik Block (jinak by
         //   Both Down ustal); ma-li Block obrance a utocnik ne, Wrestle nevoli (utocnik pada sam).
         //   Drive jen proti nosici s Blockem. Tataz podminka v C++ (`block_handler.cpp`).
+        // P312 (uživatel 20.11.: „ano“): kouč-člověk volí sám (`Coach::wrestle`), AI podle pravidel výš. Pořadí jako
+        //   C++ (`USE_WRESTLE`): napřed obránce, útočníka se ptá, jen když Wrestle obránce už oba nepoložil.
         $defWants = $this->obranceSmiWrestle($attacker, $defender, $isBlitz)
-            && (!$defHasBlock || $attHasBlock);
+            && $this->coach->wrestle($defender->getTeamSide(), $defender->getId(), $attacker->getId(), !$defHasBlock || $attHasBlock, $state);
 
-        return $attWants || $defWants;
+        return $defWants || ($attacker->hasSkill(SkillName::Wrestle)
+            && $this->coach->wrestle($attacker->getTeamSide(), $attacker->getId(), $defender->getId(), !$attHasBlock || (!$attHasBall && $defHasBlock), $state));
     }
 
     /**

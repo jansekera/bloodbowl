@@ -35,14 +35,21 @@ final class PendingGrabDTO
         private readonly ?BlockDiceFace $face = null,
         private readonly int $step = 0,
         private readonly array $standFirm = [],
-        // P309 review (1): odpověď útočníka na Juggernaut (true = Pushed); dnes nenastane (Grab jen v Block Action),
-        //   nese se pro jistotu stejně jako Stand Firm
-        private readonly ?bool $juggernaut = null,
+        // P312: odpovědi kouče z přerušené akce (viz PendingStandFirmDTO::$coach)
+        private ?ReplayAnswers $coach = null,
     ) {}
 
-    public function getJuggernaut(): ?bool
+    public function withCoach(ReplayAnswers $coach): self
     {
-        return $this->juggernaut;
+        $c = clone $this;
+        $c->coach = $coach;
+
+        return $c;
+    }
+
+    public function getCoach(): ?ReplayAnswers
+    {
+        return $this->coach;
     }
 
     /** @return array<int, bool> */
@@ -110,7 +117,7 @@ final class PendingGrabDTO
             'face' => $this->face?->value,
             'step' => $this->step,
             'standFirm' => array_map(static fn(int $id, bool $use) => ['playerId' => $id, 'use' => $use], array_keys($this->standFirm), $this->standFirm),
-            'juggernaut' => $this->juggernaut,
+            'coach' => $this->coach?->toArray(),
         ];
     }
 
@@ -137,7 +144,7 @@ final class PendingGrabDTO
             isset($data['face']) ? BlockDiceFace::from((string) $data['face']) : null,
             (int) ($data['step'] ?? 0),
             $standFirm,
-            isset($data['juggernaut']) ? (bool) $data['juggernaut'] : null,
+            isset($data['coach']) ? ReplayAnswers::fromArray((array) $data['coach']) : null,
         );
     }
 }

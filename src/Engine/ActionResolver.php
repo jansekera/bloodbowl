@@ -220,6 +220,23 @@ final class ActionResolver
                 $r->withAnswers($r->answers->withJuggernaut((bool) ($params['use'] ?? false))),
             );
         }
+        // P312: Wrestle (ř. 8670-8676 "may use") a pole Side Step (ř. 8474-8478 "may choose") — stejné přehrání.
+        if ($action === ActionType::RESOLVE_WRESTLE) {
+            $pending = $state->getPendingWrestle() ?? throw new \InvalidArgumentException('No pending Wrestle question');
+            $r = $pending->getReplay();
+
+            return $this->resolveSPrehranim(
+                $state->withPendingWrestle(null),
+                $r->withAnswers($r->answers->withWrestle((bool) ($params['use'] ?? false))),
+            );
+        }
+        if ($action === ActionType::RESOLVE_SIDE_STEP) {
+            $pending = $state->getPendingSideStep() ?? throw new \InvalidArgumentException('No pending Side Step question');
+            $r = $pending->getReplay();
+            $pole = ($params['use'] ?? false) === true ? ['x' => (int) $params['x'], 'y' => (int) $params['y']] : null;
+
+            return $this->resolveSPrehranim($state->withPendingSideStep(null), $r->withAnswers($r->answers->withSideStep($pole)));
+        }
         // P310: Piling On (ř. 8361-8371 "may use") — stejné přehrání jako u Diving Catch.
         if ($action === ActionType::RESOLVE_PILING_ON) {
             $pending = $state->getPendingPilingOn() ?? throw new \InvalidArgumentException('No pending Piling On question');
@@ -294,6 +311,7 @@ final class ActionResolver
         $this->coach->begin($replay->answers);
         try {
             $r = $this->resolveJednou($zaklad, $replay->action, $replay->params);
+            $r = $this->sOdpovedmiKouce($r);
             if (self::$hlidatLog && ($zahozene = self::bez(GameEvent::log(), $r->getEvents())) !== []) {
                 throw new \LogicException('Log akce obsahuje události, které ve výsledku nejsou (výpočet nanečisto mimo GameEvent::bezLogu?): '
                     . implode(', ', array_map(static fn(GameEvent $e): string => $e->getType(), $zahozene)));
@@ -313,6 +331,25 @@ final class ActionResolver
             GameEvent::ukoncitLog();
             $this->coach->end();
         }
+    }
+
+    /**
+     * P312: akce skončila otázkou Stand Firm / Grab (ty se nepřehrávají, blok se po odpovědi vyhodnotí znovu jinou akcí)
+     * ⇒ ať nese odpovědi kouče, které akce už spotřebovala (Juggernaut, Wrestle, Side Step…); pokračování je předřadí.
+     */
+    private function sOdpovedmiKouce(ActionResult $r): ActionResult
+    {
+        $s = $r->getNewState();
+        $pouzite = $this->coach->pouzite();
+        if ($s->getPendingStandFirm() !== null) {
+            $s = $s->withPendingStandFirm($s->getPendingStandFirm()->withCoach($pouzite));
+        } elseif ($s->getPendingGrab() !== null) {
+            $s = $s->withPendingGrab($s->getPendingGrab()->withCoach($pouzite));
+        } else {
+            return $r;
+        }
+
+        return new ActionResult($s, $r->isSuccess(), $r->isTurnover(), $r->getEvents());
     }
 
     /**
@@ -540,7 +577,7 @@ final class ActionResolver
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
             // odpovědi na otázky kouče se přehrávají v `resolve()` (P294)
             ActionType::RESOLVE_REROLL, ActionType::RESOLVE_DIVING_CATCH, ActionType::RESOLVE_BOMB_RETHROW,
-            ActionType::RESOLVE_REFEREE, ActionType::RESOLVE_BLOCK_DIE, ActionType::RESOLVE_JUGGERNAUT, ActionType::RESOLVE_PILING_ON => throw new \LogicException("{$action->value} se vyřizuje v resolve()"),
+            ActionType::RESOLVE_REFEREE, ActionType::RESOLVE_BLOCK_DIE, ActionType::RESOLVE_JUGGERNAUT, ActionType::RESOLVE_PILING_ON, ActionType::RESOLVE_WRESTLE, ActionType::RESOLVE_SIDE_STEP => throw new \LogicException("{$action->value} se vyřizuje v resolve()"),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)
@@ -636,6 +673,7 @@ final class ActionResolver
         $volba = $params['use'] === true
             ? new Position((int) $params['x'], (int) $params['y'])
             : false;
+        $this->coach->predradit($pending->getCoach());   // P312: odpovědi z přerušené akce
 
         if ($pending->getKind() === 'bnc') {
             return $this->ballAndChainHandler->resumeGrab($state, $pending, $volba);
@@ -647,7 +685,7 @@ final class ActionResolver
             $blockParams['followUp'] = $params['followUp'];
         }
 
-        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams, $volba, $pending->getStandFirm(), $pending->getJuggernaut());
+        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams, $volba, $pending->getStandFirm());
     }
 
     /**
@@ -665,6 +703,7 @@ final class ActionResolver
         }
         $odpovedi = $pending->getAnswers();
         $odpovedi[$pending->getPlayerId()] = $params['use'] === true;
+        $this->coach->predradit($pending->getCoach());   // P312: odpovědi z přerušené akce
         if ($pending->getKind() === 'bnc') {
             return $this->ballAndChainHandler->resumeStandFirm($state, $pending, $odpovedi);
         }
@@ -676,7 +715,7 @@ final class ActionResolver
             $blockParams['followUp'] = $pending->getFollowUp();
         }
 
-        return $this->blockHandler->resolveBlockChoice($state->withPendingStandFirm(null), $blockParams, $pending->getGrab(), $odpovedi, $pending->getJuggernaut());
+        return $this->blockHandler->resolveBlockChoice($state->withPendingStandFirm(null), $blockParams, $pending->getGrab(), $odpovedi);
     }
 
     /**

@@ -50,9 +50,18 @@ final class PendingStandFirmDTO
         private readonly int $index = 0,
         private readonly bool $grabPossible = false,
         private readonly array $pushToDependsOn = [],
-        // P309 review (1): odpověď útočníka na Juggernaut (true = Pushed), ať ji RESOLVE_STAND_FIRM nepoloží znovu
-        private readonly ?bool $juggernaut = null,
+        // P312 (dřív P309 review (1) jen `juggernaut`): odpovědi kouče z přerušené akce (Juggernaut, Wrestle, Side Step…),
+        //   ať je RESOLVE_STAND_FIRM nepoloží znovu (`Coach::predradit`); připojuje `ActionResolver::resolveSPrehranim`.
+        private ?ReplayAnswers $coach = null,
     ) {}
+
+    public function withCoach(ReplayAnswers $coach): self
+    {
+        $c = clone $this;
+        $c->coach = $coach;
+
+        return $c;
+    }
 
     public function getPlayerId(): int
     {
@@ -105,9 +114,9 @@ final class PendingStandFirmDTO
         return $this->grab;
     }
 
-    public function getJuggernaut(): ?bool
+    public function getCoach(): ?ReplayAnswers
     {
-        return $this->juggernaut;
+        return $this->coach;
     }
 
     public function getStep(): int
@@ -161,7 +170,7 @@ final class PendingStandFirmDTO
             'index' => $this->index,
             'grabPossible' => $this->grabPossible,
             'pushToDependsOn' => $this->pushToDependsOn,
-            'juggernaut' => $this->juggernaut,
+            'coach' => $this->coach?->toArray(),
         ];
     }
 
@@ -200,7 +209,7 @@ final class PendingStandFirmDTO
             (int) ($data['index'] ?? 0),
             (bool) ($data['grabPossible'] ?? false),
             array_values(array_map('intval', (array) ($data['pushToDependsOn'] ?? []))),
-            isset($data['juggernaut']) ? (bool) $data['juggernaut'] : null,
+            isset($data['coach']) ? ReplayAnswers::fromArray((array) $data['coach']) : null,
         );
     }
 }

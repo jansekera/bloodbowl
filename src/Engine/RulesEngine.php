@@ -63,6 +63,36 @@ final class RulesEngine
         if ($action === ActionType::RESOLVE_JUGGERNAUT) {
             return ['No pending Juggernaut question'];
         }
+        // P312: Wrestle a Side Step — stejně přednostně; pole Side Step jen z nabídnutých.
+        if ($state->getPendingWrestle() !== null) {
+            return $action !== ActionType::RESOLVE_WRESTLE ? ['Must answer the Wrestle question first']
+                : (isset($params['use']) && is_bool($params['use']) ? [] : ['use must be a boolean']);
+        }
+        if ($action === ActionType::RESOLVE_WRESTLE) {
+            return ['No pending Wrestle question'];
+        }
+        $sideStep = $state->getPendingSideStep();
+        if ($sideStep !== null) {
+            if ($action !== ActionType::RESOLVE_SIDE_STEP) {
+                return ['Must answer the Side Step question first'];
+            }
+            if (!isset($params['use']) || !is_bool($params['use'])) {
+                return ['use must be a boolean'];
+            }
+            if ($params['use'] === false) {
+                return [];
+            }
+            foreach ($sideStep->getSquares() as $p) {
+                if (($params['x'] ?? null) === $p->getX() && ($params['y'] ?? null) === $p->getY()) {
+                    return [];
+                }
+            }
+
+            return ['Side Step square not offered'];
+        }
+        if ($action === ActionType::RESOLVE_SIDE_STEP) {
+            return ['No pending Side Step question'];
+        }
         // P310: Piling On — stejně přednostně (přehrání akce po odpovědi).
         if ($state->getPendingPilingOn() !== null) {
             return $action !== ActionType::RESOLVE_PILING_ON ? ['Must answer the Piling On question first']
@@ -221,6 +251,13 @@ final class RulesEngine
         // P309: Juggernaut — jen odpověď kouče
         if ($state->getPendingJuggernaut() !== null) {
             return [['type' => ActionType::RESOLVE_JUGGERNAUT->value]];
+        }
+        // P312: Wrestle / Side Step — jen odpověď kouče
+        if ($state->getPendingWrestle() !== null) {
+            return [['type' => ActionType::RESOLVE_WRESTLE->value]];
+        }
+        if ($state->getPendingSideStep() !== null) {
+            return [['type' => ActionType::RESOLVE_SIDE_STEP->value]];
         }
         // P310: Piling On — jen odpověď kouče
         if ($state->getPendingPilingOn() !== null) {

@@ -60,6 +60,9 @@ final class GameState
         private ?PendingJuggernautDTO $pendingJuggernaut = null,
         // P310, 24.11.2026: útočník kouče-člověka smí použít Piling On (viz PendingPilingOnDTO).
         private ?PendingPilingOnDTO $pendingPilingOn = null,
+        // P312, 24.11.2026: Wrestle a pole Side Step jako volba kouče-člověka (viz PendingWrestleDTO, PendingSideStepDTO).
+        private ?PendingWrestleDTO $pendingWrestle = null,
+        private ?PendingSideStepDTO $pendingSideStep = null,
     ) {}
 
     /**
@@ -450,6 +453,30 @@ final class GameState
         return $clone;
     }
 
+    public function getPendingWrestle(): ?PendingWrestleDTO
+    {
+        return $this->pendingWrestle;
+    }
+
+    public function withPendingWrestle(?PendingWrestleDTO $pending): self
+    {
+        $clone = clone $this;
+        $clone->pendingWrestle = $pending;
+        return $clone;
+    }
+
+    public function getPendingSideStep(): ?PendingSideStepDTO
+    {
+        return $this->pendingSideStep;
+    }
+
+    public function withPendingSideStep(?PendingSideStepDTO $pending): self
+    {
+        $clone = clone $this;
+        $clone->pendingSideStep = $pending;
+        return $clone;
+    }
+
     public function getPendingPilingOn(): ?PendingPilingOnDTO
     {
         return $this->pendingPilingOn;
@@ -473,6 +500,7 @@ final class GameState
             || $this->pendingBlockDie !== null
             || $this->pendingJuggernaut !== null   // P309
             || $this->pendingPilingOn !== null     // P310
+            || $this->pendingWrestle !== null || $this->pendingSideStep !== null   // P312
             || $this->pendingReroll !== null;   // P292/P294: přehoz hodu (i v tahu soupeře), vždy přehráním
     }
 
@@ -660,6 +688,8 @@ final class GameState
             'pendingBlockDie' => $this->pendingBlockDie?->toArray($sPrehranim),
             'pendingJuggernaut' => $this->pendingJuggernaut?->toArray($sPrehranim),
             'pendingPilingOn' => $this->pendingPilingOn?->toArray($sPrehranim),
+            'pendingWrestle' => $this->pendingWrestle?->toArray($sPrehranim),
+            'pendingSideStep' => $this->pendingSideStep?->toArray($sPrehranim),
         ];
     }
 
@@ -700,6 +730,8 @@ final class GameState
             pendingBlockDie: isset($data['pendingBlockDie']) ? PendingBlockDieDTO::fromArray((array) $data['pendingBlockDie']) : null,
             pendingJuggernaut: isset($data['pendingJuggernaut']) ? PendingJuggernautDTO::fromArray((array) $data['pendingJuggernaut']) : null,
             pendingPilingOn: isset($data['pendingPilingOn']) ? PendingPilingOnDTO::fromArray((array) $data['pendingPilingOn']) : null,
+            pendingWrestle: isset($data['pendingWrestle']) ? PendingWrestleDTO::fromArray((array) $data['pendingWrestle']) : null,
+            pendingSideStep: isset($data['pendingSideStep']) ? PendingSideStepDTO::fromArray((array) $data['pendingSideStep']) : null,
         );
     }
 }

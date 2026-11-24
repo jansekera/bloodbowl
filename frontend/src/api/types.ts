@@ -187,6 +187,19 @@ export interface PendingPilingOn {
     armour: boolean;
 }
 
+/** P312 (24.11.2026): Both Down, hráč kouče-člověka má Wrestle — použít? (`rules_bb2016.txt` ř. 8670-8676) */
+export interface PendingWrestle {
+    playerId: number;
+    opponentId: number;
+}
+
+/** P312: odtlačený hráč kouče-člověka se Side Step — kam (ř. 8474-8478); `suggested` = volba AI. */
+export interface PendingSideStep {
+    playerId: number;
+    squares: { x: number; y: number }[];
+    suggested: { x: number; y: number };
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -216,6 +229,8 @@ export interface GameState {
     pendingBlockDie?: PendingBlockDie | null;
     pendingJuggernaut?: PendingJuggernaut | null;
     pendingPilingOn?: PendingPilingOn | null;
+    pendingWrestle?: PendingWrestle | null;
+    pendingSideStep?: PendingSideStep | null;
 }
 
 export interface TeamState {
