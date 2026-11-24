@@ -27,6 +27,8 @@ bool pilingOnAllowed(const GameState& state, const Player& att, const Player& de
 //   ne s míčem (turnover), ne uvnitř Multiple Block; šetří přehoz, dokud tým hraje s míčem (použije, jen když míč
 //   drží soupeř nebo náš nosič už v tahu dohrál); a jen když zisk (soupeř vyřazen po přehozu) > ztráta (náš ležící
 //   útočník vyřazen faulem: všichni stojící soupeři vedle něj asistují, faulující přijde zvenku, Dirty Player +1).
+//   Uživatel 24.11. (2): po použití musí zbýt aspoň jeden přehoz (na tah s možností TD; kromě našeho posledního
+//   tahu poločasu) a útočník nesmí stát vedle nosiče (ležící neotevře cestu k míči — roh klece / krytí nosiče).
 // `armourStage` = přehazuje se brnění (vydrželo), jinak zranění (padlo Stunned) s modifikátorem `injuryMod`.
 bool aiPilingOn(const GameState& state, const Player& att, const Player& def, bool armourStage,
                 int armourMod, bool mightyBlow, bool claw, int injuryMod, bool multipleBlock);

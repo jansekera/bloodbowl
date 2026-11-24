@@ -65,6 +65,13 @@ bool aiPilingOn(const GameState& state, const Player& att, const Player& def, bo
         ballDone = carrier.teamSide != att.teamSide || carrier.hasActed;
     }
     if (!ballDone) return false;
+    // Uživatel 24.11. (2): „1 ano - zvlášť na tah s možností dát TD šetřit aspoň jeden reroll“ ⇒ po Piling On musí
+    //   zbýt aspoň jeden týmový přehoz; v našem posledním tahu poločasu ne (přehozy se o poločase obnovují).
+    const TeamState& team = state.getTeamState(att.teamSide);
+    if (team.rerolls < 2 && team.turnNumber < 8) return false;
+    // „2 ano“ (neotevřít soupeři cestu k míči): vedle nosiče (roh naší klece / kdo kryje soupeřova nosiče) ne —
+    //   ležící nemá tackle zónu.
+    if (ball.isHeld && state.getPlayer(ball.carrierId).position.distanceTo(att.position) <= 1) return false;
     const double gain = armourStage ? armourThenOutChance(def, armourMod, mightyBlow, claw)
                                     : injuryOutChance(def, injuryMod);
     return gain > foulOutChance(state, att, def.id);

@@ -35,6 +35,8 @@ final class PilingOn
      * Rozhodnutí AI (uživatel 24.11.: „1 vše, 2 ano“ + „piling on dává našeho hráče na zem - cíl pro faul“): ne s míčem
      * (turnover), ne v Multiple Block; šetří přehoz, dokud tým hraje s míčem (jen když míč drží soupeř, nebo náš nosič
      * už v tahu dohrál); a jen když zisk (soupeř po přehozu vyřazen) > ztráta (náš ležící útočník vyřazen faulem).
+     * Uživatel 24.11. (2): po použití musí zbýt aspoň jeden přehoz (kromě posledního tahu poločasu) a útočník nesmí
+     * stát vedle nosiče (ležící neotevře cestu k míči).
      *
      * @param bool $brneni přehazuje se brnění (vydrželo), jinak zranění (Stunned) s modifikátorem `$injuryMod`
      */
@@ -56,6 +58,18 @@ final class PilingOn
         $nosic = $nosicId !== null && $state->getBall()->isHeld() ? $state->getPlayer($nosicId) : null;
         if ($nosic === null || ($nosic->getTeamSide() === $attacker->getTeamSide() && !$nosic->hasActed())) {
             return false;   // otázka 2: přehoz se šetří, dokud tým hraje s míčem
+        }
+        // Uživatel 24.11. (2): „1 ano - zvlášť na tah s možností dát TD šetřit aspoň jeden reroll“ ⇒ po Piling On musí
+        //   zbýt aspoň jeden týmový přehoz; v našem posledním tahu poločasu ne (přehozy se o poločase obnovují).
+        $tym = $state->getTeamState($attacker->getTeamSide());
+        if ($tym->getRerolls() < 2 && $tym->getTurnNumber() < 8) {
+            return false;
+        }
+        // „2 ano“ (neotevřít soupeři cestu k míči): vedle nosiče (roh naší klece / kdo kryje soupeřova nosiče) ne.
+        $poleNosice = $nosic->getPosition();
+        $pole = $attacker->getPosition();
+        if ($poleNosice !== null && $pole !== null && $poleNosice->distanceTo($pole) <= 1) {
+            return false;
         }
         $zisk = $brneni ? self::brneniPakVen($defender, $armourMod, $mightyBlow, $claw) : self::zraneniVen($defender, $injuryMod);
 

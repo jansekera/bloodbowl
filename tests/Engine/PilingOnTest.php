@@ -202,7 +202,7 @@ final class PilingOnTest extends TestCase
 
     public function testAiStunnedPrehodiZraneni(): void
     {
-        $s = $this->ai($this->stav(), [2, 6, 6, 1, 1, 4, 4])->getNewState();
+        $s = $this->ai($this->stav(2), [2, 6, 6, 1, 1, 4, 4])->getNewState();   // po Piling On zbude přehoz
         $this->assertSame(PlayerState::KO, $s->requirePlayer(2)->getState());
         $this->assertSame(PlayerState::PRONE, $s->requirePlayer(1)->getState());
     }
@@ -211,6 +211,7 @@ final class PilingOnTest extends TestCase
     public function testAiNasNosicJesteHrajeSetri(): void
     {
         $s0 = (new GameStateBuilder())
+            ->withHomeTeam(TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 2))
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Block, SkillName::PilingOn], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
             ->addPlayer(TeamSide::HOME, 2, 2, id: 4)
@@ -227,7 +228,7 @@ final class PilingOnTest extends TestCase
 
     public function testAiVolnyMicSetri(): void
     {
-        $s0 = $this->stav()->withBall(\App\DTO\BallState::onGround(new \App\ValueObject\Position(3, 3)));
+        $s0 = $this->stav(2)->withBall(\App\DTO\BallState::onGround(new \App\ValueObject\Position(3, 3)));
         $s = $this->ai($s0, [2, 6, 6, 1, 1])->getNewState();
         $this->assertSame(PlayerState::STANDING, $s->requirePlayer(1)->getState());
     }
@@ -235,7 +236,7 @@ final class PilingOnTest extends TestCase
     /** (a) brnění vydrželo: AV9 bez soupeřů vedle přehodí (zisk 0,116 > faul 0,069) … */
     public function testAiBrneniBezHrozbyFaulu(): void
     {
-        $s = $this->ai($this->stav(avUtocnika: 9), [2, 1, 1, 6, 6, 4, 4])->getNewState();
+        $s = $this->ai($this->stav(2, avUtocnika: 9), [2, 1, 1, 6, 6, 4, 4])->getNewState();
         $this->assertSame(PlayerState::KO, $s->requirePlayer(2)->getState());
         $this->assertSame(PlayerState::PRONE, $s->requirePlayer(1)->getState());
     }
@@ -243,14 +244,42 @@ final class PilingOnTest extends TestCase
     /** … se dvěma stojícími soupeři vedle (asistence k faulu, 0,174) ne — „cíl pro faul“. */
     public function testAiBrneniDvaAsistentiFauluNe(): void
     {
-        $s0 = $this->stav(avUtocnika: 9);
+        $s0 = $this->stav(2, avUtocnika: 9);
         $b = (new GameStateBuilder())->addPlayer(TeamSide::AWAY, 4, 4, id: 5)->addPlayer(TeamSide::AWAY, 4, 6, id: 6)->build();
         $s0 = $s0->withPlayer($b->requirePlayer(5))->withPlayer($b->requirePlayer(6));
         $r = $this->ai($s0, [2, 2, 1, 1]);   // dva asistenti obránce ⇒ dvě kostky bloku (obě Both Down)
         $s = $r->getNewState();
 
         $this->assertSame(PlayerState::STANDING, $s->requirePlayer(1)->getState());
+        $this->assertSame(2, $s->getTeamState(TeamSide::HOME)->getRerolls());
+    }
+
+    /** Uživatel 24.11. (2): „zvlášť na tah s možností dát TD šetřit aspoň jeden reroll“ — poslední přehoz ne … */
+    public function testAiPosledniPrehozSetriNaTahSTd(): void
+    {
+        $s = $this->ai($this->stav(1), [2, 6, 6, 1, 1])->getNewState();
+        $this->assertSame(PlayerState::STANDING, $s->requirePlayer(1)->getState());
         $this->assertSame(1, $s->getTeamState(TeamSide::HOME)->getRerolls());
+    }
+
+    /** … v našem posledním tahu poločasu ano (přehozy se o poločase obnovují). */
+    public function testAiPosledniTahPolocasuPouzijePosledniPrehoz(): void
+    {
+        $home = TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 1)->withTurnNumber(8);
+        $s0 = $this->stav(1)->withTeamState(TeamSide::HOME, $home);
+        $s = $this->ai($s0, [2, 6, 6, 1, 1, 4, 4])->getNewState();
+        $this->assertSame(PlayerState::KO, $s->requirePlayer(2)->getState());
+        $this->assertSame(PlayerState::PRONE, $s->requirePlayer(1)->getState());
+    }
+
+    /** „2 ano“ (neotevřít cestu k míči): útočník vedle soupeřova nosiče ho kryje — ležící by ho pustil. */
+    public function testAiVedleNosiceZustaneStat(): void
+    {
+        $s0 = $this->stav(2);
+        $s0 = $s0->withPlayer($s0->requirePlayer(3)->withPosition(new \App\ValueObject\Position(4, 5)))->withBall(\App\DTO\BallState::carried(new \App\ValueObject\Position(4, 5), 3));
+        $s = $this->ai($s0, [2, 2, 6, 6, 1, 1])->getNewState();   // nosič vedle útočníka asistuje ⇒ dvě kostky
+        $this->assertSame(PlayerState::STUNNED, $s->requirePlayer(2)->getState());
+        $this->assertSame(PlayerState::STANDING, $s->requirePlayer(1)->getState());
     }
 
     public function testSanceZraneniStuntyAThickSkull(): void

@@ -171,7 +171,7 @@ TEST(P310PilingOn, CarrierPilesOn_Turnover_BallLoose) {
 
 // (b) Stunned: zisk ~42 % > riziko faulu ⇒ přehodí zranění (míč drží soupeř).
 TEST(P310PilingOn, Ai_StunnedInjury_Rerolls) {
-    GameState gs = pair();
+    GameState gs = pair(2);   // po Piling On zbude přehoz (uživatel 24.11. (2))
     FixedDiceRoller dice({2, 6, 6, 1, 1, 4, 4});
     block(gs, dice);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KO);
@@ -180,18 +180,18 @@ TEST(P310PilingOn, Ai_StunnedInjury_Rerolls) {
 
 // Otázka 2: dokud náš nosič nedohrál, přehoz se šetří.
 TEST(P310PilingOn, Ai_OurCarrierStillToAct_KeepsReroll) {
-    GameState gs = pair();
+    GameState gs = pair(2);   // po Piling On zbude přehoz (uživatel 24.11. (2))
     place(gs, 2, {3, 3});
     gs.ball = BallState::carried({3, 3}, 2);
     FixedDiceRoller dice({2, 6, 6, 1, 1});
     block(gs, dice);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
-    EXPECT_EQ(gs.homeTeam.rerolls, 1);
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
 }
 
 TEST(P310PilingOn, Ai_OurCarrierDone_UsesReroll) {
-    GameState gs = pair();
+    GameState gs = pair(2);   // po Piling On zbude přehoz (uživatel 24.11. (2))
     place(gs, 2, {3, 3});
     gs.getPlayer(2).hasActed = true;
     gs.ball = BallState::carried({3, 3}, 2);
@@ -201,7 +201,7 @@ TEST(P310PilingOn, Ai_OurCarrierDone_UsesReroll) {
 }
 
 TEST(P310PilingOn, Ai_LooseBall_KeepsReroll) {
-    GameState gs = pair();
+    GameState gs = pair(2);   // po Piling On zbude přehoz (uživatel 24.11. (2))
     gs.ball = BallState::onGround({3, 3});
     FixedDiceRoller dice({2, 6, 6, 1, 1});
     block(gs, dice);
@@ -210,7 +210,7 @@ TEST(P310PilingOn, Ai_LooseBall_KeepsReroll) {
 
 // (a) brnění vydrželo: AV9 útočník bez soupeřů vedle ⇒ přehodí (zisk 0,116 > faul 0,069) ...
 TEST(P310PilingOn, Ai_ArmourHeld_NoFoulThreat_Rerolls) {
-    GameState gs = pair();
+    GameState gs = pair(2);   // po Piling On zbude přehoz (uživatel 24.11. (2))
     gs.getPlayer(1).stats.armour = 9;
     FixedDiceRoller dice({2, 1, 1, 6, 6, 4, 4});
     block(gs, dice);
@@ -220,14 +220,45 @@ TEST(P310PilingOn, Ai_ArmourHeld_NoFoulThreat_Rerolls) {
 
 // ... se dvěma stojícími soupeři vedle (asistence k faulu, 0,174) ne — „cíl pro faul“.
 TEST(P310PilingOn, Ai_ArmourHeld_TwoFoulAssists_Declines) {
-    GameState gs = pair();
+    GameState gs = pair(2);   // po Piling On zbude přehoz (uživatel 24.11. (2))
     gs.getPlayer(1).stats.armour = 9;
     place(gs, 14, {9, 6});
     place(gs, 15, {9, 8});
     FixedDiceRoller dice({2, 2, 1, 1});   // dva asistující soupeři ⇒ dvě kostky bloku (obě Both Down)
     block(gs, dice);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+}
+
+// Uživatel 24.11. (2): „zvlášť na tah s možností dát TD šetřit aspoň jeden reroll“ — s posledním přehozem ne ...
+TEST(P310PilingOn, Ai_LastRerollKeptForATouchdownTurn) {
+    GameState gs = pair(1);
+    gs.homeTeam.turnNumber = 5;
+    FixedDiceRoller dice({2, 6, 6, 1, 1});
+    block(gs, dice);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
     EXPECT_EQ(gs.homeTeam.rerolls, 1);
+}
+
+// ... v našem posledním tahu poločasu ano (přehozy se o poločase obnovují).
+TEST(P310PilingOn, Ai_LastTurnOfHalf_UsesLastReroll) {
+    GameState gs = pair(1);
+    gs.homeTeam.turnNumber = 8;
+    FixedDiceRoller dice({2, 6, 6, 1, 1, 4, 4});
+    block(gs, dice);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KO);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+}
+
+// „2 ano“ (neotevřít cestu k míči): útočník vedle soupeřova nosiče ho kryje — ležící by ho pustil.
+TEST(P310PilingOn, Ai_NextToTheCarrier_StaysUp) {
+    GameState gs = pair(2);
+    place(gs, 13, {9, 7});
+    gs.ball = BallState::carried({9, 7}, 13);
+    FixedDiceRoller dice({2, 2, 6, 6, 1, 1});   // nosič vedle útočníka asistuje obránci ⇒ dvě kostky
+    block(gs, dice);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
 }
 
 // Pravidlo AI čte čísla: Stunty sražený 7 = KO (ř. 8534-8536), Thick Skull 8 = Stunned (ř. 8595-8598).
