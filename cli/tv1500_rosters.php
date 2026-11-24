@@ -39,7 +39,8 @@ const TV1500_ROSTERS = [
         // uživatel 16.10.: jeden Catcher Nerves of Steel místo Diving Catch (chytá bez −1 za zóny)
         ['Catcher',   1, [8, 2, 4, 7], [SkillName::Catch, SkillName::Dodge, SkillName::Sprint, SkillName::Block, SkillName::NervesOfSteel]],
         ['Thrower',   1, [7, 3, 4, 7], [SkillName::Pass, SkillName::Block, SkillName::Accurate]],
-        ['Treeman',   1, [2, 6, 1, 10], [SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard]],
+        // P321 bod 4 (parita C++ 6ac70c4f, dorovnáno 24.11. — PHP zůstalo pozadu): + Strong Arm, Throw Team-Mate (ř. 9105-9107)
+        ['Treeman',   1, [2, 6, 1, 10], [SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard, SkillName::StrongArm, SkillName::ThrowTeamMate]],
         // uživatel 16.10.: jeden Lineman bez Wrestle (jen Dodge), TV 1510
         ['Lineman',   1, [7, 3, 4, 7], [SkillName::Dodge]],
         ['Lineman',   1, [7, 3, 4, 7], [SkillName::Dodge]],
@@ -92,7 +93,8 @@ const TV1500_ROSTERS = [
         ['Looney',         1, [6, 2, 3, 7], [SkillName::Chainsaw, SkillName::SecretWeapon, SkillName::Stunty]],
         ['Fanatic',        1, [3, 7, 3, 7], [SkillName::BallAndChain, SkillName::NoHands, SkillName::SecretWeapon, SkillName::Stunty]],
         ['Pogoer',         1, [7, 2, 3, 7], [SkillName::Dodge, SkillName::Leap, SkillName::VeryLongLegs, SkillName::Stunty, SkillName::SureFeet, SkillName::SideStep]],
-        ['Troll',          1, [4, 5, 1, 9], [SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block]],
+        // P310 (24.11.2026): + Piling On (Strength, normal 20) ⇒ TV 1480; parita C++ getGoblinRoster1500
+        ['Troll',          1, [4, 5, 1, 9], [SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block, SkillName::PilingOn]],
         ['Troll',          1, [4, 5, 1, 9], [SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block, SkillName::Guard]],
         ['Scrappa Sorehead', 1, [7, 2, 3, 7], [SkillName::Loner, SkillName::DirtyPlayer, SkillName::Dodge, SkillName::Leap, SkillName::RightStuff, SkillName::Sprint, SkillName::Stunty, SkillName::SureFeet, SkillName::VeryLongLegs]],
         ['Ripper Bolgrot', 1, [4, 6, 1, 9], [SkillName::Loner, SkillName::Grab, SkillName::MightyBlow, SkillName::Regeneration, SkillName::ThrowTeamMate]],

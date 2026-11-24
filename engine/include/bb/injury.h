@@ -3,6 +3,7 @@
 #include "bb/game_state.h"
 #include "bb/dice.h"
 #include "bb/game_event.h"
+#include <functional>
 #include <vector>
 
 namespace bb {
@@ -26,6 +27,10 @@ struct InjuryContext {
     bool chainsaw = false;
     // Stab hazi brneni "unmodified" -- +3 za pilu se na nej nevztahuje.
     bool unmodifiedArmour = false;
+    // P310 Piling On (ř. 8361-8371): "re-roll the Armour roll OR Injury roll" — jeden z nich, nejvýš jednou.
+    // Volá se, když brnění vydrželo (true) nebo zranění dopadlo Stunned (false); vrátí true = hod se přehodí
+    // (rozhodnutí, cenu i Loner řeší volající, `block_handler.cpp`); `injuryMod` = modifikátor přehazovaného zranění.
+    std::function<bool(bool armourStage, int injuryMod)> pilingOn;
 };
 
 // Returns true if armor was broken

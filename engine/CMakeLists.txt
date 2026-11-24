@@ -13,6 +13,7 @@ add_library(bb_engine SHARED
     src/helpers.cpp
     src/coach_choice.cpp
     src/injury.cpp
+    src/piling_on.cpp
     src/ball_handler.cpp
     src/move_handler.cpp
     src/block_handler.cpp
@@ -84,6 +85,7 @@ add_executable(bb_tests
     tests/test_game_simulator.cpp
     tests/test_ttm_handler.cpp
     tests/test_p321_skills.cpp
+    tests/test_p310_piling_on.cpp
     tests/test_bomb_handler.cpp
     tests/test_hail_mary_ai.cpp
     tests/test_bomb_ttm_macros.cpp

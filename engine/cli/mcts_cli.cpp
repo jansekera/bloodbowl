@@ -173,6 +173,9 @@ int main(int argc, char* argv[]) {
     // P309: četnost volby Juggernautu (Both Down útočníka s Juggernautem v blitzu; ponecháno = nepřevedeno na Pushed).
     const JuggernautBothDowns jugg = takeJuggernautBothDowns();
     std::cout << "P309 Juggernaut Both Down v blitzu: " << jugg.total << ", ponecháno: " << jugg.kept << "\n";
+    // P310: Piling On — kolikrát se smělo (skill, stojí vedle, přehoz v tahu) a kolikrát ho AI použila.
+    const PilingOnCounts po = takePilingOnCounts();
+    std::cout << "P310 Piling On nabídnuto: " << po.offered << ", brnění: " << po.armour << ", zranění: " << po.injury << "\n";
 
     return 0;
 }

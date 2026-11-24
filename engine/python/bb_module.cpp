@@ -538,7 +538,7 @@ PYBIND11_MODULE(bb_engine, m) {
                                           "USE_SIDE_STEP", "BLOCK_FACE", "USE_FOLLOW_UP", "USE_APOTHECARY",
                                           "APOTHECARY_PICK", "KICKOFF_RETURN", "KICKOFF_RETURN_PLAYER",
                                           "USE_GRAB", "USE_DIVING_CATCH", "BOMB_REROLL", "BOMB_RETHROW_TARGET",
-                                          "REFEREE_CALL", "USE_JUGGERNAUT"};
+                                          "REFEREE_CALL", "USE_JUGGERNAUT", "USE_PILING_ON"};
             const size_t k = static_cast<size_t>(q.question);
             d["question"] = k < sizeof(names) / sizeof(names[0]) ? names[k] : "?";
             d["player"] = q.playerId;
@@ -730,6 +730,10 @@ PYBIND11_MODULE(bb_engine, m) {
     // P302 (11.11.2026): měřidlo A18 — nejlepší šance strany `side` zvednout volný míč v jejím příštím tahu (−1 = míč není volný)
     m.def("opponent_pickup_chance", [](const bb::GameState& s, bb::TeamSide side) { return bb::opponentPickupChance(s, side); },
           py::arg("state"), py::arg("side"));
+    m.def("take_p310_piling_on", []() {   // P310: (nabídnuto, použito na brnění, použito na zranění); čte a nuluje
+        const bb::PilingOnCounts c = bb::takePilingOnCounts();
+        return py::make_tuple(c.offered, c.armour, c.injury);
+    });
     m.def("take_p220_stops", []() { return bb::takeP220RealStops(); });   // P220: jen skutečně hrané tahy; čte a nuluje
     m.def("take_dodge_cap_stops", []() {
         long v[2]; bb::takeDodgeCapStops(v);

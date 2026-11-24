@@ -63,6 +63,14 @@ final class RulesEngine
         if ($action === ActionType::RESOLVE_JUGGERNAUT) {
             return ['No pending Juggernaut question'];
         }
+        // P310: Piling On — stejně přednostně (přehrání akce po odpovědi).
+        if ($state->getPendingPilingOn() !== null) {
+            return $action !== ActionType::RESOLVE_PILING_ON ? ['Must answer the Piling On question first']
+                : (isset($params['use']) && is_bool($params['use']) ? [] : ['use must be a boolean']);
+        }
+        if ($action === ActionType::RESOLVE_PILING_ON) {
+            return ['No pending Piling On question'];
+        }
         // P272 (10.11.2026): kam hodit chycenou bombu — stejně přednostně; cíl jen z nabídnutých (legálních) polí.
         $bomba = $state->getPendingBombRethrow();
         if ($bomba !== null) {
@@ -213,6 +221,10 @@ final class RulesEngine
         // P309: Juggernaut — jen odpověď kouče
         if ($state->getPendingJuggernaut() !== null) {
             return [['type' => ActionType::RESOLVE_JUGGERNAUT->value]];
+        }
+        // P310: Piling On — jen odpověď kouče
+        if ($state->getPendingPilingOn() !== null) {
+            return [['type' => ActionType::RESOLVE_PILING_ON->value]];
         }
         // P272: kam hodit chycenou bombu — jen odpověď kouče
         if ($state->getPendingBombRethrow() !== null) {

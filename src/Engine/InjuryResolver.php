@@ -38,6 +38,7 @@ final class InjuryResolver
      *   brneni. Text neuvadi okamzik rozhodnuti; takhle to hraje vetsina
      *   implementaci a je to pro majitele skillu optimalni.
      *
+     * @param (\Closure(bool, int): array{bool, list<GameEvent>})|null $pilingOn P310 Piling On (BlockHandler)
      * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
      */
     public function resolve(
@@ -51,6 +52,7 @@ final class InjuryResolver
         bool $mightyBlow = false,
         bool $chainsawHolderBonus = true,
         bool $regenerace = true,
+        ?\Closure $pilingOn = null,
     ): array {
         $events = [];
 
@@ -68,34 +70,62 @@ final class InjuryResolver
             $armourModifier += self::CHAINSAW_ARMOUR_BONUS;
         }
 
-        // Armor roll: 2D6 > AV = armor broken
-        $armourRoll = $dice->roll2D6();
-        $armourValue = $player->getStats()->getArmour();
+        // P310 Piling On (ř. 8361-8371): "re-roll the Armour roll OR Injury roll" — jeden z nich, nejvýš jednou.
+        //   `$pilingOn(bool $brneni, int $injuryMod): array{bool, list<GameEvent>}` = přehodit? + události použití
+        //   (rozhodnutí, cenu i Loner řeší BlockHandler); události jdou do logu hned za hod, který se přehazuje.
+        $prehozeno = false;
+        $zakladBrneni = $armourModifier;
+        $zakladZraneni = $injuryModifier;
+        while (true) {
+            $armourModifier = $zakladBrneni;
+            $injuryModifier = $zakladZraneni;
+            // Armor roll: 2D6 > AV = armor broken
+            $armourRoll = $dice->roll2D6();
+            $armourValue = $player->getStats()->getArmour();
 
-        // Prolomil by hod brneni i BEZ Mighty Blow?
-        $bezMB = self::brneniPadne($armourRoll + $armourModifier, $armourValue, $hasClaw);
-        if ($mightyBlow && !$bezMB) {
-            $armourModifier++;          // MB se utrati na brneni
-        } elseif ($mightyBlow) {
-            $injuryModifier++;          // brneni padlo samo => MB jde na zraneni
+            // Prolomil by hod brneni i BEZ Mighty Blow?
+            $bezMB = self::brneniPadne($armourRoll + $armourModifier, $armourValue, $hasClaw);
+            if ($mightyBlow && !$bezMB) {
+                $armourModifier++;          // MB se utrati na brneni
+            } elseif ($mightyBlow) {
+                $injuryModifier++;          // brneni padlo samo => MB jde na zraneni
+            }
+
+            $modifiedRoll = $armourRoll + $armourModifier;
+            $armourBroken = self::brneniPadne($modifiedRoll, $armourValue, $hasClaw);
+
+            $events[] = GameEvent::armourRoll(
+                $player->getId(),
+                $armourRoll,
+                $armourModifier,
+                $armourValue,
+                $armourBroken,
+            );
+            if ($armourBroken) {
+                break;
+            }
+            if ($prehozeno || $pilingOn === null) {
+                return ['player' => $player, 'events' => $events];
+            }
+            [$prehodit, $poUdalosti] = $pilingOn(true, 0);
+            $events = [...$events, ...$poUdalosti];
+            if (!$prehodit) {
+                return ['player' => $player, 'events' => $events];
+            }
+            $prehozeno = true;   // P310: přehoz brnění, které vydrželo
         }
 
-        $modifiedRoll = $armourRoll + $armourModifier;
-        $armourBroken = self::brneniPadne($modifiedRoll, $armourValue, $hasClaw);
-
-        $events[] = GameEvent::armourRoll(
-            $player->getId(),
-            $armourRoll,
-            $armourModifier,
-            $armourValue,
-            $armourBroken,
-        );
-
-        if (!$armourBroken) {
-            return ['player' => $player, 'events' => $events];
+        $r = $this->resolveInjury($player, $dice, $injuryModifier, $events, $hasStakes, $hasNurglesRot, $regenerace);
+        // P310: Piling On přehodí zranění, které dopadlo jen Stunned (ne už po přehozu brnění)
+        if (!$prehozeno && $pilingOn !== null && $r['player']->getState() === PlayerState::STUNNED) {
+            [$prehodit, $poUdalosti] = $pilingOn(false, $injuryModifier);
+            $r['events'] = [...$r['events'], ...$poUdalosti];
+            if ($prehodit) {
+                return $this->resolveInjury($player, $dice, $injuryModifier, $r['events'], $hasStakes, $hasNurglesRot, $regenerace);
+            }
         }
 
-        return $this->resolveInjury($player, $dice, $injuryModifier, $events, $hasStakes, $hasNurglesRot, $regenerace);
+        return $r;
     }
 
     /**

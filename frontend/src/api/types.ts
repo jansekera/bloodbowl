@@ -177,6 +177,16 @@ export interface PendingJuggernaut {
     defenderId: number;
 }
 
+/**
+ * P310 (24.11.2026): útočník kouče-člověka smí použít Piling On (`rules_bb2016.txt` ř. 8361-8371) — za týmový přehoz
+ * přehodit brnění (`armour`, vydrželo) nebo zranění (padlo Stunned) a lehnout si. Po odpovědi server akci přehraje.
+ */
+export interface PendingPilingOn {
+    playerId: number;
+    defenderId: number;
+    armour: boolean;
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -205,6 +215,7 @@ export interface GameState {
     pendingReferee?: PendingReferee | null;
     pendingBlockDie?: PendingBlockDie | null;
     pendingJuggernaut?: PendingJuggernaut | null;
+    pendingPilingOn?: PendingPilingOn | null;
 }
 
 export interface TeamState {

@@ -67,7 +67,11 @@ enum class CoachQuestion : int {
     // P309 (uživatel 20.11.2026): útočník s Juggernautem v blitzu hodil Both Down (ř. 8191-8195 "may choose to treat
     // a 'Both Down' result as if a 'Pushed' result has been rolled instead"). playerId = útočník, otherId = obránce.
     // Odpověď 1 = brát jako Pushed, 0 = nechat Both Down.
-    USE_JUGGERNAUT = 20
+    USE_JUGGERNAUT = 20,
+    // P310 (uživatel 24.11.2026): Piling On (ř. 8361-8371 "may use", za týmový přehoz). playerId = útočník,
+    // otherId = sražený, roll = 1 brnění vydrželo (přehodit brnění) / 2 zranění Stunned (přehodit zranění).
+    // Odpověď 1 = použít, 0 = ne.
+    USE_PILING_ON = 21
 };
 
 namespace CoachAnswer {

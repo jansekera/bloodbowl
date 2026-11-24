@@ -26,6 +26,7 @@ use App\Engine\ThrowReroll;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\PassResolver;
+use App\Engine\PilingOn;
 use App\Engine\Pathfinder;
 use App\Engine\StrengthCalculator;
 use App\Engine\TacklezoneCalculator;
@@ -1743,28 +1744,25 @@ final class BlockHandler implements ActionHandlerInterface
             $hasClaw = $attacker->hasSkill(SkillName::Claw);
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
-            $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, regenerace: false);
+            // P310 Piling On (ř. 8361-8371). OPRAVENO 24.11.2026 -- dřív se použil vždy (je to volba), bez týmového
+            //   přehozu, bez hodu na Loner, bez kontroly „standing adjacent to the victim“ (i útočník padlý v Both Down),
+            //   a místo jednoho hodu (brnění NEBO zranění) se házelo celé brnění i zranění znovu.
+            $piled = false;
+            $injResult = $this->injuryResolver->resolve(
+                $defender,
+                $this->dice,
+                0,
+                0,
+                $hasClaw,
+                $hasStakes,
+                $hasNurglesRot,
+                (bool) $mightyBlow,
+                regenerace: false,
+                pilingOn: $attackerDown ? null : $this->pilingOnHacek($currentState, $attacker->getId(), $defender->getId(), $noFollowUp, $hasClaw, (bool) $mightyBlow, $piled),
+            );
             $defender = $injResult['player'];
             $currentState = $currentState->withPlayer($defender);
             $events = array_merge($events, $injResult['events']);
-
-            // Piling On: reroll armor if not broken, attacker goes prone
-            $freshAttackerForPO = $currentState->getPlayer($attacker->getId());
-            if ($freshAttackerForPO !== null && $freshAttackerForPO->hasSkill(SkillName::PilingOn)
-                && $defender->getState() === PlayerState::PRONE
-                && $freshAttackerForPO->getState() === PlayerState::STANDING
-            ) {
-                // Reroll armor/injury
-                $poInjResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, regenerace: false);
-                $defender = $poInjResult['player'];
-                $currentState = $currentState->withPlayer($defender);
-                $events = array_merge($events, $poInjResult['events']);
-                $events[] = GameEvent::pilingOn($freshAttackerForPO->getId(), 'armour');
-
-                // Attacker goes prone
-                $freshAttackerForPO = $freshAttackerForPO->withState(PlayerState::PRONE);
-                $currentState = $currentState->withPlayer($freshAttackerForPO);
-            }
 
             // Regeneration (r. 8406-8411); lékárník řeší ActionResolver po akci (P206)
             $regen = $this->injuryResolver->resolveRegeneration($defender, $this->dice, $hasStakes, $events);
@@ -1774,6 +1772,20 @@ final class BlockHandler implements ActionHandlerInterface
 
             // Drop ball if carrier
             [$currentState, $events] = $this->ballResolver->handleBallOnPlayerDown($currentState, $defender, $events);
+
+            // P310: "Then the Piling On player is Placed Prone in their own square - no Armour roll ... this does not
+            //   cause a turnover unless the Piling On player is carrying the ball."
+            $pilingAttacker = $piled ? $currentState->getPlayer($attacker->getId()) : null;
+            if ($pilingAttacker !== null) {
+                $pilingAttacker = $pilingAttacker->withState(PlayerState::PRONE);
+                $currentState = $currentState->withPlayer($pilingAttacker);
+                if ($currentState->getBall()->getCarrierId() === $pilingAttacker->getId()) {
+                    [$currentState, $events] = $this->ballResolver->handleBallOnPlayerDown($currentState, $pilingAttacker, $events);
+                    $events[] = GameEvent::turnover('Piling On player with the ball placed prone');
+
+                    return ActionResult::turnover($currentState->withTurnoverPending(true), $events);
+                }
+            }
         }
 
         // Handle attacker knockdown
@@ -2294,6 +2306,35 @@ final class BlockHandler implements ActionHandlerInterface
     private function obranceSmiWrestle(MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz): bool
     {
         return $defender->hasSkill(SkillName::Wrestle) && !($isBlitz && $attacker->hasSkill(SkillName::Juggernaut));
+    }
+
+    /**
+     * P310 Piling On: háček pro `InjuryResolver::resolve` — kouč-člověk otázkou (`Coach::pilingOn`), AI
+     * `PilingOn::aiPouzit`. Přehoz se spotřebuje i při neúspěšném Loneru (4+), útočník pak stojí a nic se nepřehodí.
+     * `$piled` = přehoz platí ⇒ útočníka položí volající. Stav s utraceným přehozem jde do `$state` (odkazem).
+     *
+     * @return \Closure(bool, int): array{bool, list<GameEvent>}
+     */
+    private function pilingOnHacek(GameState &$state, int $attackerId, int $defenderId, bool $multipleBlock, bool $claw, bool $mightyBlow, bool &$piled): \Closure
+    {
+        return function (bool $brneni, int $injuryMod) use (&$state, $attackerId, $defenderId, $multipleBlock, $claw, $mightyBlow, &$piled): array {
+            $att = $state->getPlayer($attackerId);
+            $def = $state->getPlayer($defenderId);
+            if ($att === null || $def === null || !PilingOn::smi($state, $att, $def)) {
+                return [false, []];
+            }
+            $armourMod = $def->hasSkill(SkillName::Chainsaw) ? InjuryResolver::CHAINSAW_ARMOUR_BONUS : 0;
+            $ai = PilingOn::aiPouzit($state, $att, $def, $brneni, $armourMod, $mightyBlow, $claw, $injuryMod, $multipleBlock);
+            if (!$this->coach->pilingOn($att->getTeamSide(), $attackerId, $defenderId, $brneni, $ai, $state)) {
+                return [false, []];
+            }
+            $udalosti = [GameEvent::pilingOn($attackerId, $brneni ? 'armour' : 'injury')];
+            $r = ThrowReroll::teamReroll($this->dice, $state, $att, $att->getTeamSide(), $udalosti);
+            $state = $r['state'];
+            $piled = $r['ok'];
+
+            return [$r['ok'], $udalosti];
+        };
     }
 
     /**

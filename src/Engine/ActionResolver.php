@@ -220,6 +220,16 @@ final class ActionResolver
                 $r->withAnswers($r->answers->withJuggernaut((bool) ($params['use'] ?? false))),
             );
         }
+        // P310: Piling On (ř. 8361-8371 "may use") — stejné přehrání jako u Diving Catch.
+        if ($action === ActionType::RESOLVE_PILING_ON) {
+            $pending = $state->getPendingPilingOn() ?? throw new \InvalidArgumentException('No pending Piling On question');
+            $r = $pending->getReplay();
+
+            return $this->resolveSPrehranim(
+                $state->withPendingPilingOn(null),
+                $r->withAnswers($r->answers->withPilingOn((bool) ($params['use'] ?? false))),
+            );
+        }
         // P272 (10.11.2026): kam hodit chycenou bombu — stejné přehrání jako u Diving Catch.
         if ($action === ActionType::RESOLVE_BOMB_RETHROW) {
             $pending = $state->getPendingBombRethrow() ?? throw new \InvalidArgumentException('No pending bomb rethrow question');
@@ -530,7 +540,7 @@ final class ActionResolver
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
             // odpovědi na otázky kouče se přehrávají v `resolve()` (P294)
             ActionType::RESOLVE_REROLL, ActionType::RESOLVE_DIVING_CATCH, ActionType::RESOLVE_BOMB_RETHROW,
-            ActionType::RESOLVE_REFEREE, ActionType::RESOLVE_BLOCK_DIE, ActionType::RESOLVE_JUGGERNAUT => throw new \LogicException("{$action->value} se vyřizuje v resolve()"),
+            ActionType::RESOLVE_REFEREE, ActionType::RESOLVE_BLOCK_DIE, ActionType::RESOLVE_JUGGERNAUT, ActionType::RESOLVE_PILING_ON => throw new \LogicException("{$action->value} se vyřizuje v resolve()"),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)

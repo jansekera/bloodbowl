@@ -75,6 +75,9 @@ BlockDiceFace aiJuggernautFace(BlockDiceFace face, const Player& att, const Play
 // Čítač (mcts_cli, sonda četnosti): Both Down útočníka s Juggernautem v blitzu a z nich ponechané (nepřevedené).
 struct JuggernautBothDowns { long total = 0; long kept = 0; };
 JuggernautBothDowns takeJuggernautBothDowns();
+// P310: čítač Piling On (mcts_cli, pozitivní kontrola): nabídnuto (smělo se) a použito na brnění / na zranění.
+struct PilingOnCounts { long offered = 0; long armour = 0; long injury = 0; };
+PilingOnCounts takePilingOnCounts();
 
 // `isBlitz`: stěna se oceňuje tak, jak ji resolver vyhodnotí (P309: Both Down s Juggernautem podle aiJuggernautFace).
 BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,

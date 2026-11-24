@@ -98,56 +98,8 @@ final class Phase12SkillsTest extends TestCase
         $this->assertContains('fend', $types);
     }
 
-    public function testPilingOnRerollsArmor(): void
-    {
-        // Attacker with Piling On, defender knocked down, armor holds → PO reroll
-        // ST4 vs ST3 → 2 dice attacker chooses, roll DD (6,6) → DEFENDER_DOWN
-        // Armor: 2+2=4 vs AV8 → holds, PO reroll: 5+4=9 vs AV8 → broken, injury: 3+3=6 = stunned
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, strength: 4, skills: [SkillName::PilingOn], id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, armour: 8, id: 2)
-            ->withBallOffPitch()
-            ->build();
-
-        $dice = new FixedDiceRoller([
-            6, 6,   // 2 block dice: DD, DD → choose DEFENDER_DOWN
-            2, 2,   // armor roll: 4 vs AV8 → holds
-            5, 4,   // PO armor reroll: 9 vs AV8 → broken
-            3, 3,   // injury roll: 6 = stunned
-        ]);
-        $resolver = new ActionResolver($dice);
-
-        $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-
-        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('piling_on', $types);
-        // Attacker should be prone from Piling On
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
-        // Defender stunned from PO reroll
-        $this->assertSame(PlayerState::STUNNED, $result->getNewState()->requirePlayer(2)->getState());
-    }
-
-    public function testPilingOnAttackerGoesProne(): void
-    {
-        // Same as above, verify attacker is PRONE after Piling On
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, strength: 4, skills: [SkillName::PilingOn], id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, armour: 10, id: 2) // AV10 so PO also fails
-            ->withBallOffPitch()
-            ->build();
-
-        $dice = new FixedDiceRoller([
-            6, 6,   // 2 block dice: DD
-            2, 2,   // armor: 4 vs AV10 → holds
-            3, 3,   // PO reroll: 6 vs AV10 → holds
-        ]);
-        $resolver = new ActionResolver($dice);
-
-        $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-
-        // Attacker is prone from Piling On even though armor held
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
-    }
+    // P310 (24.11.2026): testy Piling On odsud kódovaly vadu (použit vždy, bez týmového přehozu, Loneru a sousedství,
+    //   přehoz celého brnění i zranění) — nahradil je `PilingOnTest` podle ř. 8361-8371.
 
     public function testDirtyPlayerBonusFoulArmor(): void
     {

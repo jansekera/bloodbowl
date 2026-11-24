@@ -186,9 +186,15 @@ const TeamRoster& getHalflingRoster() {
             // P321: bez Loner, + Strong Arm, + Timmm-ber! (ř. 8862-8864)
             {{2, 6, 1, 10}, makeSkills({SkillName::TakeRoot,
                 SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull,
-                SkillName::ThrowTeamMate, SkillName::StrongArm, SkillName::Timmmber}), 2},
+                SkillName::ThrowTeamMate, SkillName::StrongArm, SkillName::Timmmber}), 1},
+            // P310 (uživatel 20.11.: „dát oběma týmům pro vyzkoušení“): druhý Treeman ZKUŠEBNĚ + Piling On (Strength,
+            //   normal) — soupiska halflingů jinak podle pravidel; bez Loneru (Troll goblinů TV1500 ho má).
+            {{2, 6, 1, 10}, makeSkills({SkillName::TakeRoot,
+                SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull,
+                SkillName::ThrowTeamMate, SkillName::StrongArm, SkillName::Timmmber, SkillName::PilingOn}), 1,
+                "Treeman +Piling On"},
         },
-        2, 60, true
+        3, 60, true
     };
     return roster;
 }
@@ -950,9 +956,11 @@ const TeamRoster& getGoblinRoster1500() {
                 SkillName::Stunty}), 1, "Fanatic"},
             {{7, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Leap, SkillName::VeryLongLegs, SkillName::Stunty,
                 SkillName::SureFeet, SkillName::SideStep}), 1, "Pogoer +Sure Feet+Side Step"},
+            // P310 (uživatel 24.11.2026: „přesto jej přidej - a pak vyzkoušej, že jej AI použije“): Piling On
+            //   (Strength = normal Trolla, 20) ⇒ 140 + 20 = 160, TV 1460 → 1480. S Lonerem — vyzkouší i hod 4+.
             {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow,
-                SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block}), 1,
-                "Troll +Block"},
+                SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block,
+                SkillName::PilingOn}), 1, "Troll +Block+Piling On"},
             {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow,
                 SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block,
                 SkillName::Guard}), 1, "Troll +Block+Guard"},

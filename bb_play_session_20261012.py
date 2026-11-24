@@ -527,7 +527,8 @@ ANO_NE = {"ne": 0, "ano": 1}
 SKILL_OTAZKY = {"USE_DODGE": "Dodge", "USE_WRESTLE": "Wrestle", "USE_STAND_FIRM": "Stand Firm",
                 "USE_SIDE_STEP": "Side Step", "USE_GRAB": "Grab", "USE_DIVING_CATCH": "Diving Catch",
                 # P309: Juggernaut v blitzu (ř. 8191-8195 "may choose"): ano = Both Down brát jako Pushed
-                "USE_JUGGERNAUT": "Juggernaut (Both Down brát jako Pushed)"}
+                "USE_JUGGERNAUT": "Juggernaut (Both Down brát jako Pushed)",
+                "USE_PILING_ON": "Piling On (za týmový přehoz přehodit brnění 1 / zranění 2, útočník si lehne)"}
 
 
 def moznosti_prehozu(q):

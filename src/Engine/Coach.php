@@ -34,6 +34,8 @@ final class Coach
     private array $blockDice = [];
     /** @var list<bool> */
     private array $juggernaut = [];
+    /** @var list<bool> */
+    private array $pilingOn = [];
 
     /** @param list<TeamSide> $sides strany kouče-člověka */
     public function __construct(array $sides = [])
@@ -61,11 +63,12 @@ final class Coach
         $this->rerolls = $answers->rerolls;
         $this->blockDice = $answers->blockDice;
         $this->juggernaut = $answers->juggernaut;
+        $this->pilingOn = $answers->pilingOn;
     }
 
     public function end(): void
     {
-        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = $this->blockDice = $this->juggernaut = [];
+        $this->divingCatch = $this->bombTargets = $this->referee = $this->rerolls = $this->blockDice = $this->juggernaut = $this->pilingOn = [];
     }
 
     /**
@@ -79,6 +82,19 @@ final class Coach
         }
 
         return array_shift($this->juggernaut) ?? throw (new JuggernautQuestion($attackerId, $defenderId))->naStavu($stav);
+    }
+
+    /**
+     * P310: použít Piling On (ř. 8361-8371, za týmový přehoz přehodit brnění / zranění, útočník si lehne)? AI = `$ai`
+     * (`PilingOn::aiPouzit`).
+     */
+    public function pilingOn(TeamSide $strana, int $attackerId, int $defenderId, bool $armour, bool $ai, GameState $stav): bool
+    {
+        if (!$this->decides($strana)) {
+            return $ai;
+        }
+
+        return array_shift($this->pilingOn) ?? throw (new PilingOnQuestion($attackerId, $defenderId, $armour))->naStavu($stav);
     }
 
     /** Skočí hráč pro míč? (ř. 8065 "can attempt") */

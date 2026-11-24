@@ -69,7 +69,9 @@ const RACE_ROSTERS = [
         ['Lineman',   3, [6, 3, 4, 8], []],
     ],
     'Halfling' => [
-        ['Treeman',  2, [2, 6, 1, 10], [SkillName::StrongArm, SkillName::MightyBlow, SkillName::StandFirm, SkillName::ThickSkull, SkillName::TakeRoot, SkillName::ThrowTeamMate, SkillName::Timmmber]],  // P321: bez Loner, + Strong Arm (ř. 8862-8864)
+        ['Treeman',  1, [2, 6, 1, 10], [SkillName::StrongArm, SkillName::MightyBlow, SkillName::StandFirm, SkillName::ThickSkull, SkillName::TakeRoot, SkillName::ThrowTeamMate, SkillName::Timmmber]],  // P321: bez Loner, + Strong Arm (ř. 8862-8864)
+        // P310 (20.11.: „dát oběma týmům pro vyzkoušení“): druhý Treeman zkušebně + Piling On; parita C++ getHalflingRoster
+        ['Treeman',  1, [2, 6, 1, 10], [SkillName::StrongArm, SkillName::MightyBlow, SkillName::StandFirm, SkillName::ThickSkull, SkillName::TakeRoot, SkillName::ThrowTeamMate, SkillName::Timmmber, SkillName::PilingOn]],
         ['Halfling', 9, [5, 2, 3, 6],  [SkillName::Dodge, SkillName::Stunty, SkillName::RightStuff]],  // P321: MA5 (ř. 8861)
     ],
     'Norse' => [

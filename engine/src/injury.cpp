@@ -245,59 +245,70 @@ bool resolveArmourAndInjury(GameState& state, int playerId, DiceRollerBase& dice
     }
     int av = player.stats.armour;
 
-    int aD1 = dice.rollD6();
-    int aD2 = dice.rollD6();
-    int base = aD1 + aD2 + ctx.armourModifier;
     // P75: +3 za pilu -- jednou, at uz zasahla pila, nebo je obet jeji nositel.
-    if (!ctx.unmodifiedArmour && (ctx.chainsaw || player.hasSkill(SkillName::Chainsaw))) {
-        base += 3;
-    }
+    const int armourMod = ctx.armourModifier +
+        ((!ctx.unmodifiedArmour && (ctx.chainsaw || player.hasSkill(SkillName::Chainsaw))) ? 3 : 0);
+    bool pilingOnUsed = false;
+    for (;;) {
+        int aD1 = dice.rollD6();
+        int aD2 = dice.rollD6();
+        int base = aD1 + aD2 + armourMod;
 
-    // Claw: armor broken on 8+ regardless of AV, after modifications.
-    auto breaksArmour = [&](int roll) {
-        return ctx.hasClaw ? (roll >= 8 || roll > av) : (roll > av);
-    };
+        // Claw: armor broken on 8+ regardless of AV, after modifications.
+        auto breaksArmour = [&](int roll) {
+            return ctx.hasClaw ? (roll >= 8 || roll > av) : (roll > av);
+        };
 
-    // Mighty Blow buys ONE roll, and which one is the coach's to choose: "if you
-    // decide to use Mighty Blow to modify the Armour roll, you may not modify
-    // the Injury roll as well." We used to add it to both at once, which is
-    // wrong in every edition of the rules -- and, since Mighty Blow sits on the
-    // orc Blitzer, the human Blitzer and Ogre and the wood elf Treeman while
-    // neither our dwarves nor the Skaven field one, the error only ever hit us.
-    //
-    // Spend it where it does work: on the armour roll only when armour needs it
-    // to break, and otherwise keep it for the injury roll. The naive repair --
-    // always spend it on armour -- would weaken opponents further than the rules
-    // do. Note this composes with Claw exactly as it should, since the +1 may
-    // legitimately push a 7 up to the 8 Claw asks for.
-    int armourRoll = base;
-    bool spentOnArmour = false;
-    if (ctx.mightyBlow && !breaksArmour(base) && breaksArmour(base + 1)) {
-        armourRoll = base + 1;
-        spentOnArmour = true;
-    }
-    bool broken = breaksArmour(armourRoll);
-
-    emitEvent(events, {GameEvent::Type::ARMOR_BREAK, playerId, -1, player.position, {},
-                      armourRoll, broken, aD1, aD2});
-
-    // P201 (8), 14.10.2026: v živé partii řádek, kam se +1 z Mighty Blow započetl (1 brnění, 2 zranění)
-    if (spentOnArmour && coachModeOn())
-        emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                           static_cast<int>(SkillName::MightyBlow), true, 1});
-    if (broken) {
-        InjuryContext injCtx = ctx;
-        if (ctx.mightyBlow && !spentOnArmour) {
-            injCtx.injuryModifier += 1;
-            if (coachModeOn())
-                emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                                   static_cast<int>(SkillName::MightyBlow), true, 2});
+        // Mighty Blow buys ONE roll, and which one is the coach's to choose: "if you
+        // decide to use Mighty Blow to modify the Armour roll, you may not modify
+        // the Injury roll as well." We used to add it to both at once, which is
+        // wrong in every edition of the rules -- and, since Mighty Blow sits on the
+        // orc Blitzer, the human Blitzer and Ogre and the wood elf Treeman while
+        // neither our dwarves nor the Skaven field one, the error only ever hit us.
+        //
+        // Spend it where it does work: on the armour roll only when armour needs it
+        // to break, and otherwise keep it for the injury roll. The naive repair --
+        // always spend it on armour -- would weaken opponents further than the rules
+        // do. Note this composes with Claw exactly as it should, since the +1 may
+        // legitimately push a 7 up to the 8 Claw asks for.
+        int armourRoll = base;
+        bool spentOnArmour = false;
+        if (ctx.mightyBlow && !breaksArmour(base) && breaksArmour(base + 1)) {
+            armourRoll = base + 1;
+            spentOnArmour = true;
         }
-        resolveInjuryRoll(state, playerId, dice, injCtx, events);
-        return true;
-    }
+        bool broken = breaksArmour(armourRoll);
 
-    return false;
+        emitEvent(events, {GameEvent::Type::ARMOR_BREAK, playerId, -1, player.position, {},
+                          armourRoll, broken, aD1, aD2});
+
+        // P201 (8), 14.10.2026: v živé partii řádek, kam se +1 z Mighty Blow započetl (1 brnění, 2 zranění)
+        if (spentOnArmour && coachModeOn())
+            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                               static_cast<int>(SkillName::MightyBlow), true, 1});
+        if (broken) {
+            InjuryContext injCtx = ctx;
+            if (ctx.mightyBlow && !spentOnArmour) {
+                injCtx.injuryModifier += 1;
+                if (coachModeOn())
+                    emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                                       static_cast<int>(SkillName::MightyBlow), true, 2});
+            }
+            const PlayerState before = player.state;
+            const bool stunnedBefore = player.stunnedThisTurn;
+            resolveInjuryRoll(state, playerId, dice, injCtx, events);
+            // P310: Piling On přehodí zranění, které dopadlo jen Stunned (ne už po přehozu brnění)
+            if (!pilingOnUsed && ctx.pilingOn && player.state == PlayerState::STUNNED && ctx.pilingOn(false, injCtx.injuryModifier)) {
+                player.setState(before);
+                player.stunnedThisTurn = stunnedBefore;
+                resolveInjuryRoll(state, playerId, dice, injCtx, events);
+            }
+            return true;
+        }
+        // P310: Piling On přehodí brnění, které vydrželo
+        if (pilingOnUsed || !ctx.pilingOn || !ctx.pilingOn(true, 0)) return false;
+        pilingOnUsed = true;
+    }
 }
 
 void resolveCrowdSurf(GameState& state, int playerId, Position from, DiceRollerBase& dice,

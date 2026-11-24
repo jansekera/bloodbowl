@@ -5,6 +5,7 @@
 #include <cmath>
 #include "bb/helpers.h"
 #include "bb/injury.h"
+#include "bb/piling_on.h"
 #include "bb/ball_handler.h"
 #include "bb/macro_actions.h"   // M1/N10: noteBlitzContinuationEvent()
 #include <algorithm>
@@ -157,6 +158,56 @@ BlockDiceFace aiJuggernautFace(BlockDiceFace face, const Player& att, const Play
     if (att.hasSkill(SkillName::Block) && !def.hasSkill(SkillName::Block)) return BlockDiceFace::BOTH_DOWN;
     if (att.hasSkill(SkillName::Wrestle) && juggernautWrestleKeepsBothDown(st, att, def)) return BlockDiceFace::BOTH_DOWN;
     return BlockDiceFace::PUSHED;
+}
+
+thread_local PilingOnCounts g_pilingOn;
+PilingOnCounts takePilingOnCounts() {
+    const PilingOnCounts v = g_pilingOn;
+    g_pilingOn = {};
+    return v;
+}
+
+// P310 Piling On (ř. 8361-8371): přehoz brnění nebo zranění sraženého za týmový přehoz; rozhoduje kouč otázkou
+//   USE_PILING_ON, AI `aiPilingOn`. Přehoz se spotřebuje i při neúspěšném Loneru (4+), útočník pak stojí.
+//   `used` = přehoz platí ⇒ po hodech volající položí útočníka (`finishPilingOn`). Jen blok Block/Blitz akce
+//   (Stab a pila mají vlastní cestu bez tohoto háčku).
+static void armPilingOn(GameState& state, int attId, int defId, InjuryContext& ctx, bool multipleBlock,
+                        DiceRollerBase& dice, std::vector<GameEvent>* events, bool& used) {
+    if (!state.getPlayer(attId).hasSkill(SkillName::PilingOn)) return;
+    const bool mb = ctx.mightyBlow, claw = ctx.hasClaw;
+    const int armourMod = ctx.armourModifier + (state.getPlayer(defId).hasSkill(SkillName::Chainsaw) ? 3 : 0);
+    ctx.pilingOn = [&state, attId, defId, multipleBlock, &dice, events, &used, mb, claw, armourMod](
+                       bool armourStage, int injuryMod) {
+        Player& att = state.getPlayer(attId);
+        const Player& def = state.getPlayer(defId);
+        if (!pilingOnAllowed(state, att, def)) return false;
+        ++g_pilingOn.offered;
+        const bool use = coachDecides(att.teamSide)
+            ? askCoach(CoachQuestion::USE_PILING_ON, attId, defId, armourStage ? 1 : 2, 0, 3) == CoachAnswer::TEAM
+            : aiPilingOn(state, att, def, armourStage, armourMod, mb, claw, injuryMod, multipleBlock);
+        if (!use) return false;
+        ++(armourStage ? g_pilingOn.armour : g_pilingOn.injury);
+        emitEvent(events, {GameEvent::Type::SKILL_USED, attId, defId, {}, {},
+                           static_cast<int>(SkillName::PilingOn), true, armourStage ? 1 : 2});
+        TeamState& team = state.getTeamState(att.teamSide);
+        team.rerolls--;
+        team.rerollUsedThisTurn = true;
+        if (!lonerAllowsTeamReroll(att, dice, events)) return false;
+        used = true;
+        return true;
+    };
+}
+
+// „Then the Piling On player is Placed Prone in their own square - no Armour roll ... does not cause a turnover
+//   unless the Piling On player is carrying the ball.“ Vrací true = turnover.
+static bool finishPilingOn(GameState& state, int attId, bool used, DiceRollerBase& dice,
+                           std::vector<GameEvent>* events) {
+    if (!used) return false;
+    Player& att = state.getPlayer(attId);
+    att.setState(PlayerState::PRONE);
+    const bool carrier = state.ball.isHeld && state.ball.carrierId == attId;
+    if (carrier) handleBallOnPlayerDown(state, attId, dice, events);
+    return carrier;
 }
 
 thread_local JuggernautBothDowns g_juggernautBothDowns;
@@ -1507,8 +1558,11 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 InjuryContext defCtx;
                 if (att.hasSkill(SkillName::MightyBlow)) defCtx.mightyBlow = true;
                 if (att.hasSkill(SkillName::Claw)) defCtx.hasClaw = true;
+                bool piled = false;   // P310 (útočník s Blockem stojí vedle)
+                armPilingOn(state, att.id, def.id, defCtx, frenzyDisabled, dice, events, piled);
                 resolveArmourAndInjury(state, def.id, dice, defCtx, events);
                 handleBallOnPlayerDown(state, def.id, dice, events);
+                if (finishPilingOn(state, att.id, piled, dice, events)) turnover = true;
             }
             if (attKnockedDown) {
                 InjuryContext attCtx;
@@ -1674,9 +1728,12 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             if (att.hasSkill(SkillName::MightyBlow)) defCtx.mightyBlow = true;
             if (att.hasSkill(SkillName::Claw)) defCtx.hasClaw = true;
             if (att.hasSkill(SkillName::Stakes)) defCtx.hasStakes = true;
+            bool piled = false;   // P310
+            armPilingOn(state, att.id, def.id, defCtx, frenzyDisabled, dice, events, piled);
 
             resolveArmourAndInjury(state, def.id, dice, defCtx, events);
             handleBallOnPlayerDown(state, def.id, dice, events);
+            if (finishPilingOn(state, att.id, piled, dice, events)) turnover = true;
         }
     }
 
