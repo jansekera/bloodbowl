@@ -173,9 +173,8 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             });
         }
 
-        // ⛔⛔ ZAVOR M13 (31.08.2026): lezici dostane MOVE (krok A) a BLITZ
-        // (krok B). Vsechno nize je zamerne NEDOSTUPNE, a NENI to opatrnost,
-        // je to spravnost:
+        // ⛔⛔ ZAVOR M13 (31.08.2026), od P316 (24.11.) už jen pro BLOCK a BOMB: lezici dostane MOVE (krok A),
+        // BLITZ (krok B) a od P316 i PASS/HAND_OFF/FOUL/TTM/GAZE (resolver `standsUpFirst`). Původní zápis:
         //   BLOCK      -- r. 674-676 ho lezicimu VYSLOVNE zakazuje. Vyjimka
         //                 Jump Up (r. 8199-8203, AG roll +2) je od P303 (14.11.2026)
         //                 nabizena (mayBlockNow, Multiple Block vyse).
@@ -224,7 +223,8 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         };
         // P303: ležící s Jump Up smí i Multiple Block (je to Block Action, ř. 8199-8203); BLOCK výš přes mayBlockNow.
         if (mayBlockFromProne(p)) offerMultipleBlock();
-        if (prone) return;
+        // P316 (24.11.2026): ležící dostane i PASS / HAND_OFF / FOUL / TTM / GAZE — resolver ho napřed postaví
+        //   (`standsUpFirst`, ř. 670-676). Bomba dál jen stojícímu (níž, ř. 7953-7954), blok jen s Jump Up (výš).
 
         // PASS: if not used this turn, has ball, each standing teammate within range 13
         if (!team.passUsedThisTurn && state.ball.isHeld && state.ball.carrierId == p.id &&
@@ -325,7 +325,7 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             }
         }
 
-        offerMultipleBlock();
+        if (!prone) offerMultipleBlock();
     });
 
     // Also allow standing up prone players

@@ -44,6 +44,12 @@ void consumeDeclaredTeamAction(GameState& state, TeamSide side, ActionType type)
     }
 }
 
+// P316: akce, před kterými ležící napřed vstane v resolveru (MOVE a BLITZ mají vstání ve své větvi; Block ne).
+bool standsUpFirst(ActionType t) {
+    return t == ActionType::PASS || t == ActionType::HAND_OFF || t == ActionType::FOUL ||
+           t == ActionType::THROW_TEAM_MATE || t == ActionType::HYPNOTIC_GAZE;
+}
+
 }  // namespace
 
 // ============================================================================
@@ -302,6 +308,18 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
                 }
                 return ActionResult::ok();  // Action wasted, not turnover
             }
+        }
+    }
+
+    // P316 (uživatel 24.11.: „1 vše, 2 ano“): ležící „may take any Action other than a Block Action“ (ř. 670-676)
+    //   ⇒ i Pass, Hand-off, Foul, Throw Team-Mate a Hypnotic Gaze napřed vstanou (ř. 690-695), jedním místem.
+    //   OPRAVENO 24.11.2026 -- dřív je ležícímu nenabízela nabídka a resolver neměl vstání. Nevstal-li, akce
+    //   propadla (ne turnover) a týmový limit je spotřebován ohlášením (M2). Bomba ne (ř. 7953-7954).
+    if (standsUpFirst(action.type) && action.playerId > 0 && state.getPlayer(action.playerId).state == PlayerState::PRONE) {
+        ActionResult stand = resolveStandUp(state, action.playerId, dice, events);
+        if (!stand.success) {
+            consumeDeclaredTeamAction(state, state.getPlayer(action.playerId).teamSide, action.type);
+            return stand;
         }
     }
 

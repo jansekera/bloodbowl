@@ -1665,8 +1665,9 @@ constexpr int kTtmMinGain = 4;
 static void offerBombAndTtmMacros(const GameState& state, TeamSide mySide, std::vector<Macro>& out) {
     const TeamState& myTeam = state.getTeamState(mySide);
     state.forEachOnPitch(mySide, [&](const Player& p) {
-        if (!p.canAct() || p.hasActed || p.state != PlayerState::STANDING) return;
-        if (p.hasSkill(SkillName::Bombardier) && !p.hasMoved) {
+        // P316: hod spoluhráčem smí i ležící (resolver ho napřed postaví, ř. 670-676); bomba jen stojící (ř. 7953-7954)
+        if (!p.canDeclareAction()) return;
+        if (p.state == PlayerState::STANDING && p.hasSkill(SkillName::Bombardier) && !p.hasMoved) {
             // pravidla výběru (pravítko, Hail Mary až potom, cena ≥ 1, náš mimo výbuch) na jednom místě s hodem dál
             const BombChoice c = chooseBombTarget(state, p, false);
             if (c.pos.x >= 0) out.push_back({MacroType::BOMB, p.id, -1, c.pos});
@@ -2985,7 +2986,9 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
     // FOUL: foul not used, prone/stunned enemy adjacent
     if (!myTeam.foulUsedThisTurn) {
         state.forEachOnPitch(mySide, [&](const Player& fouler) {
-            if (!fouler.canAct() || fouler.hasActed) return;
+            // P316 (uživatel 24.11.: „2 ano, 3 ano“): faulovat smí i ležící — resolver ho napřed postaví
+            //   (ř. 670-676; foul pole pohybu nestojí, ř. 1839-1843); asistence počítá `resolveFoul` (ř. 1844-1851).
+            if (!fouler.canDeclareAction()) return;
             if (fouler.hasSkill(SkillName::BallAndChain)) return;
 
             auto adj = fouler.position.getAdjacent();

@@ -293,7 +293,12 @@ final class MatchPlayerDTO
      * Blitz Block Action není). OPRAVENO 19.11.2026 (P86) -- dřív `canAct()`, tedy jen stojící. Vzor: C++ 38e4fd85.
      * Ball & Chain a týmový limit hlídá `RulesEngine`.
      */
-    public function canTakeBlitzAction(): bool
+    /**
+     * Smí ohlásit akci jinou než Block (Move, Blitz, Pass, Hand-off, Foul, Throw Team-Mate, Hypnotic Gaze)? I ležící:
+     * `rules_bb2016.txt` ř. 670-676 „The player may take any Action other than a Block Action“ (vstane na začátku
+     * akce, ř. 690-695). P86 (blitz), P316 (24.11.2026, ostatní; dřív `canTakeBlitzAction` jen pro blitz).
+     */
+    public function canDeclareNonBlockAction(): bool
     {
         return $this->canAct() || ($this->state === PlayerState::PRONE && !$this->hasActed);
     }

@@ -552,6 +552,28 @@ final class ActionResolver
             }
         }
 
+        // P316 (uživatel 24.11.: „1 vše, 2 ano“): ležící „may take any Action other than a Block Action“ (ř. 670-676)
+        //   ⇒ napřed vstane (ř. 690-695) týmž `MoveHandler` jako MOVE a blitz (P86). OPRAVENO 24.11.2026 -- dřív
+        //   validace pustila jen stojícího. Nevstal ⇒ akce propadá (ne turnover), týmový limit spotřebovalo ohlášení.
+        //   Parita s C++ `standsUpFirst`. Bomba ne (ř. 7953-7954), Block jen s Jump Up (BlockHandler).
+        if (in_array($action, [ActionType::PASS, ActionType::HAND_OFF, ActionType::FOUL, ActionType::THROW_TEAM_MATE, ActionType::HYPNOTIC_GAZE], true)
+            && isset($params['playerId'])) {
+            $lezici = $state->getPlayer((int) $params['playerId']);
+            $pole = $lezici?->getPosition();
+            if ($lezici !== null && $pole !== null && $lezici->getState() === PlayerState::PRONE) {
+                $vstani = $this->moveHandler->resolve($state, ['playerId' => $lezici->getId(), 'x' => $pole->getX(), 'y' => $pole->getY(), 'partial' => true]);
+                $state = $vstani->getNewState();
+                $preEvents = array_merge($preEvents, $vstani->getEvents());
+                $po = $state->requirePlayer($lezici->getId());
+                if ($po->getState() !== PlayerState::STANDING) {
+                    $state = $this->consumeDeclaredTeamAction($state, $po->getTeamSide(), $action)
+                        ->withPlayer($po->withHasActed(true)->withHasMoved(true));
+
+                    return ActionResult::success($state, $preEvents);
+                }
+            }
+        }
+
         // otázka položená v handleru ukáže i události kontroly před akcí (Bone Head …, Bloodlust) — log akce (P306 A1)
         $result = match ($action) {
             ActionType::MOVE => $this->moveHandler->resolve($state, $params),

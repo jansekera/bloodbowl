@@ -542,6 +542,20 @@ TEST(MacroActions, FoulAvailableWithProneEnemy) {
     EXPECT_TRUE(hasMacroType(macros, MacroType::FOUL));
 }
 
+// P316 (uživatel 24.11.: „1 vše, 2 ano, 3 ano“): ležící „may take any Action other than a Block Action“ (ř. 670-676)
+// ⇒ AI nabídne faul i ležícímu (resolver ho napřed postaví). Dřív `canAct()` = jen stojící.
+TEST(MacroActions, P316ProneFoulerIsOfferedAFoul) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).state = PlayerState::PRONE;
+    state.getPlayer(12).state = PlayerState::PRONE;
+    state.getPlayer(12).position = {11, 7};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    EXPECT_TRUE(hasMacroType(macros, MacroType::FOUL));
+}
+
 TEST(MacroActions, FoulNotAvailableWhenUsed) {
     GameState state = makeMinimalState();
     state.getPlayer(12).state = PlayerState::PRONE;

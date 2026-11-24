@@ -624,6 +624,52 @@ TEST(ActionResolver, P315RootedProneBlitzerStillRollsToStandUpButDoesNotBlock) {
     EXPECT_EQ(dice.remaining(), 0u);
 }
 
+// P316: ležící smí faul (ř. 670-676) — napřed vstane za 3 pole (ř. 690-692), faul pole pohybu nestojí (ř. 1839-1843).
+TEST(ActionResolver, P316ProneFoulerStandsUpThenFouls) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+
+    std::vector<Action> legal;
+    getAvailableActions(gs, legal);
+    bool offered = false;
+    for (const Action& a : legal) offered = offered || (a.type == ActionType::FOUL && a.playerId == 1 && a.targetId == 12);
+    EXPECT_TRUE(offered) << "ležícímu se faul nenabídl";
+
+    Action foul{ActionType::FOUL, 1, 12, {11, 7}};
+    FixedDiceRoller dice({1, 2});   // brnění 1+2 (bez dubletu) drží
+    auto r = resolveAction(gs, foul, dice, nullptr);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_TRUE(gs.homeTeam.foulUsedThisTurn);
+    EXPECT_EQ(dice.remaining(), 0u) << "hod na brnění faulu se hodil";
+}
+
+// MA < 3: vstání 4+; nevstal ⇒ faul propadá (ne turnover), faul týmu je ohlášením spotřebován (ř. 1838-1840).
+TEST(ActionResolver, P316ProneSlowFoulerFailsToStand_FoulWastedNotTurnover) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/2);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    gs.homeTeam.rerolls = 0;
+
+    Action foul{ActionType::FOUL, 1, 12, {11, 7}};
+    FixedDiceRoller dice({3});
+    auto r = resolveAction(gs, foul, dice, nullptr);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_TRUE(gs.homeTeam.foulUsedThisTurn);
+    EXPECT_TRUE(gs.getPlayer(1).hasActed);
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
 // ř. 997-1004 „Scoring in the opponent's turn“: nosič zatlačený do koncové zóny během soupeřova
 // kola skóruje, „but must move their Turn marker one space along the Turn track“. Týž princip jako
 // review výkopu #4 (TD kopajících při dopadu po Blitz!), tady v běžném kole.

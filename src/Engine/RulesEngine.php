@@ -311,7 +311,7 @@ final class RulesEngine
                     if ($player->canMove() && $this->canPlayerMoveAnywhere($state, $player)) {
                         $actions[] = ['type' => ActionType::MOVE->value, 'playerId' => $player->getId()];
                     }
-                    if ($player->canTakeBlitzAction()) {
+                    if ($player->canDeclareNonBlockAction()) {
                         $actions[] = ['type' => ActionType::BLITZ->value, 'playerId' => $player->getId()];
                     }
                     continue;
@@ -363,7 +363,7 @@ final class RulesEngine
                 }
 
                 // Hypnotic Gaze: once per turn, player with HypnoticGaze, adjacent opponent
-                if ($player->canAct() && $player->hasSkill(SkillName::HypnoticGaze)) {
+                if ($player->canDeclareNonBlockAction() && $player->hasSkill(SkillName::HypnoticGaze)) {
                     $gazeTargets = $this->getHypnoticGazeTargets($state, $player);
                     if ($gazeTargets !== []) {
                         $actions[] = ['type' => ActionType::HYPNOTIC_GAZE->value, 'playerId' => $player->getId()];
@@ -373,10 +373,10 @@ final class RulesEngine
 
             // Blitz: once per turn, any unmoved player (excluding B&C). P210: ohlasuje se na zacatku
             //   aktivace -- kdo uz ohlasil pohyb (MOVE), blitz nedostane (r. 346-349, 414-427).
-            //   P86: i lezici (r. 676), `canTakeBlitzAction`.
+            //   P86: i lezici (r. 676), `canDeclareNonBlockAction`.
             if (!$teamState->isBlitzUsedThisTurn()) {
                 foreach ($state->getTeamPlayers($side) as $player) {
-                    if ($player->canTakeBlitzAction() && !$player->hasMovedThisTurn() && !$player->hasSkill(SkillName::BallAndChain)) {
+                    if ($player->canDeclareNonBlockAction() && !$player->hasMovedThisTurn() && !$player->hasSkill(SkillName::BallAndChain)) {
                         $actions[] = ['type' => ActionType::BLITZ->value, 'playerId' => $player->getId()];
                     }
                 }
@@ -425,7 +425,7 @@ final class RulesEngine
             // Throw Team-Mate: player with TTM skill adjacent to RightStuff teammate
             if (!$teamState->isPassUsedThisTurn()) {
                 foreach ($state->getTeamPlayers($side) as $player) {
-                    if (!$player->canAct() || !$player->hasSkill(SkillName::ThrowTeamMate)) {
+                    if (!$player->canDeclareNonBlockAction() || !$player->hasSkill(SkillName::ThrowTeamMate)) {
                         continue;
                     }
                     $ttmTargets = $this->getThrowTeamMateTargets($state, $player);
@@ -436,9 +436,11 @@ final class RulesEngine
             }
 
             // Foul: once per turn, standing player with adjacent prone/stunned enemy (excluding B&C)
+            // P316 (24.11.2026): i ležící (ř. 670-676) — `ActionResolver` ho napřed postaví; totéž Pass, Hand-off,
+            //   Throw Team-Mate, Hypnotic Gaze (`canDeclareNonBlockAction`). Bomba ne (ř. 7953-7954).
             if (!$teamState->isFoulUsedThisTurn()) {
                 foreach ($state->getTeamPlayers($side) as $player) {
-                    if ($player->canAct() && !$player->hasSkill(SkillName::BallAndChain)) {
+                    if ($player->canDeclareNonBlockAction() && !$player->hasSkill(SkillName::BallAndChain)) {
                         $foulTargets = $this->getFoulTargets($state, $player);
                         if ($foulTargets !== []) {
                             $actions[] = ['type' => ActionType::FOUL->value, 'playerId' => $player->getId()];
@@ -742,7 +744,7 @@ final class RulesEngine
         }
 
         // P86: i ležící, který ještě nejednal (vstane na začátku akce, ř. 670-676)
-        if (!$player->canTakeBlitzAction()) {
+        if (!$player->canDeclareNonBlockAction()) {
             return ['Player cannot act'];
         }
 
@@ -815,7 +817,7 @@ final class RulesEngine
     public function getBlitzTargets(GameState $state, MatchPlayerDTO $player): array
     {
         $declared = $state->getDeclaredBlitzerId() === $player->getId();   // P210: ohlášený blitz
-        if (!$player->canTakeBlitzAction() || (!$declared && ($player->hasMovedThisTurn()
+        if (!$player->canDeclareNonBlockAction() || (!$declared && ($player->hasMovedThisTurn()
                 || $state->getTeamState($player->getTeamSide())->isBlitzUsedThisTurn()))) {
             return [];   // bez ohlášení: blitz jen na začátku aktivace (P210)
         }
@@ -895,7 +897,7 @@ final class RulesEngine
             return ['Can only pass with players from the active team'];
         }
 
-        if (!$player->canAct()) {
+        if (!$player->canDeclareNonBlockAction()) {
             return ['Player cannot act'];
         }
 
@@ -953,7 +955,7 @@ final class RulesEngine
             return ['Can only hand-off with players from the active team'];
         }
 
-        if (!$player->canAct()) {
+        if (!$player->canDeclareNonBlockAction()) {
             return ['Player cannot act'];
         }
 
@@ -1053,7 +1055,7 @@ final class RulesEngine
         if ($player->getTeamSide() !== $state->getActiveTeam()) {
             return ['Can only throw with players from the active team'];
         }
-        if (!$player->canAct()) {
+        if (!$player->canDeclareNonBlockAction()) {
             return ['Player cannot act'];
         }
         if (!$player->hasSkill(SkillName::ThrowTeamMate)) {
@@ -1105,7 +1107,7 @@ final class RulesEngine
     public function getThrowTeamMateTargets(GameState $state, MatchPlayerDTO $player): array
     {
         $pos = $player->getPosition();
-        if ($pos === null || !$player->canAct() || !$player->hasSkill(SkillName::ThrowTeamMate)) {
+        if ($pos === null || !$player->canDeclareNonBlockAction() || !$player->hasSkill(SkillName::ThrowTeamMate)) {
             return [];
         }
 
@@ -1229,7 +1231,7 @@ final class RulesEngine
             return ['Can only foul with players from the active team'];
         }
 
-        if (!$player->canAct()) {
+        if (!$player->canDeclareNonBlockAction()) {
             return ['Player cannot act'];
         }
 
@@ -1310,7 +1312,7 @@ final class RulesEngine
     public function getFoulTargets(GameState $state, MatchPlayerDTO $player): array
     {
         $pos = $player->getPosition();
-        if ($pos === null || !$player->canAct()) {
+        if ($pos === null || !$player->canDeclareNonBlockAction()) {
             return [];
         }
 
@@ -1339,7 +1341,7 @@ final class RulesEngine
     public function getHypnoticGazeTargets(GameState $state, MatchPlayerDTO $player): array
     {
         $pos = $player->getPosition();
-        if ($pos === null || !$player->canAct() || !$player->hasSkill(SkillName::HypnoticGaze)) {
+        if ($pos === null || !$player->canDeclareNonBlockAction() || !$player->hasSkill(SkillName::HypnoticGaze)) {
             return [];
         }
 
@@ -1525,7 +1527,7 @@ final class RulesEngine
         if ($player->getTeamSide() !== $state->getActiveTeam()) {
             return ['Can only use Hypnotic Gaze with players from the active team'];
         }
-        if (!$player->canAct()) {
+        if (!$player->canDeclareNonBlockAction()) {
             return ['Player cannot act'];
         }
         if (!$player->hasSkill(SkillName::HypnoticGaze)) {
