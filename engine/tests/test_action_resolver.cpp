@@ -595,6 +595,35 @@ TEST(ActionResolver, RootedWhileProneFailsToStandAndStaysRootedIntoTheNextTurn) 
     EXPECT_TRUE(gs.getPlayer(1).rooted);
 }
 
+// P315 (port z PHP P86, 19.11.2026): ř. 8582-8584 „if a player fails his Take Root roll as part of a Blitz Action
+// he may not block that turn (he can still roll to stand up if he is Prone)“. Dřív C++ ležícímu v BLITZ po
+// neúspěchu akci zahodil bez vstání (vstání pouštěl jen u MOVE na vlastní pole). PHP `vstatZakorenenyBezRany`:
+// vstane (4+), nehne se, ránu nedá, blitz spotřebován.
+TEST(ActionResolver, P315RootedProneBlitzerStillRollsToStandUpButDoesNotBlock) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/2);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.homeTeam.rerolls = 0;
+
+    // 1 = Take Root selže · 4 = vstání na 4+ vyjde (MA 2 < 3, ř. 690-693)
+    Action blitz{ActionType::BLITZ, 1, 12, {11, 7}};
+    FixedDiceRoller dice({1, 4});
+    auto r = resolveAction(gs, blitz, dice, nullptr);
+
+    EXPECT_FALSE(r.turnover);
+    EXPECT_TRUE(gs.getPlayer(1).rooted);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING) << "ležící smí i v blitzu vstát (ř. 8583-8584)";
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "blokovat nesmí";
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn) << "blitz je spotřebován (ř. 351-352)";
+    EXPECT_TRUE(gs.getPlayer(1).hasActed);
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
 // ř. 997-1004 „Scoring in the opponent's turn“: nosič zatlačený do koncové zóny během soupeřova
 // kola skóruje, „but must move their Turn marker one space along the Turn track“. Týž princip jako
 // review výkopu #4 (TD kopajících při dopadu po Blitz!), tady v běžném kole.

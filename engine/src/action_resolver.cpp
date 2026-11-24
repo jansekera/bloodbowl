@@ -289,6 +289,17 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
                 if (bgResult.wastesTeamAction) {
                     consumeDeclaredTeamAction(state, p.teamSide, action.type);
                 }
+                // P315 (port PHP P86 `vstatZakorenenyBezRany`): OPRAVENO 24.11.2026 -- ležící, který v BLITZ akci
+                //   zakořenil, akci ztratil i bez vstání. Ř. 8582-8584: „he may not block that turn (he can still
+                //   roll to stand up if he is Prone)“ ⇒ vstane (hod, ř. 690-693), nehne se, ránu nedá.
+                if (action.type == ActionType::BLITZ && p.state == PlayerState::PRONE && p.rooted) {
+                    p.usedBlitz = true;
+                    ActionResult stand = resolveStandUp(state, action.playerId, dice, events);
+                    Player& q = state.getPlayer(action.playerId);
+                    q.hasActed = true;
+                    q.hasMoved = true;
+                    return stand.turnover ? stand : ActionResult::ok();
+                }
                 return ActionResult::ok();  // Action wasted, not turnover
             }
         }
