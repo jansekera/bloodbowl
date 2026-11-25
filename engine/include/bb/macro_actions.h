@@ -144,11 +144,17 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kP302SurroundWorst = 1ull << 36  // P302: obestoupit volný míč na pole s nejmenší šancí soupeře ho zvednout (`opponentPickupChance`), jen když ji sníží; vypnuto = nejbližší pole (P250b)
     , kP304bActivation = 1ull << 38    // P304 bod 5: měřidla příštího tahu soupeře (zvednutí P302, výhled nosiče P245) počítají hod velkého hráče, vstávání pod MA 3 a zakořenění; vypnuto = vyrazí vždy (dřív)
     , kP304ProneBlock = 1ull << 37     // P304 bod 2: makro BLOCK i ležícímu s Jump Up (hod AG +2, neúspěch není turnover); vypnuto = jen stojící (dřív)
+    , kQ3AgileEscape = 1ull << 39      // Q3 (uživatel 25.11.2026: „odskočení je pro agilní tým, vstát a zavazet pro silnější“): agilní ležící vedle soupeře dostane „vstát a odskočit“ s oceněním nejhorší odpovědi a „vstát a zůstat“ ztratí, když je odskok levnější a stání nic nedrží; neagilní beze změny
     , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
 void setExtraFeaturesOff(uint64_t mask);
 uint64_t extraFeaturesOff();
 inline bool extraFeatureOn(ExtraFeature f) { return (extraFeaturesOff() & f) == 0; }
+
+// Agilní hráč: AG4+, nebo AG3 s Dodge (P220). Jedno místo pro P220 (nekončit přesun v kontaktu) i Q3 (odskok po vstání).
+inline bool isAgilePlayer(const Player& p) {
+    return p.stats.agility >= 4 || (p.stats.agility == 3 && p.hasSkill(SkillName::Dodge));
+}
 void takeDodgeCapStops(long* out3);
 // P245: [0] přesunů obrany posouzeno, [1] cíl změněn kvůli nosiči, [2] blitz na nosiče nenabídnut (šance < 1/2), [3] nabídnut výjimkou (nosič jinak skóruje). Kumulativní, nuluje se čtením.
 void takeP245Obstruct(long* out4);

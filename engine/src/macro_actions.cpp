@@ -1808,7 +1808,11 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
         // Q3: cela vetev "vstat a odejit" (krok A) i jeji ocenení (krok B) sedi
         // pod JEDNIM vypinacem. Nabidnout utek bez ocenení je pulka zmeny --
         // planovac by dostal moznost navic, ale duvod, proc si ji vybrat, ne.
-        if (nextToEnemy && standUpEscapeArm(mySide)) {
+        // Q3 (uživatel 25.11.2026: „ocenění vstávání je jasné — odskočení je pro agilní tým, vstát a zavazet pro
+        //   silnější“): pro agilního hráče obě půlky (Q3-N odskok + Q3-O odebrání „zůstat“) zapnuté; neagilní vstává
+        //   a zavazí jako dosud. Měřeno 06.–07.09.: dw-dw ekvivalence (trpaslík bez Dodge), we-we 4× víc použití.
+        const bool agileEscape = extraFeatureOn(kQ3AgileEscape) && isAgilePlayer(p);
+        if (nextToEnemy && (standUpEscapeArm(mySide) || agileEscape)) {
             const int budget = movementAfterStandUp(p) + maxGfiSquares(p);
             const bool priced = true;
             Position best{-1, -1};
@@ -1996,7 +2000,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                         });
                     }
                 }
-                if (priced && standUpRemoveStayArm(mySide) && !stayEarnsItsKeep &&
+                if (priced && (standUpRemoveStayArm(mySide) || agileEscape) && !stayEarnsItsKeep &&
                     worstReplyCost(state, p, p.position, true) > bestCost + 1e-9) {
                     offerStay = false;
                     armChangedOffer = true;
@@ -3629,7 +3633,7 @@ enum class WalkStep { ARRIVED, STEP, STOP };
 //   Čte se jen stav, neplánuje se: „blok může přijít“, ne „blok přijde“.
 static bool p220MustAvoidContact(const GameState& state, const Player& p, Position sq) {
     if (!extraFeatureOn(kP220AgileNoContact)) return false;
-    if (p.stats.agility < 4 && !(p.stats.agility == 3 && p.hasSkill(SkillName::Dodge))) return false;
+    if (!isAgilePlayer(p)) return false;
     const TeamSide me = p.teamSide;
     if (state.ball.isHeld && state.ball.carrierId > 0) {   // (a)
         const Player& c = state.getPlayer(state.ball.carrierId);

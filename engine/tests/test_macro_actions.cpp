@@ -2677,6 +2677,46 @@ TEST(MacroActions, ProneePlayerIsOfferedStandUp) {
     EXPECT_TRUE(found) << "ležící musí dostat nabídku vstát";
 }
 
+// Q3 (uživatel 25.11.2026: „odskočení je pro agilní tým — vstát a zavazet pro silnější“): ležící vedle soupeře
+// s Mighty Blow, míč daleko (stání nic nedrží). Agilní (AG4) dostane „vstát a odskočit“ a ztratí „vstát a zůstat“;
+// neagilní (AG2) vstává a zavazí jako dřív. Pozitivní kontrola: s vypnutým kQ3AgileEscape i agilní jen „zůstat“.
+TEST(MacroActions, Q3AgileProneEscapesStrongStaysAndObstructs) {
+    auto board = [](int ag) {
+        GameState gs;
+        gs.phase = GamePhase::PLAY;
+        gs.activeTeam = TeamSide::HOME;
+        gs.homeTeam.turnNumber = 3;
+        p45Place(gs, 1, {10, 7}, TeamSide::HOME);
+        gs.getPlayer(1).state = PlayerState::PRONE;
+        gs.getPlayer(1).stats.agility = static_cast<int8_t>(ag);
+        p45Place(gs, 12, {11, 7}, TeamSide::AWAY);
+        gs.getPlayer(12).skills.add(SkillName::MightyBlow);
+        gs.ball = BallState::onGround({24, 13});
+        return gs;
+    };
+    auto offers = [](const GameState& gs, bool& stay, bool& escape) {
+        std::vector<Macro> ms;
+        getAvailableMacros(gs, ms, true);
+        stay = escape = false;
+        for (const auto& m : ms) {
+            if (m.playerId != 1 || m.type != MacroType::REPOSITION) continue;
+            if (m.targetPos == (Position{10, 7})) stay = true; else escape = true;
+        }
+    };
+    bool stay, escape;
+    offers(board(4), stay, escape);
+    EXPECT_TRUE(escape) << "agilní: vstát a odskočit";
+    EXPECT_FALSE(stay) << "agilní: vstát a zůstat vedle Mighty Blow nic nedrží";
+    offers(board(2), stay, escape);
+    EXPECT_TRUE(stay) << "silnější: vstát a zavazet";
+    EXPECT_FALSE(escape);
+    setExtraFeaturesOff(kQ3AgileEscape);
+    offers(board(4), stay, escape);
+    setExtraFeaturesOff(0);
+    EXPECT_TRUE(stay);
+    EXPECT_FALSE(escape) << "pozitivní kontrola: bez přepínače jako dřív";
+}
+
 TEST(MacroActions, StandUpMacroActuallyStandsThePlayerUp) {
     GameState gs;
     gs.phase = GamePhase::PLAY;
