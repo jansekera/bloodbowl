@@ -102,7 +102,8 @@ final class MissedPassScatterTest extends TestCase
             ->build();
 
         // hod 4 (ne fumble); rozptyl S (20,0), S (20,-1) mimo -> dal se nehazi;
-        // throw-in od (20,0): sablona 3 = kolmo (J), 2D6 = 1+2 -> (20,3), hrac 3 chyta 6
+        // throw-in od (20,0): sablona 3 = kolmo (J), 2D6 = 1+2 = 3 pole, prvni je (20,0) samo (FAQ r. 9307-9314)
+        //   -> (20,2) prazdne, odraz 6 (OPRAVENO 24.11. -- komentar tvrdil (20,3) a chytani hrace 3; P89 PassThrowInTurnoverTest)
         // (stara verze: treti rozptyl 5 vrati mic na (20,0), zadny throw-in)
         $dice = new FixedDiceRoller([4, 1, 1, 3, 1, 2, 6]);
         $result = (new ActionResolver($dice))->resolve($state, ActionType::PASS, [
