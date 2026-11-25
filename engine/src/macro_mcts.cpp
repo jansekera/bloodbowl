@@ -1242,6 +1242,7 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     const bool basPick = (bestMacro.type == MacroType::BLITZ_AND_SCORE);
     if (basPick) ++g_basRealBas;
     const long p220Before = p220StopsTotal();   // P220: zastavení jen ve SKUTEČNÉM tahu (rozdíl kolem rozbalení)
+    setRealExpansionMacro(static_cast<int>(bestMacro.type));   // P157d měřidlo
     auto expansion = greedyExpandMacro(planState, bestMacro, expansionDice_);
     addP220RealStops(p220StopsTotal() - p220Before);
     // TD se pozna podle fáze: action_resolver nastavuje TOUCHDOWN, kdyz
@@ -1266,6 +1267,7 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         bestMacro = search_.search(state);
         source = MacroDecisionInfo::Source::SEARCH;
         planState = state.clone();
+        setRealExpansionMacro(static_cast<int>(bestMacro.type));
         expansion = greedyExpandMacro(planState, bestMacro, expansionDice_);
     }
 

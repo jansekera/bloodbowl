@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include "bb/game_state.h"
 #include "bb/rules_engine.h"
 #include "bb/dice.h"
@@ -156,6 +157,11 @@ inline bool isAgilePlayer(const Player& p) {
     return p.stats.agility >= 4 || (p.stats.agility == 3 && p.hasSkill(SkillName::Dodge));
 }
 void takeDodgeCapStops(long* out3);
+// P157d měřidlo: úhyby na 4+ ve skutečném tahu podle makra (MACRO_COUNT×3: strop / posl. aktivace / 8. tah s míčem).
+void setRealExpansionMacro(int type);
+void takeDodge4Real(long* out);
+void noteRealDodge4(const GameState& state, const Action& action);
+void takeDodge4RealLog(std::vector<std::array<int, 9>>& out);
 // P245: [0] přesunů obrany posouzeno, [1] cíl změněn kvůli nosiči, [2] blitz na nosiče nenabídnut (šance < 1/2), [3] nabídnut výjimkou (nosič jinak skóruje). Kumulativní, nuluje se čtením.
 void takeP245Obstruct(long* out4);
 // P248: [0] blok lovce nenabídnut, [1] lovec vynechán jako blitzující, [2] lovec stažen za hradbu. Kumulativní, nuluje se čtením.

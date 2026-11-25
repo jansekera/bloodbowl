@@ -1,3 +1,4 @@
+#include "bb/macro_actions.h"
 #include "bb/game_simulator.h"
 #include <set>
 #include "bb/cage_advance.h"
@@ -873,6 +874,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
 
         // Execute with event capture
         turnEvents.clear();
+        noteRealDodge4(state, chosen);   // P157d měřidlo (jen skutečně hraná akce)
         executeAction(state, chosen, dice, &turnEvents);
 
         // Append events to current turn log

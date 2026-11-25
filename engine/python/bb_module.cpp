@@ -735,6 +735,14 @@ PYBIND11_MODULE(bb_engine, m) {
         return py::make_tuple(c.offered, c.armour, c.injury);
     });
     m.def("take_p220_stops", []() { return bb::takeP220RealStops(); });   // P220: jen skutečně hrané tahy; čte a nuluje
+    m.def("take_dodge4_real_log", []() {   // P157d: jednotlivé úhyby na 4+ (tah, hráč, z, na, cíl, makro, druh)
+        std::vector<std::array<int, 9>> v; bb::takeDodge4RealLog(v);
+        py::list l; for (const auto& r : v) { py::list x; for (int i : r) x.append(i); l.append(x); } return l;
+    });
+    m.def("take_dodge4_real", []() {   // P157d: úhyby na 4+ ve skutečném tahu podle makra (16×3), čte a nuluje
+        long v[static_cast<int>(bb::MacroType::MACRO_COUNT) * 3]; bb::takeDodge4Real(v);
+        py::list l; for (long x : v) l.append(x); return l;
+    });
     m.def("take_dodge_cap_stops", []() {
         long v[3]; bb::takeDodgeCapStops(v);
         return py::make_tuple(v[0], v[1], v[2]);

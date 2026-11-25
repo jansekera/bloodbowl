@@ -1,3 +1,4 @@
+#include <array>
 #include "bb/macro_actions.h"
 #include "bb/one_cage.h"
 #include "bb/big_guy_handler.h"
@@ -3485,6 +3486,34 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
 }
 
 // --- Macro Expansion ---
+
+// P157d (25.11.) — MĚŘIDLO: úhyb na 4+ a horší ve SKUTEČNĚ hraném tahu podle makra, které ho udělalo. Řádek =
+// MacroType, sloupec [0] strop platil, [1] výjimka poslední aktivace, [2] výjimka „jde o míč“ v 8. tahu.
+// Typ nastavuje macro_mcts.cpp při výběru makra pro skutečný tah; počítá game_simulator.cpp u akce, kterou hra opravdu
+// provede (ne simulace hledání). Blitz se tu neobjeví (celou cestu jde action_resolver v jedné akci). ⚠️ Typ makra se
+// nenuluje: platí pro hru macro_mcts × macro_mcts; s jinou politikou soupeře by jeho tahy nesly poslední typ.
+thread_local int g_realMacroType = -1;
+// Řádek: tah, hráč, z x,y, na x,y, cíl hodu, MacroType, druh (jako sloupec čítače).
+thread_local std::vector<std::array<int, 9>> g_dodge4RealLog;
+thread_local long g_dodge4Real[static_cast<int>(MacroType::MACRO_COUNT)][3] = {};
+void setRealExpansionMacro(int type) { g_realMacroType = type; }
+void takeDodge4Real(long* out) {
+    for (int t = 0; t < static_cast<int>(MacroType::MACRO_COUNT); ++t)
+        for (int k = 0; k < 3; ++k) { out[t * 3 + k] = g_dodge4Real[t][k]; g_dodge4Real[t][k] = 0; }
+}
+void noteRealDodge4(const GameState& state, const Action& action) {
+    if (g_realMacroType < 0 || action.type != ActionType::MOVE || action.playerId <= 0) return;
+    const Player& p = state.getPlayer(action.playerId);
+    if (!p.isOnPitch() || action.target == p.position ||
+        countTacklezones(state, p.position, p.teamSide) == 0) return;
+    const int tgt = calculateDodgeTarget(state, p, action.target, p.position);
+    if (tgt < kDodgeCapTarget) return;
+    const int k = dodgeCapFor(state, p, false) == 0 ? 1 : (dodgeCapFor(state, p, true) == 0 ? 2 : 0);
+    ++g_dodge4Real[g_realMacroType][k];
+    g_dodge4RealLog.push_back({state.getTeamState(p.teamSide).turnNumber, p.id, p.position.x, p.position.y,
+                               action.target.x, action.target.y, tgt, g_realMacroType, k});
+}
+void takeDodge4RealLog(std::vector<std::array<int, 9>>& out) { out.swap(g_dodge4RealLog); g_dodge4RealLog.clear(); }
 
 // Execute a single action, add to result, return true if turnover
 static bool executeAndRecord(GameState& state, const Action& action,
