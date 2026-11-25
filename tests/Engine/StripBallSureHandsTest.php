@@ -37,7 +37,7 @@ final class StripBallSureHandsTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::StripBall], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 7, skills: $nosic, id: 2)
             ->withBallCarried(2)
-            ->build();
+            ->withNoRerolls()->build();
 
         return (new ActionResolver(new FixedDiceRoller([3, 1])))
             ->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);

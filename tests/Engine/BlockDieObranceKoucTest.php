@@ -36,7 +36,7 @@ final class BlockDieObranceKoucTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: $silaObrance, armour: 8, id: 2)
             ->withBallOffPitch()
-            ->build()
+            ->withNoRerolls()->build()
             ->withAiTeam(TeamSide::HOME);
     }
 
@@ -165,7 +165,7 @@ final class BlockDieObranceKoucTest extends TestCase
         $s = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, skills: [SkillName::Frenzy], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 4, armour: 9, id: 2)
-            ->withBallOffPitch()->build()->withAiTeam(TeamSide::HOME);
+            ->withBallOffPitch()->withNoRerolls()->build()->withAiTeam(TeamSide::HOME);
         $resolver = $this->resolverTahuAi(new FixedDiceRoller([3, 4, 6, 1, 1, 1, 1, 1, 1, 1]));
 
         $a = $resolver->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
@@ -208,7 +208,7 @@ final class BlockDieObranceKoucTest extends TestCase
         $s = (new GameStateBuilder())
             ->addPlayer(TeamSide::AWAY, 5, 5, strength: 3, id: 1)
             ->addPlayer(TeamSide::HOME, 6, 5, strength: 4, armour: 9, id: 2)
-            ->withBallOffPitch()->withActiveTeam(TeamSide::HOME)->build()->withAiTeam(TeamSide::AWAY);
+            ->withBallOffPitch()->withActiveTeam(TeamSide::HOME)->withNoRerolls()->build()->withAiTeam(TeamSide::AWAY);
         $o = $this->orchestrator();
 
         $x = $o->executeAction($s, ActionType::END_TURN, []);

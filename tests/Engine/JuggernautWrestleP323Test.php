@@ -28,7 +28,7 @@ final class JuggernautWrestleP323Test extends TestCase
         $b = $nosic !== null ? $b->withBallCarried($nosic) : $b->withBallOffPitch();
 
         return (new ActionResolver(new FixedDiceRoller([2, 1, 1, 1, 1, 1, 1, 1, 1, 1])))
-            ->resolve($b->build(), ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]);
+            ->resolve($b->withNoRerolls()->build(), ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]);
     }
 
     /** @return list<string> */

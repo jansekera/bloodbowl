@@ -485,7 +485,7 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
                 //     BFS je jedina cesta, `pickApproachStep`/`canReachAdjacentTo`
                 //     uz se tu nepouzivaji.
                 Position bestNext;
-                if (!nextStepTowardAdjacent(state, player, target.position, bestNext)) {
+                if (!nextStepTowardAdjacent(state, player, target.position, bestNext, blitzDodgeCap())) {
                     noteBlitzWasted(0);
                     return ActionResult::fail();
                 }

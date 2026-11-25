@@ -4665,9 +4665,12 @@ static bool randomBlitzBoard(std::mt19937& rng, GameState& s, Position& tp) {
 // (smyčka hry: nextStepTowardAdjacent + resolveMoveStep, všechny hody 6). Náhodné pozice
 // s Dodge, Break Tackle, Tackle, ležícím blitzujícím a vlastním nosičem (sestavil reviewer
 // 06.10.; první verze dotazu tu měla 337 úniků z 30 000).
+// P157a (25.11.2026): hra jde doběhem se stropem (`setBlitzDodgeCap` → `nextStepTowardAdjacent(…, cap)`), dotaz
+// přehrává totéž. Chůze se stropem úhyb 4+ nehodí nikdy; „dojde / nedojde“ se s dotazem shoduje. Pozitivní kontrola:
+// doběhy, které by bez stropu hodily úhyb 4+, a se stropem k cíli dojdou obchůzkou (dřív blitzující vypadl).
 TEST(DodgeCap, BlitzPredictionMatchesTheRealWalk) {
     std::mt19937 rng(12345);
-    int checked = 0, walksWithRiskyDodge = 0, leaks = 0, falseBlocks = 0, reachMismatch = 0;
+    int checked = 0, uncappedRisky = 0, detours = 0, leaks = 0, falseBlocks = 0, reachMismatch = 0;
     for (int it = 0; it < 2500; ++it) {
         GameState s;
         Position tp;
@@ -4683,34 +4686,124 @@ TEST(DodgeCap, BlitzPredictionMatchesTheRealWalk) {
         if (wb.state == PlayerState::PRONE) {
             if (!resolveStandUp(w, 1, dice, nullptr).success) continue;
         }
+        // Bez stropu: hodila by chůze úhyb 4+? (stará hra)
+        bool risky = false;
+        {
+            GameState u = w.clone();
+            Player& ub = u.getPlayer(1);
+            for (int g = 0; g < 30 && ub.position.distanceTo(tp) > 1; ++g) {
+                Position nx;
+                if (!nextStepTowardAdjacent(u, ub, tp, nx)) break;
+                if (countTacklezones(u, ub.position, ub.teamSide) > 0 &&
+                    calculateDodgeTarget(u, ub, nx, ub.position) >= 4) { risky = true; break; }
+                const Position before = ub.position;
+                auto r = resolveMoveStep(u, 1, nx, dice, nullptr);
+                if (!r.success || ub.position == before || ub.state != PlayerState::STANDING) break;
+            }
+        }
         int real = 0, guard = 0;
         bool reached = true;
         while (wb.position.distanceTo(tp) > 1) {
             Position nx;
-            if (!nextStepTowardAdjacent(w, wb, tp, nx) || ++guard > 30) { reached = false; break; }
+            if (!nextStepTowardAdjacent(w, wb, tp, nx, 4) || ++guard > 30) { reached = false; break; }
             if (countTacklezones(w, wb.position, wb.teamSide) > 0) {
                 real = std::max(real, calculateDodgeTarget(w, wb, nx, wb.position));
             }
-            if (real >= 4) break;      // dotaz končí na prvním úhybu nad stropem; dál se neporovnává
+            if (real >= 4) break;
             const Position before = wb.position;
             auto r = resolveMoveStep(w, 1, nx, dice, nullptr);
             if (!r.success || wb.position == before || wb.state != PlayerState::STANDING) { reached = false; break; }
         }
         ++checked;
-        if (real >= 4) {
-            ++walksWithRiskyDodge;
-            if (!predHit) ++leaks;
-        } else if (predHit) {
-            ++falseBlocks;
-        } else if (predReaches != reached) {
-            ++reachMismatch;
-        }
+        if (risky) { ++uncappedRisky; if (reached) ++detours; }
+        if (real >= 4) ++leaks;
+        else if (predHit) ++falseBlocks;
+        else if (predReaches != reached) ++reachMismatch;
     }
     EXPECT_GT(checked, 1500);
-    EXPECT_GT(walksWithRiskyDodge, 100);     // pozitivní kontrola: vzorek rizikové doběhy obsahuje
-    EXPECT_EQ(leaks, 0);                     // chůze by hodila úhyb 4+ a horší, dotaz to neviděl
-    EXPECT_EQ(falseBlocks, 0);               // dotaz zakázal doběh, který takový úhyb nemá
+    EXPECT_GT(uncappedRisky, 100);           // pozitivní kontrola: bez stropu vzorek rizikové doběhy obsahuje
+    EXPECT_GT(detours, 10);                  // P157a (naměřeno 18): část z nich se stropem dojde obchůzkou
+    EXPECT_EQ(leaks, 0);                     // chůze se stropem úhyb 4+ a horší nehodí
+    EXPECT_EQ(falseBlocks, 0);               // dotaz nehlásí úhyb, který chůze nehodí
     EXPECT_EQ(reachMismatch, 0);             // „dojde / nedojde“ se shoduje s chůzí
+}
+
+// P157a/b (uživatel 25.11.2026: „1 ano, 2 ano“): chůze (`nextStepToward`) se stropem 4 na náhodných pozicích
+// úhyb 4+ nehodí nikdy, a když k cíli nedojde, nekončí v zóně soupeře (pokud se vůbec pohnula). Pozitivní
+// kontrola: bez stropu tytéž chůze úhyb 4+ hází a v zóně končí.
+TEST(DodgeCap, P157WalkNeverDodgesFourPlusAndStopsOutsideZones) {
+    std::mt19937 rng(777);
+    int walks = 0, risky = 0, leaks = 0, inZoneOld = 0, inZoneNew = 0;
+    for (int it = 0; it < 2500; ++it) {
+        GameState s;
+        Position tp;
+        if (!randomBlitzBoard(rng, s, tp)) continue;
+        Player& b0 = s.getPlayer(1);
+        if (b0.state == PlayerState::PRONE) continue;
+        s.getPlayer(12).position = {-1, -1};          // cíl = volné pole (chůze, ne blitz)
+        if (s.ball.isHeld && s.ball.carrierId == 12) s.ball = BallState::onGround({0, 0});
+        for (int mode : {0, 1, 2}) {   // 0 bez stropu, 1 strop bez (b), 2 strop s (b)
+            const int cap = mode == 0 ? 0 : 4;
+            GameState w = s.clone();
+            Player& wb = w.getPlayer(1);
+            const Position start = wb.position;
+            SixDice dice;
+            bool dodged4 = false;
+            for (int g = 0; g < 20 && wb.position != tp; ++g) {
+                Position nx;
+                const int budget = wb.movementRemaining + 2;
+                if (budget <= 0 || !nextStepToward(w, wb, tp, budget, Position{-1, -1}, nx, cap, mode == 2)) break;
+                if (countTacklezones(w, wb.position, wb.teamSide) > 0 &&
+                    calculateDodgeTarget(w, wb, nx, wb.position) >= 4) dodged4 = true;
+                const Position before = wb.position;
+                auto r = resolveMoveStep(w, 1, nx, dice, nullptr);
+                if (!r.success || wb.position == before || wb.state != PlayerState::STANDING) break;
+            }
+            const bool endInZone = wb.position != tp && wb.position != start &&
+                                   countTacklezones(w, wb.position, wb.teamSide) > 0;
+            if (mode == 0) { ++walks; if (dodged4) ++risky; }
+            else if (mode == 1) { if (endInZone) ++inZoneOld; }
+            else { if (dodged4) ++leaks; if (endInZone) ++inZoneNew; }
+        }
+    }
+    EXPECT_GT(walks, 1500);
+    EXPECT_GT(risky, 100);       // pozitivní kontrola
+    EXPECT_GT(inZoneOld, 20);    // pozitivní kontrola (b): strop bez (b) v zóně končí
+    EXPECT_EQ(leaks, 0);
+    EXPECT_EQ(inZoneNew, 0);
+}
+
+// P157c (uživatel 25.11.: „3 ano“): tah, ve kterém strop vyřadí všechny cíle blitzu, se započte. Hráč 1 (AG2, v zóně 13)
+// by na cíl 12 musel přes úhyb 5+, nikdo jiný nedosáhne. Pozitivní kontrola: blitzující volně ⇒ nabídka je, čítač 0.
+TEST(DodgeCap, P157BlitzLostToTheCapIsCounted) {
+    auto position = [](bool free) {
+        GameState state = makeDodgeCapState(2);
+        state.getPlayer(12).position = {12, 5};
+        state.ball = BallState::onGround({20, 1});
+        state.getPlayer(2).position = {1, 14};        // spoluhráč daleko
+        state.getPlayer(13).stats.strength = 7;        // blitz na souseda 13: 3 kostky volí on (P227) ⇒ jen cíl 12
+        if (free) state.getPlayer(13).position = {20, 12};
+        return state;
+    };
+    long c[3];
+    takeDodgeCapStops(c);
+    auto blitzes = [](const std::vector<Macro>& ms) {
+        return std::count_if(ms.begin(), ms.end(), [](const Macro& m) { return m.type == MacroType::BLITZ; });
+    };
+    {
+        std::vector<Macro> ms;
+        getAvailableMacros(position(false), ms, true);
+        takeDodgeCapStops(c);
+        EXPECT_EQ(blitzes(ms), 0);
+        EXPECT_GE(c[2], 1);
+    }
+    {
+        std::vector<Macro> ms;
+        getAvailableMacros(position(true), ms, true);
+        takeDodgeCapStops(c);
+        EXPECT_GE(blitzes(ms), 1);
+        EXPECT_EQ(c[2], 0);
+    }
 }
 
 // P227 review H1 (23.10.2026): pole dopadu, ze kterého P227 počítá kostky bloku, proti SKUTEČNÉ

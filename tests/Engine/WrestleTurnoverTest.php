@@ -39,7 +39,7 @@ final class WrestleTurnoverTest extends TestCase
             );
         $b = $attackerCarriesBall ? $b->withBallCarried(1) : $b->withBallOffPitch();
 
-        return $b->build();
+        return $b->withNoRerolls()->build();
     }
 
     public function testWrestleWithoutTheBallIsNotATurnover(): void

@@ -61,7 +61,7 @@ static int teammatesStillToAct(const GameState& state, int excludePlayerId,
 //   Přepínač je zapnutý; vypnout jde jen kvůli párovému měření „před / po“.
 constexpr int kDodgeCapTarget = 4;
 thread_local bool g_dodgeCapEnabled = true;
-thread_local long g_dodgeCapStops[2] = {0, 0};   // [0] zastavená chůze, [1] vyřazený blitzující
+thread_local long g_dodgeCapStops[3] = {0, 0, 0};   // [0] zastavená chůze, [1] vyřazený blitzující, [2] blitz bez nabídky (P157c)
 void setDodgeCapEnabled(bool on) { g_dodgeCapEnabled = on; }
 thread_local unsigned g_cageFeaturesOff = 0;
 void setCageFeaturesOff(unsigned mask) { g_cageFeaturesOff = mask; }
@@ -97,8 +97,8 @@ static long g_p253[2] = {0, 0};
 void takeP253(long* out2) { takeCounters(g_p253, out2); }
 thread_local bool g_foulOnlyLast = true;
 void setFoulOnlyLastEnabled(bool on) { g_foulOnlyLast = on; }
-void takeDodgeCapStops(long* out2) {
-    for (int i = 0; i < 2; ++i) { out2[i] = g_dodgeCapStops[i]; g_dodgeCapStops[i] = 0; }
+void takeDodgeCapStops(long* out3) {
+    for (int i = 0; i < 3; ++i) { out3[i] = g_dodgeCapStops[i]; g_dodgeCapStops[i] = 0; }
 }
 // P220: zastavení agilního před kontaktem. `g_p220Stops` = každé rozbalení (i simulace hledání a klece),
 // ne dotaz nabídky; `g_p220RealStops` = jen skutečně hraný tah — přičítá ho macro_mcts.cpp rozdílem kolem
@@ -1305,6 +1305,14 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
 //   výš oceňuje starou hladovou cestu `pickApproachStep` — první verze stropu se o ni opřela
 //   a Runner 5 v tahu 5 partie 02.10. dál blitzoval přes úhyby 5+, 4+, 4+ (kniha P155).
 // Hlídá se při výběru blitzujícího (pickBlitzer) — v rozbalení i v nabídce (P196, 15.10.2026).
+// Strop úhybu doběhu `blitzer` → `target` (0 = bez stropu). Jedno místo pro výběr blitzujícího i pro hru
+// (`expandBlitz` → `setBlitzDodgeCap`, P157a), aby přehrání doběhu a skutečný doběh hledaly s týmž stropem.
+static int blitzDodgeCapValue(const GameState& state, const Player& blitzer, const Player& target) {
+    const bool aboutTheBall = state.ball.isHeld && state.ball.carrierId == target.id;
+    if (aboutTheBall && target.teamSide != blitzer.teamSide && extraFeatureOn(kP249fCarrierNoDodgeCap)) return 0;
+    return dodgeCapFor(state, blitzer, aboutTheBall);
+}
+
 static bool blitzDodgeCapped(const GameState& state, const Player& blitzer, const Player& target) {
     const bool aboutTheBall = state.ball.isHeld && state.ball.carrierId == target.id;
     // P249f (uživatel 5.11.2026: „jestliže je riziko přes třetinu, AI šanci zahodí, ale člověk se po ní vrhne — uprav,
@@ -2558,6 +2566,18 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             out.push_back(m);
             ++offered;
         }
+        // P157c (uživatel 25.11.: „3 ano“): tah bez blitzu jen kvůli stropu — bez stropu by se nějaký cíl nabídl.
+        if (offered == 0 && !candidates.empty() && g_dodgeCapEnabled) {
+            g_dodgeCapEnabled = false;
+            bool withoutCap = false;
+            for (size_t i = 0; i < candidates.size() && !withoutCap; ++i) {
+                Action ignored;
+                withoutCap = pickBlitzer(state, Macro{MacroType::BLITZ, -1, candidates[i].targetId, {-1, -1}},
+                                         actions, ignored, /*count=*/false);
+            }
+            g_dodgeCapEnabled = true;
+            if (withoutCap) ++g_dodgeCapStops[2];
+        }
     }
 
     // BLITZ_AND_SCORE: carrier can almost reach endzone, but opponent blocks path
@@ -3661,7 +3681,11 @@ static WalkStep nextWalkStep(const GameState& state, const Player& p, Position t
         out = Action{ActionType::MOVE, p.id, -1, target};
     } else {
         Position next;
-        if (!nextStepToward(state, p, target, budget, avoid, next)) {
+        // P157a/b (uživatel 25.11.: „1 ano, 2 ano“): strop jako zakázaná hrana; chůze, která k cíli nedojde, míří
+        //   na nejbližší pole MIMO zóny soupeře (volná chůze by jinak v zóně skončila označená; přesun s P211e
+        //   by zastavil dřív, než musí). Přesuny klece (`Contact::EnRoute`, pole volí plánovač) beze změny.
+        if (!nextStepToward(state, p, target, budget, avoid, next, dodgeCap,
+                            /*endOutsideZones=*/dodgeCap > 0 && contact != Contact::EnRoute)) {
             if (count) ++g_mwNoStep;
             return WalkStep::STOP;
         }
@@ -4332,7 +4356,8 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
             if (extraFeatureOn(kP248HunterGuard) && carrierHunter(cand) &&
                 !(state.ball.isHeld && state.ball.carrierId == target.id)) {
                 Position landing{-1, -1};
-                if (!blitzLandingSquare(state, cand, target.position, landing) || hunterExposedAt(state, cand, landing)) {
+                if (!blitzLandingSquare(state, cand, target.position, landing, blitzDodgeCapValue(state, cand, target)) ||
+                    hunterExposedAt(state, cand, landing)) {
                     if (count) ++g_p248[1];
                     continue;
                 }
@@ -4354,7 +4379,11 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
     Action bestBlitzAction{};
     if (!pickBlitzer(state, macro, actions, bestBlitzAction, /*count=*/true)) return result;
 
+    // P157a: doběh jde s týmž stropem, se kterým ho `pickBlitzer` přehrál (obchůzka místo úhybu 4+).
+    setBlitzDodgeCap(blitzDodgeCapValue(state, state.getPlayer(bestBlitzAction.playerId),
+                                        state.getPlayer(bestBlitzAction.targetId)));
     executeAndRecord(state, bestBlitzAction, dice, result);
+    setBlitzDodgeCap(0);
     return result;
 }
 

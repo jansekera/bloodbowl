@@ -405,7 +405,7 @@ final class ActionResolverTest extends TestCase
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
-            ->build();
+            ->withNoRerolls()->build();
 
         // Roll 1 = ATTACKER_DOWN
         // Armour for attacker: 4+4=8 vs AV8 - not broken
@@ -429,7 +429,7 @@ final class ActionResolverTest extends TestCase
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
-            ->build();
+            ->withNoRerolls()->build();
 
         // Roll 2 = BOTH_DOWN, neither has Block skill
         // Defender armour: 3+3=6 vs AV8 - holds
@@ -550,7 +550,7 @@ final class ActionResolverTest extends TestCase
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 4, id: 2) // ST4 > ST3
-            ->build();
+            ->withNoRerolls()->build();
 
         // 2 dice, defender chooses: roll 6 (DEFENDER_DOWN), 1 (ATTACKER_DOWN)
         // Defender picks ATTACKER_DOWN (worst for attacker, score -100)

@@ -24,11 +24,16 @@ long takeBlitzPushTieEligibleInSearch();
 long takeBlitzPushTieFlipsInSearch();
 int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
                                Position target);
+// `dodgeCap` > 0 (P157a): krok s úhybem na `dodgeCap`+ je zakázaný (strop P149), 0 = bez stropu.
 bool nextStepTowardAdjacent(const GameState& state, const Player& player,
-                            Position target, Position& outStep);
+                            Position target, Position& outStep, int dodgeCap = 0);
 // P149: vede doběh blitzu k cíli přes úhyb na `cap`+ a horší? Přehrává smyčku hry (po každém
 // kroku nové hledání, Break Tackle jen na první úhyb), čítače chůze nemění.
 // `reachesOut` = false, když hráč k cíli nedojde (pak vrací false).
+// P157a: strop úhybu doběhu blitzu, který právě provádí AI (makro BLITZ ho nastaví na dobu jedné akce,
+// `action_resolver` ho předá hledání cesty). 0 = bez stropu (člověk, ostatní volající).
+void setBlitzDodgeCap(int cap);
+int blitzDodgeCap();
 bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Position target,
                                int cap, bool* reachesOut = nullptr);
 
@@ -44,9 +49,11 @@ bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Pos
 // (typicky volny mic -- `avoid` u `movePlayerToward`); {-1,-1} = zadne
 // omezeni. False = zadne dosazitelne pole nezlepsi vzdalenost k cili (uz
 // na miste, nebo skutecne zaseknuto).
+// `dodgeCap` jako u `nextStepTowardAdjacent`; `endOutsideZones` (P157b): nedosažitelný cíl ⇒ nejbližší
+// pole MIMO zóny soupeře.
 bool nextStepToward(const GameState& state, const Player& player,
                     Position target, int budget, Position blockedSquare,
-                    Position& outStep);
+                    Position& outStep, int dodgeCap = 0, bool endOutsideZones = false);
 
 // 09.09.2026 (W-GFI gap oprava): delka NEJLEVNEJSI (riziko-vazene, stejny
 // tiebreak jako `nextStepToward`) cesty PRESNE na `target` v ramci
@@ -89,7 +96,8 @@ bool blitzLandingDiceFree(const GameState& state, const Player& player, Position
                           Position& landing, int& steps);
 // P227: pole, ze kterého blitzující po doběhu hry k cíli blokuje (přehrává smyčku hry, úhyby nevadí);
 // false = nedojde (pak `landing` nedefinované). Sousedí-li už, vrací jeho pole.
-bool blitzLandingSquare(const GameState& state, const Player& player, Position target, Position& landing);
+bool blitzLandingSquare(const GameState& state, const Player& player, Position target, Position& landing,
+                        int dodgeCap = 0);
 
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,

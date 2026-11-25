@@ -25,7 +25,7 @@ final class CombatSkillsTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Wrestle], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
             ->withBallOffPitch()
-            ->build();
+            ->withNoRerolls()->build();
 
         $dice = new FixedDiceRoller([2]); // BD result = Both Down
         $resolver = new ActionResolver($dice);
@@ -49,7 +49,7 @@ final class CombatSkillsTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, skills: [SkillName::Wrestle], id: 2)
             ->withBallOffPitch()
-            ->build();
+            ->withNoRerolls()->build();
 
         $dice = new FixedDiceRoller([2]); // BD
         $resolver = new ActionResolver($dice);
@@ -67,7 +67,7 @@ final class CombatSkillsTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Wrestle], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
             ->withBallCarried(1)
-            ->build();
+            ->withNoRerolls()->build();
 
         // BD, odskok 3 (V) na lezici obrance (6,5) -> odskakuje dal (r. 893-898): 5 (J) -> (6,6)
         $dice = new FixedDiceRoller([2, 3, 5]);
@@ -104,7 +104,7 @@ final class CombatSkillsTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
             ->withBallOffPitch()
-            ->build();
+            ->withNoRerolls()->build();
 
         // 1-die: 2 → BD, both down (no Block), attacker armor 2+1=3 not > 8, defender armor 2+1=3 not > 8
         $dice = new FixedDiceRoller([2, 2, 1, 2, 1]);
@@ -434,7 +434,7 @@ final class CombatSkillsTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Juggernaut], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
             ->withBallOffPitch()
-            ->build();
+            ->withNoRerolls()->build();
 
         // BD, attacker armor=2+1=3 not > 8, defender armor=2+1=3 not > 8
         $dice = new FixedDiceRoller([2, 2, 1, 2, 1]);
@@ -709,7 +709,7 @@ final class CombatSkillsTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Pro], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
             ->withBallOffPitch()
-            ->build();
+            ->withNoRerolls()->build();
 
         // AD, Pro=3 (fail), armor 1+2=3 not > 8
         $dice = new FixedDiceRoller([1, 3, 1, 2]);

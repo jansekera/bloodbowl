@@ -1066,8 +1066,14 @@ final class BlockHandler implements ActionHandlerInterface
         //   neexistuje (`evidence/audit_pravidla_20260915.md`). Odstranen na pokyn uzivatele.
         $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz(), $state);
 
-        // Try Pro if result is bad
-        if ($this->spatnaKostka($pending->getFaces()[$bestIdx], $attacker, $defender, $pending->isBlitz(), $state) && $pending->isProAvailable()) {
+        // P328 (uživatel 25.11.2026: „6 ano“, parita s C++ `resolveBlock`): špatný výsledek ⇒ napřed Pro, po
+        //   neúspěšném Pro týmový přehoz HODU PRO (ř. 8385-8387), bez Pro týmový přehoz kostek. Dřív PHP AI týmový
+        //   přehoz na blok nebralo vůbec. Na soupeřova nosiče je špatný každý výsledek, který ho nesrazí ani mu
+        //   nevezme míč (C++ P249c).
+        $chce = $this->aiChcePrehoz($pending->getFaces()[$bestIdx], $attacker, $defender, $pending->isBlitz(), $state);
+        $proZkouseno = false;
+        if ($chce && $pending->isProAvailable()) {
+            $proZkouseno = true;
             $result = $this->resolveBlockReroll($state, ['type' => 'pro']);
             $accumulatedEvents = array_merge($accumulatedEvents, $result->getEvents());
             $state = $result->getNewState();
@@ -1083,7 +1089,25 @@ final class BlockHandler implements ActionHandlerInterface
             $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz(), $state);
         }
 
-        // Note: team rerolls are NOT auto-used on blocks (available through interactive dialog only)
+        // Týmový přehoz: po neúspěšném Pro na hod Pro (C++ přehazuje hod Pro bez dalšího ptaní), bez Pro na kostky,
+        //   jsou-li pořád špatné. Po úspěšném Pro už ne (C++ `rerolled`).
+        $poNeuspesnemPro = $proZkouseno && $pending->isProFailed();
+        if ($pending->isTeamRerollAvailable() && !$pending->isRerollUsed() && ($poNeuspesnemPro || (!$proZkouseno
+            && $this->aiChcePrehoz($pending->getFaces()[$bestIdx], $attacker, $defender, $pending->isBlitz(), $state)))) {
+            $result = $this->resolveBlockReroll($state, ['type' => 'team']);
+            $accumulatedEvents = array_merge($accumulatedEvents, $result->getEvents());
+            $state = $result->getNewState();
+            $pending = $state->getPendingBlock();
+            if ($pending === null) {
+                return $result;
+            }
+            $attacker = $state->getPlayer($pending->getAttackerId());
+            $defender = $state->getPlayer($pending->getDefenderId());
+            if ($attacker === null || $defender === null) {
+                return $result;
+            }
+            $bestIdx = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender, $pending->isBlitz(), $state);
+        }
 
         // OPRAVENO 20.11.2026 (P308) -- kostku vybíral engine i za člověka-obránce (`autoChooseBlockDie`). Pravidla
         //   ř. 633-634: "The coach of the stronger player picks which block dice is used." (`kostkaKouce`)
@@ -2432,6 +2456,39 @@ final class BlockHandler implements ActionHandlerInterface
      * Špatná kostka pro AI (přehoz Pro): lebka, nebo Both Down útočníka bez Blocku. Parita s C++ `shouldRerollBlock`
      * (dřív PHP `scoreBlockFace < 0` — Both Down útočníka s Wrestle nebralo jako špatnou).
      */
+    /** P328: chce AI přehodit (C++ `wantsReroll`): špatná kostka, nebo na soupeřova nosiče výsledek bez sražení / míče. */
+    private function aiChcePrehoz(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz, GameState $state): bool
+    {
+        if ($this->spatnaKostka($face, $attacker, $defender, $isBlitz, $state)) {
+            return true;
+        }
+
+        return $defender->getTeamSide() !== $attacker->getTeamSide()
+            && $state->getBall()->getCarrierId() === $defender->getId()
+            && !$this->srazNeboVyrazi($face, $attacker, $defender, $isBlitz, $state);
+    }
+
+    /**
+     * C++ `blockFaceDownsOrStrips`: Defender Down vždy; Stumbles ne, má-li obránce Dodge a útočník ne Tackle (leda Strip
+     * Ball); Pushed jen Strip Ball na nosiče; Both Down: Wrestle kohokoli, jinak obránce bez Blocku; Attacker Down nikdy.
+     */
+    private function srazNeboVyrazi(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz, GameState $state): bool
+    {
+        $strip = $state->getBall()->getCarrierId() === $defender->getId() && $this->stripBallVyrazi($attacker, $defender);
+        $utocnikWrestle = $attacker->hasSkill(SkillName::Wrestle) && (!$attacker->hasSkill(SkillName::Block)
+            || ($state->getBall()->getCarrierId() !== $attacker->getId() && $defender->hasSkill(SkillName::Block)));
+        $obranceWrestle = $this->obranceSmiWrestle($attacker, $defender, $isBlitz)
+            && (!$defender->hasSkill(SkillName::Block) || $attacker->hasSkill(SkillName::Block));
+
+        return match ($this->aiJuggernautFace($face, $attacker, $defender, $isBlitz, $state)) {
+            BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW => true,
+            BlockDiceFace::DEFENDER_STUMBLES => $strip || !($defender->hasSkill(SkillName::Dodge) && !$attacker->hasSkill(SkillName::Tackle)),
+            BlockDiceFace::PUSHED => $strip,
+            BlockDiceFace::BOTH_DOWN => $utocnikWrestle || $obranceWrestle || !$defender->hasSkill(SkillName::Block),
+            BlockDiceFace::ATTACKER_DOWN => false,
+        };
+    }
+
     private function spatnaKostka(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz, ?GameState $state = null): bool
     {
         $face = $this->aiJuggernautFace($face, $attacker, $defender, $isBlitz, $state);

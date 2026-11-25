@@ -163,6 +163,17 @@ final class GameStateBuilder
         return $this;
     }
 
+    /**
+     * P328 (25.11.2026): oba týmy bez týmových přehozů — pro testy jiné mechaniky s pevnými kostkami, ve kterých by AI
+     * špatnou kostku bloku jinak přehodila (`BlockHandler::autoResolvePendingBlock`) a posunula pořadí hodů.
+     */
+    public function withNoRerolls(): self
+    {
+        $this->homeTeam = $this->homeTeam->withRerolls(0);
+        $this->awayTeam = $this->awayTeam->withRerolls(0);
+        return $this;
+    }
+
     public function withBallOnGround(int $x, int $y): self
     {
         $this->ball = BallState::onGround(new Position($x, $y));

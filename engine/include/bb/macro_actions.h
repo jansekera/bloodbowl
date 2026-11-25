@@ -36,7 +36,8 @@ void takeBlitzAndScoreReal(long* out3);
 
 // P149 (06.10.2026): strop na úhyb v makrech BLITZ, REPOSITION a PICKUP (4+ a horší se nehraje;
 // výjimky: poslední aktivace tahu, míč v posledním kole; skórující makra strop nemají). Zapnuto; vypínat jen pro párové
-// měření „před / po“. takeDodgeCapStops: [0] zastavená chůze, [1] vyřazený blitzující —
+// měření „před / po“. takeDodgeCapStops: [0] zastavená chůze, [1] vyřazený blitzující, [2] tah bez nabídky
+// blitzu, protože všechny proveditelné cíle vyřadil strop (P157c) —
 // počítá i uvnitř hledání, čte se jen jako „zasáhl strop vůbec?“.
 // Kostky bloku z místa, kde útočník stojí: kladné = vybírá útočník, záporné = vybírá obránce.
 int blockDiceCount(const GameState& state, const Player& attacker, const Player& defender);
@@ -148,7 +149,7 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
 void setExtraFeaturesOff(uint64_t mask);
 uint64_t extraFeaturesOff();
 inline bool extraFeatureOn(ExtraFeature f) { return (extraFeaturesOff() & f) == 0; }
-void takeDodgeCapStops(long* out2);
+void takeDodgeCapStops(long* out3);
 // P245: [0] přesunů obrany posouzeno, [1] cíl změněn kvůli nosiči, [2] blitz na nosiče nenabídnut (šance < 1/2), [3] nabídnut výjimkou (nosič jinak skóruje). Kumulativní, nuluje se čtením.
 void takeP245Obstruct(long* out4);
 // P248: [0] blok lovce nenabídnut, [1] lovec vynechán jako blitzující, [2] lovec stažen za hradbu. Kumulativní, nuluje se čtením.

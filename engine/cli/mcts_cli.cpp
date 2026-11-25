@@ -1,4 +1,5 @@
 #include "bb/block_handler.h"   // P225: čítač odmítnutých Stand Firm
+#include "bb/macro_actions.h"   // P157: čítač stropu úhybu
 #include "bb/game_simulator.h"
 #include "bb/policies.h"
 #include "bb/roster.h"
@@ -176,6 +177,9 @@ int main(int argc, char* argv[]) {
     // P310: Piling On — kolikrát se smělo (skill, stojí vedle, přehoz v tahu) a kolikrát ho AI použila.
     const PilingOnCounts po = takePilingOnCounts();
     std::cout << "P310 Piling On nabídnuto: " << po.offered << ", brnění: " << po.armour << ", zranění: " << po.injury << "\n";
+    // P149/P157: strop úhybu — zastavená chůze, vyřazený blitzující, tah bez nabídky blitzu kvůli stropu (tiká i v hledání).
+    long cap[3]; takeDodgeCapStops(cap);
+    std::cout << "P157 strop: chůze " << cap[0] << ", blitzující " << cap[1] << ", blitz bez nabídky " << cap[2] << "\n";
 
     return 0;
 }

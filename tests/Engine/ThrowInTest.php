@@ -139,7 +139,7 @@ final class ThrowInTest extends TestCase
             ->addPlayer(TeamSide::HOME, 24, 5, strength: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 25, 5, strength: 3, id: 2) // nosic u prave hrany
             ->withBallCarried(2)
-            ->build();
+            ->withNoRerolls()->build();
 
         // blok 3 = odstrceni do davu; throw-in: sablona 3 = Z, 2D6 = 2+2 -> 3 pole (22,5) -> odskok 5 -> (22,6);
         // zraneni od davu 2D6 = 3+3 (P197: 2D6 − 1 polí)

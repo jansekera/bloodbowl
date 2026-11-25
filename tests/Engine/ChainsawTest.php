@@ -229,7 +229,7 @@ final class ChainsawTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, armour: 8, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, skills: [SkillName::Chainsaw], id: 2)
             ->withBallOffPitch()
-            ->build();
+            ->withNoRerolls()->build();
 
         // 1 = ATTACKER_DOWN; brneni utocnika 3+3 (+3) = 9 > 8; zraneni 3+3 = 6 => stunned
         $dice = new FixedDiceRoller([1, 3, 3, 3, 3]);

@@ -565,7 +565,7 @@ final class Phase12SkillsTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 8, 5, agility: 3, id: 3)
             ->withBallCarried(2)
             ->withAwayTeam(TeamStateDTO::create(2, 'Away', 'Orc', TeamSide::AWAY, 2)->withPassUsed())
-            ->build();
+            ->withNoRerolls()->build();
 
         // Block: roll 3 = PUSHED (no dump-off rolls needed)
         $dice = new FixedDiceRoller([3]);

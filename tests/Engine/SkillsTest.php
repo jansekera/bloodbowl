@@ -177,7 +177,7 @@ final class SkillsTest extends TestCase
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, skills: [SkillName::Frenzy], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
-            ->build();
+            ->withNoRerolls()->build();
 
         // First block: roll 3 = PUSHED → defender to (7,5), attacker follows to (6,5)
         // Frenzy second block: roll 1 = ATTACKER_DOWN → turnover

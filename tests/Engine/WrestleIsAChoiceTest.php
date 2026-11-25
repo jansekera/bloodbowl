@@ -45,7 +45,7 @@ final class WrestleIsAChoiceTest extends TestCase
         }
 
         return (new ActionResolver(new FixedDiceRoller([2, 1, 1, 1, 1, 1, 1])))
-            ->resolve($b->build(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+            ->resolve($b->withNoRerolls()->build(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
     }
 
     /** @return list<string> */

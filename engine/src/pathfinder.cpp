@@ -170,12 +170,22 @@ static constexpr double kRiskShortFirst = 4.0;
 void riskWeightedDijkstra(const GameState& state, const Player& player,
                           int budget, Position blockedSquare,
                           int* key, int8_t* steps, int16_t* parent,
-                          bool preferStraight = false, double kRiskMultiplier = kRiskSafeFirst) {
+                          bool preferStraight = false, double kRiskMultiplier = kRiskSafeFirst,
+                          int dodgeCap = 0) {
     constexpr int kScale = 100;     // 1 pole = 100 jednotek klice
     const int freeSteps = movementAfterStandUp(player);   // bez GFI
     const bool rerollAvailable = false;   // viz odduvodneni u puvodni funkce
     const bool blizzard = (state.weather == Weather::BLIZZARD);
     const bool hasDodge = player.hasSkill(SkillName::Dodge);
+    // P94 (25.11.2026, nalezeno testem P157: hráč s Break Tackle si naplánoval dva úhyby po 2+, po prvním BT
+    //   došel a strop ho zastavil v zóně): u hráče s Break Tackle znamená vrstva 1 „po prvním úhybu“ — Síla
+    //   platí jen na první úhyb (move_handler.cpp, P77). S Dodge zároveň (v soupiskách nikdo) je ve vrstvě 1
+    //   i přehoz Dodge brán jako utracený, i když ho Tackle na prvním úhybu zrušil — opatrně, přesnou cenu
+    //   zvolené cesty počítá `chainFailProb`.
+    const bool btLayer = player.hasSkill(SkillName::BreakTackle) &&
+                         !player.breakTackleUsedThisTurn && player.stats.strength > player.stats.agility;
+    Player spentBt = player;
+    spentBt.breakTackleUsedThisTurn = true;
     bool done[kNodeCount];
     for (int i = 0; i < kNodeCount; ++i) {
         key[i] = kInfCost; parent[i] = -1; done[i] = false; steps[i] = 127;
@@ -230,8 +240,13 @@ void riskWeightedDijkstra(const GameState& state, const Player& player,
             if (countTacklezones(state, curPos, player.teamSide) > 0) {
                 // `calculateDodgeTarget` uz vraci cil clampnuty do [2,6],
                 // takze P_fail sama od sebe padne do [1/6, 5/6].
-                const int dodgeTarget =
-                    calculateDodgeTarget(state, player, /*dest=*/np, /*source=*/curPos);
+                const int dodgeTarget = calculateDodgeTarget(state, (btLayer && curLayer == 1) ? spentBt : player,
+                                                             /*dest=*/np, /*source=*/curPos);
+                if (btLayer) nLayer = 1;              // první úhyb Break Tackle spotřebuje
+                // P157a (uživatel 25.11.2026: „1 ano“): strop úhybu (P149) je ZAKÁZANÁ HRANA, ne až zákaz
+                //   hotové cesty — dřív se vybrala cesta přes úhyb 4+ (cena jen ~2 pole) a chůze ji pak
+                //   odmítla, i když bezpečná obchůzka o 3+ pole existovala.
+                if (dodgeCap > 0 && dodgeTarget >= dodgeCap) continue;
                 const double pFail = (dodgeTarget - 1) / 6.0;
                 // Reroll se smi vzit jen ve vrstve 0 a jen kdyz ho soused
                 // s Tackle u OPOUSTENEHO pole nerusi (`curPos`, ne `np` --
@@ -332,12 +347,13 @@ inline int bestLayerIdx(const int* key, int sq) {
 // přes hod). Jedno místo pro všechny volající, aby chůze i její ocenění četly tutéž cestu.
 template <typename Reached>
 void searchRoutes(const GameState& state, const Player& player, int budget, Position blockedSquare,
-                  int* key, int8_t* steps, int16_t* parent, bool preferStraight, Reached reached) {
+                  int* key, int8_t* steps, int16_t* parent, bool preferStraight, Reached reached,
+                  int dodgeCap = 0) {
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent, preferStraight,
-                         (cageFeatureOn(kFeatPathRisk) ? kRiskSafeFirst : kRiskShortFirst));
+                         (cageFeatureOn(kFeatPathRisk) ? kRiskSafeFirst : kRiskShortFirst), dodgeCap);
     if (reached(key, steps)) return;
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent, preferStraight,
-                         kRiskShortFirst);
+                         kRiskShortFirst, dodgeCap);
 }
 
 // Nejmenší vzdálenost k `target`, na kterou hledání došlo (pro chůzi „co nejblíž“).
@@ -382,7 +398,8 @@ static int pickAdjacentGoalNode(const GameState& state, const Player& player, Po
 
 // `countDiag` = false: dotaz (P149), čítače chůze se nemění.
 static bool nextStepTowardAdjacentImpl(const GameState& state, const Player& player,
-                                       Position target, Position& outStep, bool countDiag) {
+                                       Position target, Position& outStep, bool countDiag,
+                                       int dodgeCap = 0) {
     const int budget = movementAfterStandUp(player) + maxGfiSquares(player);
     if (budget <= 0) return false;
 
@@ -443,7 +460,7 @@ static bool nextStepTowardAdjacentImpl(const GameState& state, const Player& pla
                          if (p2 != player.position && p2.distanceTo(target) == 1) return true;
                      }
                      return false;
-                 });
+                 }, dodgeCap);
     const int startIdx = gridIdx(player.position.x, player.position.y);
 
     // Cilove pole: sousedi s `target` a v rozpoctu zbyva pole na BLOK
@@ -476,8 +493,8 @@ static bool nextStepTowardAdjacentImpl(const GameState& state, const Player& pla
 }
 
 bool nextStepTowardAdjacent(const GameState& state, const Player& player,
-                            Position target, Position& outStep) {
-    return nextStepTowardAdjacentImpl(state, player, target, outStep, /*countDiag=*/true);
+                            Position target, Position& outStep, int dodgeCap) {
+    return nextStepTowardAdjacentImpl(state, player, target, outStep, /*countDiag=*/true, dodgeCap);
 }
 
 // ⭐ JEDNO MÍSTO přehrání doběhu blitzu (review P227 23.10.2026, H1): dřív tři kopie téže smyčky
@@ -492,7 +509,7 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
 enum class ApproachEnd { Reached, NoPath, Stopped };
 template <class OnStep>
 static ApproachEnd replayBlitzApproach(const GameState& state, const Player& player, Position target,
-                                       Position& landing, int& steps, OnStep onStep) {
+                                       Position& landing, int& steps, OnStep onStep, int dodgeCap = 0) {
     steps = 0;
     landing = player.position;
     if (player.position.distanceTo(target) <= 1) return ApproachEnd::Reached;
@@ -504,7 +521,7 @@ static ApproachEnd replayBlitzApproach(const GameState& state, const Player& pla
     }
     for (int guard = 0; guard < 24 && w.position.distanceTo(target) > 1; ++guard) {
         Position next;
-        if (!nextStepTowardAdjacentImpl(sim, w, target, next, /*countDiag=*/false)) return ApproachEnd::NoPath;
+        if (!nextStepTowardAdjacentImpl(sim, w, target, next, /*countDiag=*/false, dodgeCap)) return ApproachEnd::NoPath;
         const bool dodge = countTacklezones(sim, w.position, w.teamSide) > 0;
         if (!onStep(sim, w, next, dodge)) return ApproachEnd::Stopped;
         // Spotřeba Break Tackle přesně jako move_handler.cpp (P77): první úhyb, kde Síla nahradí Obratnost.
@@ -520,6 +537,10 @@ static ApproachEnd replayBlitzApproach(const GameState& state, const Player& pla
     return w.position.distanceTo(target) == 1 ? ApproachEnd::Reached : ApproachEnd::NoPath;
 }
 
+thread_local int g_blitzDodgeCap = 0;
+void setBlitzDodgeCap(int cap) { g_blitzDodgeCap = cap; }
+int blitzDodgeCap() { return g_blitzDodgeCap; }
+
 // P149 (06.10.2026): vede doběh blitzu k cíli přes úhyb na `cap`+ a horší?
 // Čítače chůze se tu nepočítají — je to dotaz, ne tah. Nedojde-li hráč, vrací false
 // (takový blitz hra neprovede; vyřazuje ho volající).
@@ -530,7 +551,7 @@ bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Pos
     const ApproachEnd end = replayBlitzApproach(state, player, target, landing, steps,
         [&](const GameState& sim, const Player& w, Position next, bool dodge) {
             return !(dodge && calculateDodgeTarget(sim, w, next, w.position) >= cap);
-        });
+        }, /*dodgeCap=*/cap);   // P157a: doběh hledá s týmž stropem jako hra (`setBlitzDodgeCap`)
     if (reachesOut) *reachesOut = end != ApproachEnd::NoPath;
     return end == ApproachEnd::Stopped;
 }
@@ -550,7 +571,7 @@ bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Pos
 //   hadani krok po kroku, ktere osciluje.
 bool nextStepToward(const GameState& state, const Player& player,
                     Position target, int budget, Position blockedSquare,
-                    Position& outStep) {
+                    Position& outStep, int dodgeCap, bool endOutsideZones) {
     if (budget <= 0) return false;
     if (target == player.position) return false;   // volajici uz je na cili
 
@@ -560,13 +581,14 @@ bool nextStepToward(const GameState& state, const Player& player,
     const int startIdx = gridIdx(player.position.x, player.position.y);
     // P170: bezpečně napřed; kratší cesta přes hod jen tehdy, když dovede BLÍŽ k cíli.
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
-                        /*preferStraight=*/true, (cageFeatureOn(kFeatPathRisk) ? kRiskSafeFirst : kRiskShortFirst));
+                        /*preferStraight=*/true, (cageFeatureOn(kFeatPathRisk) ? kRiskSafeFirst : kRiskShortFirst),
+                        dodgeCap);
     if (bestLayerIdx(key, gridIdx(target.x, target.y)) < 0) {
         int key2[kNodeCount];
         int8_t steps2[kNodeCount];
         int16_t parent2[kNodeCount];
         riskWeightedDijkstra(state, player, budget, blockedSquare, key2, steps2, parent2,
-                            /*preferStraight=*/true, kRiskShortFirst);
+                            /*preferStraight=*/true, kRiskShortFirst, dodgeCap);
         if (closestReached(key2, target, startIdx) < closestReached(key, target, startIdx)) {
             std::copy(key2, key2 + kNodeCount, key);
             std::copy(steps2, steps2 + kNodeCount, steps);
@@ -575,12 +597,21 @@ bool nextStepToward(const GameState& state, const Player& player,
     }
 
     const int curDist = player.position.distanceTo(target);
-    int bestDist = curDist, bestKeyAmongTies = kInfCost, goalIdx = -1;
+    // P157b: hráč, který do zóny vešel během tohoto přesunu (`hasMoved`), smí k nejbližšímu poli mimo zóny i „zpět“ —
+    //   jinak žádné pole mimo zóny není blíž než on a zůstane v zóně stát (test P157Walk…: 13 případů). Kdo v zóně
+    //   stál už na začátku, ne: nabídka (`walkCanStart`) by mu dala přesun k cíli, při kterém od cíle odejde
+    //   (test PickerRankedByComputedChanceNotAgilityProxy).
+    const bool leaveZone = endOutsideZones && player.hasMoved &&
+                           countTacklezones(state, player.position, player.teamSide) > 0;
+    int bestDist = leaveZone ? 1000 : curDist, bestKeyAmongTies = kInfCost, goalIdx = -1;
     for (int i = 0; i < kNodeCount; ++i) {
         const int sq = i % GRID_SIZE;
         if (key[i] >= kInfCost || sq == startIdx) continue;
         Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
         const int d = p2.distanceTo(target);
+        // P157b (uživatel 25.11.: „2 ano“): když cíl nejde, chůze nekončí v zóně soupeře (zůstala by
+        //   označená, na ránu) — „co nejblíž“ jen mezi poli mimo zóny.
+        if (endOutsideZones && p2 != target && countTacklezones(state, p2, player.teamSide) > 0) continue;
         if (d < bestDist || (d == bestDist && key[i] < bestKeyAmongTies)) {
             bestDist = d; bestKeyAmongTies = key[i]; goalIdx = i;
         }
@@ -589,7 +620,7 @@ bool nextStepToward(const GameState& state, const Player& player,
     //   na `curDist` a remíza se brala): u nedosažitelného cíle (partie 2: cíl obsadil spoluhráč, hráč stál
     //   vedle) šel hráč do strany, zpět, do strany… až do konce pohybu. Prohledávání vidělo všechna pole
     //   v rozpočtu; když žádné není blíž, krok nic nepřinese ⇒ zůstat stát.
-    if (goalIdx < 0 || bestDist >= curDist) return false;   // nic nezlepsi vzdalenost -- opravdu zaseknuto
+    if (goalIdx < 0 || (!leaveZone && bestDist >= curDist)) return false;   // nic nezlepsi vzdalenost -- opravdu zaseknuto
 
     int idx = goalIdx;
     while (parent[idx] != -1 && parent[idx] != startIdx) idx = parent[idx];
@@ -864,10 +895,11 @@ bool blitzLandingDiceFree(const GameState& state, const Player& player, Position
            == ApproachEnd::Reached;
 }
 
-bool blitzLandingSquare(const GameState& state, const Player& player, Position target, Position& landing) {
+bool blitzLandingSquare(const GameState& state, const Player& player, Position target, Position& landing,
+                        int dodgeCap) {
     int steps = 0;
     return replayBlitzApproach(state, player, target, landing, steps,
-               [](const GameState&, const Player&, Position, bool) { return true; })
+               [](const GameState&, const Player&, Position, bool) { return true; }, dodgeCap)
            == ApproachEnd::Reached;
 }
 

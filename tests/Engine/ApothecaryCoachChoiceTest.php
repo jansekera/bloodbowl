@@ -27,7 +27,7 @@ final class ApothecaryCoachChoiceTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->withBallOffPitch()
-            ->build();
+            ->withNoRerolls()->build();
     }
 
     /** @param list<int> $dice @param array<string, mixed> $params */
@@ -107,7 +107,7 @@ final class ApothecaryCoachChoiceTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 7, skills: [\App\Enum\SkillName::Regeneration], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->withBallOffPitch()
-            ->build();
+            ->withNoRerolls()->build();
     }
 
     /** @param list<\App\DTO\GameEvent> $events */
