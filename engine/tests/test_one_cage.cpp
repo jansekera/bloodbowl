@@ -3500,3 +3500,62 @@ TEST(OneCage, P241DoubleGfiOnlyOutOfReachOrCheapFall) {
     }
 }
 
+
+// --- N1 (rozbor M11 20.11.2026, uživatel 21.11.: „N1 ano“): klec nepostoupí bezpečně ⇒ napřed srazit soupeře,
+// který krok vpřed ohrožuje, pak plán postupu znovu. Klec kolem (12,7) se 4 rohy; soupeři (ST 3, MA 6) na (14,7) přímo
+// před klecí a na (15,5), (15,9) — ve sloupci 2 jen jeden, zeď P229 (2+) to není. Plánovač vrátí 0 maker; po sražení
+// soupeře na (14,7) postoupí s hrozbou ≤ 0,15 (čteno plánovačem v předpokladech). Náš hráč 6 (ST 4, bez Block) stojí
+// u soupeře na (15,6) — drží ho dva soupeři, takže rány řadiče na uvolnění (P154 a: jediný držitel, útočník s Block) na
+// soupeře nebijí; s asistencí obou předních rohů má blok 2 kostky naše a odtlačení vede od klece.
+namespace {
+Board pathBoard() {
+    Board b(3);
+    b.put(1, TeamSide::HOME, {12, 7}, 4);
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {13, 6});
+    b.put(5, TeamSide::HOME, {13, 8});
+    b.put(6, TeamSide::HOME, {15, 6}, 4, 4);
+    b.put(13, TeamSide::AWAY, {14, 7}, 6);
+    b.put(14, TeamSide::AWAY, {15, 5}, 6);
+    b.put(15, TeamSide::AWAY, {15, 9}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    return b;
+}
+bool safeStep(const GameState& s) {
+    CageAdvancePlanner planner(nullptr, cfg(), 1);
+    const CageAdvancePlan p = planner.build(s);
+    return p.valid && p.step >= 1 && (p.blitzThreat <= kSafeBlitzThreat || p.riskAccepted);
+}
+}  // namespace
+
+TEST(OneCageClearPath, OpponentThreateningTheStepIsHitFirstThenTheCageAdvances) {
+    P217Off p217;
+    Board b = pathBoard();
+    {
+        GameState down = b.s.clone();
+        down.getPlayer(13).state = PlayerState::PRONE;
+        ASSERT_FALSE(safeStep(b.s)) << "předpoklad: se soupeřem na nohou krok vpřed bezpečný není";
+        ASSERT_TRUE(safeStep(down)) << "předpoklad: se sraženým soupeřem klec postoupí bezpečně";
+        ASSERT_EQ(blockDiceCount(b.s, b.s.getPlayer(6), b.s.getPlayer(13)), 2);
+    }
+    // pozitivní kontrola: bez N1 řadič na soupeře nebije
+    {
+        Board off = pathBoard();
+        setExtraFeaturesOff(kP217BestChance | kN1ClearPath);
+        const CageTurn t = cageTurn(off);
+        setExtraFeaturesOff(kP217BestChance);
+        EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 6, 13)) << "bez N1 rána na soupeře před klecí nepřijde";
+    }
+    const CageTurn t = cageTurn(b);
+    ASSERT_FALSE(t.macros.empty());
+    EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 6, 13)) << "N1: blok hráče, který u soupeře stojí";
+    // rána přijde dřív než krok nosiče
+    size_t hit = t.macros.size(), step = t.macros.size();
+    for (size_t i = 0; i < t.macros.size(); ++i) {
+        if (t.macros[i].type == MacroType::BLOCK && t.macros[i].targetId == 13 && hit == t.macros.size()) hit = i;
+        if (t.macros[i].type == MacroType::REPOSITION && t.macros[i].playerId == 1 && step == t.macros.size()) step = i;
+    }
+    EXPECT_LT(hit, step) << "napřed rána, pak postup klece";
+    EXPECT_GT(t.carrier.x, 12) << "po sražení soupeře klec postoupila";
+}

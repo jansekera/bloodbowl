@@ -146,6 +146,7 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kP304bActivation = 1ull << 38    // P304 bod 5: měřidla příštího tahu soupeře (zvednutí P302, výhled nosiče P245) počítají hod velkého hráče, vstávání pod MA 3 a zakořenění; vypnuto = vyrazí vždy (dřív)
     , kP304ProneBlock = 1ull << 37     // P304 bod 2: makro BLOCK i ležícímu s Jump Up (hod AG +2, neúspěch není turnover); vypnuto = jen stojící (dřív)
     , kQ3AgileEscape = 1ull << 39      // Q3 (uživatel 25.11.2026: „odskočení je pro agilní tým, vstát a zavazet pro silnější“): agilní ležící vedle soupeře dostane „vstát a odskočit“ s oceněním nejhorší odpovědi a „vstát a zůstat“ ztratí, když je odskok levnější a stání nic nedrží; neagilní beze změny
+    , kN1ClearPath = 1ull << 40        // N1 (uživatel 21.11.2026: „N1 ano“): klec nepostoupí bezpečně ⇒ napřed rána na soupeře 2–3 sloupce před nosičem, po jehož sražení plán postoupí; pak plán znovu (1× za tah)
     , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
 void setExtraFeaturesOff(uint64_t mask);
@@ -188,6 +189,8 @@ void carrierBlitzReserve(const GameState& state, std::vector<int>& out);
 bool carrierBlitzOdds(const GameState& state, double& fail, double& success);
 // P220: zastavení agilního před kontaktem. Total = každé rozbalení vč. simulací (nenuluje se);
 // Real = jen skutečně hraný tah (macro_mcts.cpp), čte a nuluje.
+// N1: [0] vyzkoušeno, [1] cíl nalezen, [2] blok, [3] blitz. Počítá i hledání (řadič klece běží i v simulacích). Nuluje se čtením.
+void takeN1PathClear(long* out4);
 long p220StopsTotal();
 void addP220RealStops(long n);
 long takeP220RealStops();

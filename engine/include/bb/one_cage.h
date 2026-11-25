@@ -156,6 +156,10 @@ private:
     // volíme my, s asistenty přidanými jen tolik, kolik je třeba; nikdo z nich vedle nosiče. True = do fronty šla rána.
     // Volá se znovu po každé ráně (Stage::WALL_CLEAR), dokud další taková rána jde.
     bool planWallClear(const GameState& state);
+    // N1: krok klece vpřed nevyšel bezpečně ⇒ rána (blok na 2+ naše, jinak blitz) na soupeře 2–3 sloupce před nosičem,
+    // po jehož sražení plán postoupí bezpečně. True = do fronty šla rána. Nejvýš 1× za tah (`pathCleared_`).
+    bool planPathClear(const GameState& state, const Player& carrier);
+    bool pathCleared_ = false;
     bool wallClearing_ = false;   // planWallBreak předal tah čištění zdi (P233)
     double wallThreat_ = -1.0;    // P233: hrozba na nosiče na začátku čištění zdi (-1 = ještě nezměřena)
     std::vector<std::pair<int, int>> wallHits_;   // rány do zdi (P229 bloky rohů a blitz, P233) útočník→cíl: před ranou znovu hitKeepsCage

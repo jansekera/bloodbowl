@@ -84,7 +84,8 @@ def _add_engine_to_path() -> None:
     """bb_engine je zkompilovaná .so v engine/build, ne nainstalovaný balík.
     Stejně jako `diag_utils.py:69-70`; ve workeru zvlášť, aby to platilo i při
     startovací metodě `spawn` (fork by cestu zdědil, spawn ne)."""
-    for p in ("engine/build", "python"):
+    # ENGINE_DIR (25.11.2026, N1 A/B): zmrazená kopie .so, aby přestavba engine/build během běhu korpus nezměnila
+    for p in (os.environ.get("ENGINE_DIR", "engine/build"), "python"):
         if p not in sys.path:
             sys.path.insert(0, p)
 
@@ -94,6 +95,10 @@ def _game_worker(args: tuple) -> dict:
     os.nice(19)
     _add_engine_to_path()
     import bb_engine
+    # EXTRA_FEATURES_OFF (25.11.2026, N1 A/B): maska vypnutých úprav (ExtraFeature) pro rameno A/B, obě strany
+    off = int(os.environ.get("EXTRA_FEATURES_OFF", "0"), 0)
+    if off:
+        bb_engine.set_extra_features_off(off)
     opp = OPPONENTS[(idx // 2) % len(OPPONENTS)]
     dwarf_home = (idx % 2 == 0)          # obě orientace, ať se nemíchá bias
     ra, rb = (HOME_RACE, opp) if dwarf_home else (opp, HOME_RACE)
@@ -113,6 +118,8 @@ def _game_worker(args: tuple) -> dict:
         "seed": seed, "home_race": ra, "away_race": rb,
         "home_score": lgr.result.home_score, "away_score": lgr.result.away_score,
         "turn_logs": turns,
+        # N1 čítač (vyzkoušeno, cíl, blok, blitz) — počítá i hledání; chybí u starších enginů
+        "n1": list(bb_engine.take_n1_path_clear()) if hasattr(bb_engine, "take_n1_path_clear") else None,
     }
     with gzip.open(out_path, "wt") as f:
         json.dump(rec, f, default=lambda o: o.tolist() if hasattr(o, "tolist") else o)
