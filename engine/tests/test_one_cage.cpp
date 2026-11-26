@@ -3623,3 +3623,87 @@ TEST(OneCageClearPath, CornerDoesNotBlitzWithoutAReplacement) {
     const CageTurn t = cageTurn(b);
     EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 2, 13)) << "bez náhradníka roh neblitzuje";
 }
+
+// ⭐ N5 (uživatel: „každý zadní roh zvlášť“; 26.11.: „N5 začni“). Táž deska, ale soupeři na (15,5) a (15,9) mají MA 2 — za
+// klec nedojdou. Zadní roh 2 (11,6): bez něj hrozba na nosiče nestoupne ⇒ je volný a N1 jím blitzne bez náhradníka.
+// Pozitivní kontrola: s vypnutým N5 ne; a s rychlým soupeřem za klecí na (8,6) — který by bez rohu k nosiči došel — taky ne.
+TEST(OneCageClearPath, N5FreeBackCornerHitsWithoutAReplacement) {
+    P217Off p217;
+    auto board = [](bool runnerBehind) {
+        Board b = pathBoard(false);
+        b.put(2, TeamSide::HOME, {11, 6}, 4, 4);
+        b.put(4, TeamSide::HOME, {13, 6}, 4, 2);
+        b.put(5, TeamSide::HOME, {13, 8}, 4, 2);
+        b.put(14, TeamSide::AWAY, {15, 5}, 2);
+        b.put(15, TeamSide::AWAY, {15, 9}, 2);
+        if (runnerBehind) b.put(16, TeamSide::AWAY, {7, 5}, 6);
+        return b;
+    };
+    auto threatWithout2 = [](const GameState& s) {
+        GameState g = s.clone();
+        g.getPlayer(2).position = {-1, -1};
+        g.getPlayer(2).state = PlayerState::OFF_PITCH;
+        return blitzThreat(g, g.getPlayer(1));
+    };
+    {
+        Board b = board(false);
+        GameState down = b.s.clone();
+        down.getPlayer(13).state = PlayerState::PRONE;
+        ASSERT_FALSE(safeStep(b.s));
+        ASSERT_TRUE(safeStep(down));
+        ASSERT_LE(threatWithout2(b.s), blitzThreat(b.s, b.s.getPlayer(1)) + 1e-9) << "předpoklad: zezadu nikdo nedojde";
+        Board r = board(true);
+        ASSERT_GT(threatWithout2(r.s), blitzThreat(r.s, r.s.getPlayer(1)) + 1e-9) << "předpoklad: běžec zezadu by došel";
+    }
+    {
+        Board off = board(false);
+        setExtraFeaturesOff(kP217BestChance | kN5FreeBackCorner);
+        const CageTurn t = cageTurn(off);
+        setExtraFeaturesOff(kP217BestChance);
+        EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 2, 13)) << "bez N5 roh bez náhradníka neblitzuje";
+    }
+    Board runner = board(true);
+    EXPECT_FALSE(hasMacro(cageTurn(runner), MacroType::BLITZ, 2, 13)) << "soupeř za klecí ⇒ roh drží";
+    Board b = board(false);
+    EXPECT_TRUE(hasMacro(cageTurn(b), MacroType::BLITZ, 2, 13)) << "N5: volný zadní roh blitzuje";
+}
+
+// N1c (uživatel 26.11.: „N1 - ano“). Plánovač krok vpřed přijme s rizikem (P232, hrozba nad 0,15) — se soupeřem na (14,7)
+// sraženým by šel do 0,15. Pak N1 napřed bije i tak. Bez N1c ne (krok přijatý s rizikem bral N1 jako bezpečný).
+TEST(OneCageClearPath, N1cHitsEvenWhenTheRiskyStepWasAccepted) {
+    P217Off p217;
+    auto board = []() {
+        Board b = pathBoard(false);
+        b.put(2, TeamSide::HOME, {11, 6}, 4, 4);
+        b.put(7, TeamSide::HOME, {10, 6}, 1);
+        b.put(14, TeamSide::AWAY, {15, 5}, 8);
+        b.put(15, TeamSide::AWAY, {15, 9}, 8);
+        b.put(16, TeamSide::AWAY, {16, 7}, 8);
+        return b;
+    };
+    Board b = board();
+    {
+        CageAdvancePlanner planner(nullptr, cfg(), 1);
+        const CageAdvancePlan p = planner.build(b.s);
+        ASSERT_TRUE(p.valid && p.step >= 1 && p.riskAccepted && p.blitzThreat > kSafeBlitzThreat)
+            << "předpoklad: krok přijatý s rizikem, hrozba " << p.blitzThreat;
+        GameState down = b.s.clone();
+        down.getPlayer(13).state = PlayerState::PRONE;
+        const CageAdvancePlan q = planner.build(down);
+        ASSERT_TRUE(q.valid && q.step >= 1 && q.blitzThreat <= kSafeBlitzThreat) << "předpoklad: po sražení bezpečně, " << q.blitzThreat;
+    }
+    // cíl volí N1 (nejnižší hrozba po sražení) — tady blitz na (15,5) s hrozbou po 0,06; stačí rána na soupeře před klecí
+    auto hitsAhead = [](const CageTurn& t) {
+        for (const Macro& m : t.macros)
+            if ((m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) && m.targetId >= 13 && m.targetId <= 16) return true;
+        return false;
+    };
+    {
+        Board off = board();
+        setExtraFeaturesOff(kP217BestChance | kN1OverRisk);
+        const CageTurn t = cageTurn(off);
+        setExtraFeaturesOff(kP217BestChance);
+        EXPECT_FALSE(hitsAhead(t)) << "bez N1c řadič při přijatém riziku nebije";
+    }
+    EXPECT_TRUE(hitsAhead(cageTurn(b))) << "N1c: rána na soupeře, po níž je krok bezpečný";
+}

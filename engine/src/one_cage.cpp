@@ -433,6 +433,21 @@ ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
     return r;
 }
 
+// ⭐ N5 VOLNÝ ZADNÍ ROH (rozbor M11 20.11.2026 N5; uživatel: „každý zadní roh zvlášť“, 26.11.: „N5 začni“). Zadní roh
+//   (úhlopříčně vedle nosiče, o sloupec za ním ve směru útoku), jehož odchod z desky hrozbu rány na nosiče v příštím
+//   soupeřově tahu (blitzThreat — týž výpočet jako plánovač) nezvýší: soupeř zezadu na nosiče nedojde ani bez něj. Takový
+//   roh klec nedrží a smí pomáhat vpředu — rána N1 bez náhradníka, přesun hledáním, blok mimo pojistku P169, křídlo
+//   a blitz u zdi (P230). Každý zadní roh se posuzuje zvlášť (druhý zůstává na desce). Čtení, ne hledání.
+static bool freeBackCorner(const GameState& state, const Player& carrier, const Player& p) {
+    if (!extraFeatureOn(kN5FreeBackCorner) || p.teamSide != carrier.teamSide || p.state != PlayerState::STANDING) return false;
+    const int dir = carrier.teamSide == TeamSide::HOME ? 1 : -1;
+    if ((p.position.x - carrier.position.x) * dir != -1 || std::abs(p.position.y - carrier.position.y) != 1) return false;
+    GameState sim = state.clone();
+    sim.getPlayer(p.id).position = Position{-1, -1};
+    sim.getPlayer(p.id).state = PlayerState::OFF_PITCH;
+    return blitzThreat(sim, sim.getPlayer(carrier.id)) <= blitzThreat(state, carrier) + 1e-9;
+}
+
 // Roh klece s Frenzy: po ráně musí následovat, takže blokem roh opustí.
 static bool frenzyCorner(const Player& p, const Player& carrier) {
     return p.hasSkill(SkillName::Frenzy) && std::abs(p.position.x - carrier.position.x) == 1 &&
@@ -1354,7 +1369,7 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
         const bool isCorner = p.teamSide == carrier.teamSide && p.state == PlayerState::STANDING &&
                               std::abs(p.position.x - carrier.position.x) == 1 &&
                               std::abs(p.position.y - carrier.position.y) == 1;
-        if (isCorner && m.targetPos != p.position) return true;
+        if (isCorner && m.targetPos != p.position && !freeBackCorner(state, carrier, p)) return true;
     }
 
     // Roh s Frenzy po ráně následovat MUSÍ (ř. 8134-8145) ⇒ blokem z rohu odejde. Ukázka 07.10.
@@ -1364,7 +1379,7 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
         const Player& p = state.getPlayer(m.playerId);
         if (p.teamSide == carrier.teamSide && p.hasSkill(SkillName::Frenzy) &&
             std::abs(p.position.x - carrier.position.x) == 1 &&
-            std::abs(p.position.y - carrier.position.y) == 1) {
+            std::abs(p.position.y - carrier.position.y) == 1 && !freeBackCorner(state, carrier, p)) {
             return true;
         }
     }
@@ -1379,7 +1394,7 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
         const Player& p = state.getPlayer(m.playerId);
         const bool isCorner = p.teamSide == carrier.teamSide && p.state == PlayerState::STANDING &&
                               std::abs(p.position.x - carrier.position.x) == 1 &&
-                              std::abs(p.position.y - carrier.position.y) == 1;
+                              std::abs(p.position.y - carrier.position.y) == 1 && !freeBackCorner(state, carrier, p);
         if (isCorner) {
             if (m.type == MacroType::FOUL) return true;
             const bool safe = m.targetId > 0 && p.hasSkill(SkillName::Block) &&
@@ -1684,8 +1699,11 @@ void CageController::planAdvance(const GameState& state) {
     //   útěkem nosiče stranou ani úhybem — pořadí vpřed > stranou > stát > vzad (review P232 nález 1)
     const bool planSafe = planMoves && (plan.blitzThreat <= kSafeBlitzThreat || plan.riskAccepted);
     // N1: krok vpřed nevyšel bezpečně ⇒ napřed srazit soupeře, který ho ohrožuje, a plán postupu znovu (1× za tah)
-    if (!planSafe && !pathCleared_ && extraFeatureOn(kN1ClearPath) &&
-        countTacklezones(state, carrier.position, carrier.teamSide, carrier.id) == 0 && planPathClear(state, carrier)) {
+    // N1c (uživatel 26.11.: „N1 - ano“): i krok přijatý s rizikem (P232) — rána jen tehdy, když po ní krok vyjde do 0,15
+    const bool overRisk = planSafe && plan.riskAccepted && plan.blitzThreat > kSafeBlitzThreat && extraFeatureOn(kN1OverRisk);
+    if ((!planSafe || overRisk) && !pathCleared_ && extraFeatureOn(kN1ClearPath) &&
+        countTacklezones(state, carrier.position, carrier.teamSide, carrier.id) == 0 &&
+        planPathClear(state, carrier, overRisk)) {
         pathCleared_ = true;
         stage_ = Stage::AFTER_BLOCKS;
         return;
@@ -1894,6 +1912,8 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
     std::vector<int> used{carrier.id, front[0]->id, front[1]->id};
     auto isUsed = [&](int id) { return std::find(used.begin(), used.end(), id) != used.end(); };
     auto inCage = [&](const Player& p) { return p.position.distanceTo(cp) == 1; };
+    // N5: volný zadní roh smí i blitz u zdi; na křídla jde i tak až po hráčích mimo klec (pořadí uživatele 27.10.)
+    auto holdsCage = [&](const Player& p) { return inCage(p) && !freeBackCorner(state, carrier, p); };
     std::vector<Macro> wings;
     GameState after = state;                      // deska s asistenty na křídlech (pro kostky bloků)
     for (int dy : {-2, 2}) {
@@ -1941,7 +1961,7 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
         Position bestLanding{-1, -1};
         std::tuple<int, int, int, int> bestKey{INT_MAX, INT_MAX, INT_MAX, INT_MAX};
         state.forEachOnPitch(side, [&](const Player& p) {
-            if (!cageMayMove(p) || isUsed(p.id) || inCage(p)) return;
+            if (!cageMayMove(p) || isUsed(p.id) || holdsCage(p)) return;
             Position landing{-1, -1};
             int steps = 0;
             if (!blitzLandingDiceFree(state, p, centre->position, landing, steps)) return;
@@ -2006,13 +2026,13 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
 thread_local long g_n1[6] = {0, 0, 0, 0, 0, 0};   // [0] vyzkoušeno, [1] cíl, [2] blok, [3] blitz, [4] 1 kostka, [5] rohem
 void takeN1PathClear(long* out6) { for (int i = 0; i < 6; ++i) { out6[i] = g_n1[i]; g_n1[i] = 0; } }
 
-bool CageController::planPathClear(const GameState& state, const Player& carrier) {
+bool CageController::planPathClear(const GameState& state, const Player& carrier, bool strict) {
     const TeamSide side = carrier.teamSide;
     const int dir = side == TeamSide::HOME ? 1 : -1;
     const Position cp = carrier.position;
     ++g_n1[0];
     auto planSafeOn = [&](const CageAdvancePlan& p) {
-        return p.valid && p.step >= 1 && (p.blitzThreat <= kSafeBlitzThreat || p.riskAccepted);
+        return p.valid && p.step >= 1 && (p.blitzThreat <= kSafeBlitzThreat || (p.riskAccepted && !strict));
     };
     struct Cand { int id; double threat; int step; };
     std::vector<Cand> cands;
@@ -2031,7 +2051,9 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
         if (std::abs(a.threat - b.threat) > 1e-9) return a.threat < b.threat;
         return a.step > b.step;
     });
-    auto inCage = [&](const Player& p) { return p.position.distanceTo(cp) == 1; };
+    // N5: volný zadní roh klec nedrží (rána bez náhradníka); přednost: mimo klec 0, volný zadní roh 1, roh 2
+    auto rank = [&](const Player& p) { return p.position.distanceTo(cp) != 1 ? 0 : freeBackCorner(state, carrier, p) ? 1 : 2; };
+    auto inCage = [&](const Player& p) { return rank(p) == 2; };
     // N1b záloha za roh: po ráně (útočník `attId` na `at`, odehraný; 1 kostka ⇒ i ležící) a sraženém cíli plán stále bezpečný
     auto cornerCovered = [&](int attId, Position at, int defId, int dice) {
         // náhradník: jiný volný hráč mimo klec, který na uvolněné pole rohu dojde bez hodu (plánovač sám by zadní roh
@@ -2066,13 +2088,13 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
             if (!hitAllowed(state, a, dice) || (dice < 2 && !wider)) return;   // 2+ kostky, nebo 1 s Block/Wrestle (N1b)
             if (!hitKeepsCage(state, carrier.id, a.id, a.position, d.id, false)) return;
             if (dice < 2 && inCage(a) && !cornerCovered(a.id, a.position, d.id, dice)) return;
-            const std::tuple<int, int, int> key{inCage(a) ? 1 : 0, -dice, a.hasSkill(SkillName::Block) ? 0 : 1};
+            const std::tuple<int, int, int> key{rank(a), -dice, a.hasSkill(SkillName::Block) ? 0 : 1};
             if (key < bestKey) { bestKey = key; bestBlock = &a; }
         });
         if (bestBlock) {
             ++g_n1[2];
             if (std::get<1>(bestKey) == -1) ++g_n1[4];
-            if (std::get<0>(bestKey) == 1) ++g_n1[5];
+            if (std::get<0>(bestKey) == 2) ++g_n1[5];
             if (std::getenv("BB_CAGE_DEBUG"))
                 std::fprintf(stderr, "[cage ctl] N1 uvolnit cestu: blok %d -> %d (hrozba po %.2f, krok %d)\n",
                              bestBlock->id, d.id, c.threat, c.step);
@@ -2099,13 +2121,13 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
             if (!hitAllowed(sim, p, dice) || (dice < 2 && !wider)) return;   // 2+ kostky, nebo 1 s Block/Wrestle (N1b)
             if (!hitKeepsCage(sim, carrier.id, p.id, landing, d.id, true)) return;
             if (inCage(p) && !cornerCovered(p.id, landing, d.id, dice)) return;
-            const std::tuple<int, int, int, int> key{inCage(p) ? 1 : 0, blitzGfiCount(p, steps), -dice, steps};
+            const std::tuple<int, int, int, int> key{rank(p), blitzGfiCount(p, steps), -dice, steps};
             if (key < bestBz) { bestBz = key; best = &p; bestLanding = landing; }
         });
         if (best) {
             ++g_n1[3];
             if (std::get<2>(bestBz) == -1) ++g_n1[4];
-            if (std::get<0>(bestBz) == 1) ++g_n1[5];
+            if (std::get<0>(bestBz) == 2) ++g_n1[5];
             if (std::getenv("BB_CAGE_DEBUG"))
                 std::fprintf(stderr, "[cage ctl] N1 uvolnit cestu: blitz %d -> %d z (%d,%d) (hrozba po %.2f, krok %d)\n",
                              best->id, d.id, bestLanding.x, bestLanding.y, c.threat, c.step);

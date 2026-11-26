@@ -148,6 +148,8 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kQ3AgileEscape = 1ull << 39      // Q3 (uživatel 25.11.2026: „odskočení je pro agilní tým, vstát a zavazet pro silnější“): agilní ležící vedle soupeře dostane „vstát a odskočit“ s oceněním nejhorší odpovědi a „vstát a zůstat“ ztratí, když je odskok levnější a stání nic nedrží; neagilní beze změny
     , kN1ClearPath = 1ull << 40        // N1 (uživatel 21.11.2026: „N1 ano“): klec nepostoupí bezpečně ⇒ napřed rána na soupeře 2–3 sloupce před nosičem, po jehož sražení plán postoupí; pak plán znovu (1× za tah)
     , kN2CageLaneBlitz = 1ull << 41    // N2 (uživatel 25.11.2026: „1 A - vyhodnocení blitzu pro klec má vždy přednost“): v útoku soupeř v pruhu postupu klece (1–3 sloupce před nosičem, řady ±2) = cíl blitzu před vším ostatním
+    , kN5FreeBackCorner = 1ull << 43   // N5 (uživatel 26.11.2026: „N5 začni“; zadání „každý zadní roh zvlášť“): zadní roh, jehož odchod hrozbu na nosiče nezvýší, je volný hráč (rána, přesun, křídlo)
+    , kN1OverRisk = 1ull << 44         // N1c (uživatel 26.11.2026: „N1 - ano“): N1 i když plánovač krok přijal s rizikem (P232), pokud po sražení vyjde bezpečně (≤ 0,15)
     , kN1bWiderHit = 1ull << 42        // N1b (uživatel 25.11.2026): N1 smí ránu na 1 kostku s Block/Wrestle a blitz/1 kostku rohem klece jen se zálohou
     , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
