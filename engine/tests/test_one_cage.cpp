@@ -2864,27 +2864,36 @@ TEST(OneCageWallClear, AHitWhoseAssistDidNotArriveIsNotPlayed) {
     (void)hits;
 }
 
-// Totéž s blitzerem s Block: pravidla P229 by mu jednu kostku dovolila, čištění zdi chce 2 kostky naše (review 2).
+// Totéž s blitzerem s Block: pravidla P229 by mu jednu kostku dovolila, čištění zdi chtělo 2 kostky naše (review 2).
+//   N6 (uživatel 26.11.: „2 sjednotit na povolení jedné kostky s block nebo wrestle všude“): i do zdi stačí 1 kostka
+//   útočníkem s Block ⇒ bez N6 se rána na 1 kostku nezahraje, s N6 ano (blitz hráče 6 s Block).
 TEST(OneCageWallClear, AHitWhoseAssistDidNotArriveIsNotPlayedEvenWithBlock) {
-    Board b = wallWithHelpers(4);
-    b.s.getPlayer(6).skills.add(SkillName::Block);
-    CageController cc(nullptr, cfg(), 1);
-    Macro m;
-    bool skipped = false;
-    while (cc.next(b.s, m)) {
-        if (!skipped && m.type == MacroType::REPOSITION && m.playerId == 8) {
-            ASSERT_EQ(m.targetPos, (Position{14, 4})) << "předpoklad: 8 jde asistovat blitzu hráče 6 na (14,5)";
-            skipped = true;
-            continue;
+    for (uint64_t off : {uint64_t{kN6UnifiedHit}, uint64_t{0}}) {
+        struct Off { uint64_t saved = extraFeaturesOff(); explicit Off(uint64_t m) { setExtraFeaturesOff(saved | m); } ~Off() { setExtraFeaturesOff(saved); } } guard(off);
+        Board b = wallWithHelpers(4);
+        b.s.getPlayer(6).skills.add(SkillName::Block);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        bool skipped = false;
+        int oneDie = 0;
+        while (cc.next(b.s, m)) {
+            if (!skipped && m.type == MacroType::REPOSITION && m.playerId == 8) {
+                ASSERT_EQ(m.targetPos, (Position{14, 4})) << "předpoklad: 8 jde asistovat blitzu hráče 6 na (14,5)";
+                skipped = true;
+                continue;
+            }
+            if (skipped && m.type == MacroType::BLITZ) {
+                GameState s = b.s.clone();
+                s.getPlayer(m.playerId).position = m.viaPos;
+                const int dice = blockDiceCount(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId));
+                if (off) EXPECT_GE(dice, 2) << "bez N6: blitz hráče " << m.playerId;
+                if (dice == 1) { ++oneDie; EXPECT_TRUE(s.getPlayer(m.playerId).hasSkill(SkillName::Block)); }
+            }
+            play(b.s, m);
         }
-        if (skipped && m.type == MacroType::BLITZ) {
-            GameState s = b.s.clone();
-            s.getPlayer(m.playerId).position = m.viaPos;
-            EXPECT_GE(blockDiceCount(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId)), 2) << "blitz hráče " << m.playerId;
-        }
-        play(b.s, m);
+        ASSERT_TRUE(skipped);
+        if (!off) EXPECT_GT(oneDie, 0) << "N6: blitz s Block na 1 kostku do zdi se zahraje";
     }
-    ASSERT_TRUE(skipped);
 }
 
 // Zmařená rána tah neukončí: zbytek týmu hraje dál jako po ranách (review P233 F7).
@@ -3592,7 +3601,7 @@ TEST(OneCageClearPath, OneDieHitOnlyWithBlockOrWrestle) {
     }
     {   // pozitivní kontrola: bez N1b se na 1 kostku nebije ani s Block
         Board off = board({SkillName::Block});
-        setExtraFeaturesOff(kP217BestChance | kN1bWiderHit);
+        setExtraFeaturesOff(kP217BestChance | kN1bWiderHit | kN6UnifiedHit);   // N6 by 1 kostku s Block pustil taky
         const CageTurn t = cageTurn(off);
         setExtraFeaturesOff(kP217BestChance);
         EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 6, 13)) << "bez N1b rána na 1 kostku nepřijde";

@@ -129,7 +129,20 @@ def _game_worker(args: tuple) -> dict:
             "races": f"{ra}/{rb}", "n_turns": len(turns)}
 
 
+def _check_frozen_engine() -> None:
+    """ENGINE_DIR musí zmrazit i libbb_engine.so (26.11.2026: Python modul je jen vazba, engine je sdílená knihovna
+    s RUNPATH na engine/build — bez kopie a LD_LIBRARY_PATH by proces spuštěný po přestavbě hrál nový kód)."""
+    ed = os.environ.get("ENGINE_DIR")
+    if not ed:
+        return
+    lib = Path(ed) / "libbb_engine.so"
+    ld = os.environ.get("LD_LIBRARY_PATH", "").split(":")
+    if not lib.exists() or os.path.abspath(ed) not in [os.path.abspath(x) for x in ld if x]:
+        sys.exit(f"ENGINE_DIR={ed}: chybí kopie libbb_engine.so nebo LD_LIBRARY_PATH={ed} — zmrazení by nebylo úplné")
+
+
 def cmd_collect(n: int) -> None:
+    _check_frozen_engine()
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     tasks = [(BASE_SEED + i, i, str(DATA_ROOT / f"g{i:04d}.json.gz"))
              for i in range(n)]

@@ -2110,7 +2110,11 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
         });
         return spare && planSafeOn(planner_.build(sim, {}, scoringRangeCage_));
     };
-    const bool wider = extraFeatureOn(kN1bWiderHit);
+    const bool wider = extraFeatureOn(kN1bWiderHit) || extraFeatureOn(kN6UnifiedHit);   // N6: 1 kostka s Block / Wrestle všude
+    // N6: roh klece blitzuje až ve 2. průchodu — jen když v 1. průchodu nikdo jiný (mimo klec, volný zadní roh) žádnou
+    //   ránu na žádného kandidáta nemá; a vždy jen se zálohou (cornerCovered). Bez N6 jeden průchod jako dřív.
+    const bool n6 = extraFeatureOn(kN6UnifiedHit);
+    for (int pass = 0; pass < (n6 ? 2 : 1); ++pass)
     for (const Cand& c : cands) {
         const Player& d = state.getPlayer(c.id);
         // (1) blok hráče, který u něj už stojí — napřed hráči mimo klec, pak víc kostek, pak Block
@@ -2126,7 +2130,7 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
             const std::tuple<int, int, int> key{rank(a), -dice, a.hasSkill(SkillName::Block) ? 0 : 1};
             if (key < bestKey) { bestKey = key; bestBlock = &a; }
         });
-        if (bestBlock) {
+        if (bestBlock && pass == 0) {
             ++g_n1[2];
             if (std::get<1>(bestKey) == -1) ++g_n1[4];
             if (std::get<0>(bestKey) == 2) ++g_n1[5];
@@ -2144,8 +2148,9 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
         Position bestLanding{-1, -1};
         BlitzKey bestBz;
         std::function<bool(const Player&, Position, int)> cornerOk;
-        if (wider) cornerOk = [&](const Player& p, Position at, int dice) { return cornerCovered(p.id, at, d.id, dice); };
-        if (bestCageBlitzer(state, carrier, d, wider, cornerOk, best, bestLanding, bestBz)) {
+        if (n6 ? pass == 1 : wider) cornerOk = [&](const Player& p, Position at, int dice) { return cornerCovered(p.id, at, d.id, dice); };
+        if (bestCageBlitzer(state, carrier, d, wider, cornerOk, best, bestLanding, bestBz) &&
+            (pass == 0 || std::get<0>(bestBz) == 2)) {
             ++g_n1[3];
             if (std::get<2>(bestBz) == -1) ++g_n1[4];
             if (std::get<0>(bestBz) == 2) ++g_n1[5];
@@ -2220,7 +2225,7 @@ bool CageController::planLaneBlitz(const GameState& state) {
     std::sort(lane.begin(), lane.end(), [&](const Player* a, const Player* b) {
         return std::make_tuple(a->position.distanceTo(cp), a->id) < std::make_tuple(b->position.distanceTo(cp), b->id);
     });
-    const bool wider = extraFeatureOn(kN1bWiderHit);
+    const bool wider = extraFeatureOn(kN1bWiderHit) || extraFeatureOn(kN6UnifiedHit);   // N6: 1 kostka s Block / Wrestle všude
     // Kdo blitzovat nesmí: hráč, kterého v tomto tahu čeká jiná úloha klece — roh přes GFI odložený na konec tahu
     //   (P230 deferredGfi_), připravený hráč (P180) a záloha (P230); a hráč držený P232 (threatHeld_ — plní se hlavně
     //   v zaostalcích, kteří jdou až po N2b, takže tady chytí jen držení z hledání). Doběh nesmí zvednout hrozbu na
@@ -2302,8 +2307,9 @@ bool CageController::planWallClear(const GameState& state) {
     struct Hit { std::vector<Macro> assists; Macro hit; int dice = -9; bool blitz = false; int rowDist = 99; int gfi = 0; int steps = 0; };
     std::optional<Hit> best;
     auto better = [](const Hit& a, const Hit& b) {
-        return std::make_tuple(a.assists.size(), a.blitz, a.rowDist, a.gfi, a.steps) <
-               std::make_tuple(b.assists.size(), b.blitz, b.rowDist, b.gfi, b.steps);   // bez GFI dřív (30.10.)
+        // N6: rána na 2+ kostky před ranou na 1 kostku s Block / Wrestle (bez N6 jiné než 2+ nejsou)
+        return std::make_tuple(a.dice < 2, a.assists.size(), a.blitz, a.rowDist, a.gfi, a.steps) <
+               std::make_tuple(b.dice < 2, b.assists.size(), b.blitz, b.rowDist, b.gfi, b.steps);   // bez GFI dřív (30.10.)
     };
     // síla rány: kostky, při shodě čistý rozdíl asistencí (review F3: jeden asistent kostky nezmění, dva ano)
     auto strength = [&](const GameState& b, int attId, Position attPos, int defId) {
@@ -2367,6 +2373,20 @@ bool CageController::planWallClear(const GameState& state) {
         return !extraFeatureOn(kP232KeepThreat) || blitzThreat(b, b.getPlayer(carrier.id)) <= threatNow + 0.01;
     };
 
+    // Kostky rány: 2+ naše (asistenti se přidávají, dokud nejsou). N6: jedno pravidlo s ostatními ranami řadiče — když
+    //   2 nevyjdou, stačí 1 kostka útočníkem s Block / Wrestle (hitAllowed); asistenti pak jen ti, bez nichž by ani
+    //   ta 1 nebyla (bez užitku se nikdo nepřesouvá).
+    auto wallDiceOk = [&](GameState& board, const Player& a, Position from, int targetId, Hit& h) {
+        if (h.dice >= 2) return true;
+        if (!extraFeatureOn(kN6UnifiedHit) || !hitAllowed(board, board.getPlayer(a.id), h.dice)) return false;
+        GameState bare = state.clone();
+        bare.getPlayer(a.id).position = from;
+        if (blockDiceCount(bare, bare.getPlayer(a.id), bare.getPlayer(targetId)) == h.dice) {
+            board = state.clone();
+            h.assists.clear();
+        }
+        return true;
+    };
     for (const Player* target : ends) {
         const int rowDist = std::abs(target->position.y - cp.y);
         // blok hráčem, který u cíle už stojí (bez pohybu)
@@ -2375,7 +2395,8 @@ bool CageController::planWallClear(const GameState& state) {
             GameState board = state.clone();
             Hit h;
             h.dice = addAssists(board, a.id, a.position, target->id, h.assists);
-            if (h.dice < 2 || !keepsThreat(board) || !hitKeepsCage(board, carrier.id, a.id, a.position, target->id, false)) return;
+            if (!wallDiceOk(board, a, a.position, target->id, h)) return;
+            if (!keepsThreat(board) || !hitKeepsCage(board, carrier.id, a.id, a.position, target->id, false)) return;
             h.hit = Macro{MacroType::BLOCK, a.id, target->id, {-1, -1}};
             h.rowDist = rowDist;
             if (!best || better(h, *best)) best = std::move(h);
@@ -2392,7 +2413,7 @@ bool CageController::planWallClear(const GameState& state) {
             GameState board = state.clone();
             Hit h;
             h.dice = addAssists(board, a.id, landing, target->id, h.assists);
-            if (h.dice < 2) return;
+            if (!wallDiceOk(board, a, landing, target->id, h)) return;
             // doběh znovu na desce s asistenty: musí skončit na tomtéž poli a bez hodu (review F1)
             Position again{-1, -1};
             int steps2 = 0;
@@ -3097,12 +3118,14 @@ static bool wallHitKeepsCage(const GameState& state, const Macro& m) {
     return hitKeepsCage(state, state.ball.carrierId, m.playerId, from, m.targetId, m.type == MacroType::BLITZ);
 }
 
-// P233: rána do zdi jen na 2+ kostky naše, i útočníkem s Block (stillValid pustí s Block i 1 kostku — review 2)
+// P233: rána do zdi jen na 2+ kostky naše, i útočníkem s Block (stillValid pustí s Block i 1 kostku — review 2).
+//   N6: jedno pravidlo pro všechny rány řadiče ⇒ i do zdi 2+, nebo 1 s Block / Wrestle (hitAllowed).
 static bool wallHitTwoDice(const GameState& state, const Macro& m) {
     if (m.type != MacroType::BLOCK && m.type != MacroType::BLITZ) return true;
     GameState sim = state.clone();
     if (m.type == MacroType::BLITZ && m.viaPos.isOnPitch()) sim.getPlayer(m.playerId).position = m.viaPos;
-    return blockDiceCount(sim, sim.getPlayer(m.playerId), sim.getPlayer(m.targetId)) >= 2;
+    const int dice = blockDiceCount(sim, sim.getPlayer(m.playerId), sim.getPlayer(m.targetId));
+    return extraFeatureOn(kN6UnifiedHit) ? hitAllowed(sim, sim.getPlayer(m.playerId), dice) : dice >= 2;
 }
 
 bool CageController::next(const GameState& state, Macro& out) {
