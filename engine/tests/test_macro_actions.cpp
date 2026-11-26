@@ -5406,9 +5406,9 @@ GameState p227CarrierState(int8_t carrierST) {
 }
 // Maska se po testu vrací na hodnotu PŘED testem (review L1), ne natvrdo na 0.
 struct P227Off {
-    explicit P227Off(unsigned m) : saved(extraFeaturesOff()) { setExtraFeaturesOff(m); }
+    explicit P227Off(uint64_t m) : saved(extraFeaturesOff()) { setExtraFeaturesOff(m); }
     ~P227Off() { setExtraFeaturesOff(saved); }
-    unsigned saved;
+    uint64_t saved;
 };
 }  // namespace
 

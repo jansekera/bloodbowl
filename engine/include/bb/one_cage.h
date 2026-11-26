@@ -161,9 +161,12 @@ private:
     // strict: kandidát jen s krokem do 0,15 (N1c — původní plán byl přijatý s rizikem P232)
     bool planPathClear(const GameState& state, const Player& carrier, bool strict = false);
     bool pathCleared_ = false;
+    // N2b: po postupu klece (před zaostalci) blitz na soupeře v pruhu klece — zahraje řadič, ne hledání. True = blitz ve frontě.
+    bool planLaneBlitz(const GameState& state);
+    bool laneBlitzDone_ = false;    // nejvýš 1× za tah
     bool wallClearing_ = false;   // planWallBreak předal tah čištění zdi (P233)
     double wallThreat_ = -1.0;    // P233: hrozba na nosiče na začátku čištění zdi (-1 = ještě nezměřena)
-    std::vector<std::pair<int, int>> wallHits_;   // rány do zdi (P229 bloky rohů a blitz, P233) útočník→cíl: před ranou znovu hitKeepsCage
+    std::vector<std::pair<int, int>> wallHits_;   // rány řadiče (zeď P229/P233, blitz do pruhu N2b) útočník→cíl: před ranou znovu hitKeepsCage
     // P230: přestavba klece platí jen celá — nedojde-li hráč na své pole, zbytek fronty se zahodí (review 27.10.)
     bool strictQueue_ = false;
     // P230: roh přes GFI se hraje až na konci tahu (po zaostalcích) — nepovedené GFI je turnover (review 27.10.)

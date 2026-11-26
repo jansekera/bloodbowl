@@ -889,7 +889,8 @@ TEST(RiskyForward, WithTimeSlackTheCageStillStepsForward) {
 // k nosiči a po tahu byla hrozba 0,55. Hrozba, se kterou se tah rozhodl, musí platit i po tahu — zaostalec ani
 // záloha se nepřesunou, když by ji zvedli. A řadič přijatý krok vpřed nepřebije útěkem nosiče stranou.
 TEST(RiskyForward, LaggardsDoNotRaiseTheAcceptedThreat) {
-    for (unsigned off : {0u, static_cast<unsigned>(kP232KeepThreat)}) {
+    // pozitivní kontrola i bez N2b: blitz do pruhu by jinak zaostalce předběhl a hrozbu by neměl kdo zvednout
+    for (uint64_t off : {uint64_t{0}, uint64_t{kP232KeepThreat} | uint64_t{kN2bLaneBlitzPlay}}) {
         setExtraFeaturesOff(off);
         Board b = riskBoard(0, 8, 4);
         CageController cc(nullptr, cfg(), 1);
@@ -910,7 +911,8 @@ TEST(RiskyForward, LaggardsDoNotRaiseTheAcceptedThreat) {
 // Hráč, který zůstal stát, protože by odchodem zvedl hrozbu na nosiče, nesmí po tahu klece odvést ani hledání
 // (review 2 P232). V téže pozici chtěl zaostalec 2 z (7,6) na (11,3).
 TEST(RiskyForward, SearchDoesNotMoveAPlayerHeldForTheCarriersSafety) {
-    for (unsigned off : {0u, static_cast<unsigned>(kP232KeepThreat)}) {
+    // pozitivní kontrola i bez N2b: bez pojistky by hráče 2 jinak odvedl blitz do pruhu, ne zaostalec
+    for (uint64_t off : {uint64_t{0}, uint64_t{kP232KeepThreat} | uint64_t{kN2bLaneBlitzPlay}}) {
         setExtraFeaturesOff(off);
         Board b = riskBoard(0, 8, 4);
         CageController cc(nullptr, cfg(), 1);

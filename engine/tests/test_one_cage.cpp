@@ -2959,7 +2959,19 @@ TEST(OneCageWallClear, ADetachedPlayerBeyondAGapIsNotTheEnd) {
         Board b = wallWithHelpers(4);
         b.s.getPlayer(13).position = {14, 4};
         b.s.getPlayer(17).position = {14, 10};
-        EXPECT_TRUE(wallClearTurn(b).empty());
+        // N2b vypnuto: nosič po posunu stojí na (12,3) a 13 na (14,4) už zdí není — jeho blitz do pruhu na 2 kostky
+        //   je jiný mechanismus (OneCageLaneBlitz); tady se měří jen P233
+        Board withN2b = b;
+        {
+            struct Off { uint64_t saved = extraFeaturesOff(); Off() { setExtraFeaturesOff(saved | kN2bLaneBlitzPlay); } ~Off() { setExtraFeaturesOff(saved); } } off;
+            EXPECT_TRUE(wallClearTurn(b).empty());
+        }
+        // ...a se zapnutým N2b je jediná rána tahu blitz do pruhu na 13 na 2 kostky (review N2b T4)
+        const std::vector<Hit> hits = wallClearTurn(withN2b);
+        ASSERT_EQ(hits.size(), 1u);
+        EXPECT_EQ(hits[0].m.type, MacroType::BLITZ);
+        EXPECT_EQ(hits[0].m.targetId, 13);
+        EXPECT_GE(hits[0].dice, 2);
     }
 }
 
@@ -3668,6 +3680,86 @@ TEST(OneCageClearPath, N5FreeBackCornerHitsWithoutAReplacement) {
     EXPECT_TRUE(hasMacro(cageTurn(b), MacroType::BLITZ, 2, 13)) << "N5: volný zadní roh blitzuje";
 }
 
+// ⭐ N2b (uživatel 26.11.: „1 má se zahrát když se vybere - nevybírat z jiných“). Klec postoupí bezpečně (soupeř 13
+// daleko vpředu), po postupu stojí soupeř v pruhu před novým polem nosiče ⇒ blitz na něj zahraje řadič, hráčem mimo klec,
+// až po kroku nosiče. Bez N2b řadič neblitzuje (zbytek tahu nechá hledání).
+TEST(OneCageLaneBlitz, AfterTheAdvanceTheControllerBlitzesTheOpponentInTheLane) {
+    P217Off p217;
+    auto board = []() {
+        Board b(3);
+        b.put(1, TeamSide::HOME, {8, 7}, 4);
+        b.put(2, TeamSide::HOME, {7, 6});
+        b.put(3, TeamSide::HOME, {7, 8});
+        b.put(4, TeamSide::HOME, {9, 6});
+        b.put(5, TeamSide::HOME, {9, 8});
+        b.put(6, TeamSide::HOME, {11, 3}, 6, 4);
+        b.put(7, TeamSide::HOME, {11, 2}, 6, 4);
+        b.put(13, TeamSide::AWAY, {15, 5}, 6);
+        b.s.ball = BallState::carried({8, 7}, 1);
+        return b;
+    };
+    {
+        Board off = board();
+        setExtraFeaturesOff(kP217BestChance | kN2bLaneBlitzPlay);
+        const CageTurn t = cageTurn(off);
+        setExtraFeaturesOff(kP217BestChance);
+        ASSERT_GT(t.carrier.x, 8) << "předpoklad: klec postoupí";
+        const Position o = off.s.getPlayer(13).position;
+        ASSERT_GE(o.x - t.carrier.x, 1) << "nosič (" << int(t.carrier.x) << "," << int(t.carrier.y) << ")";
+        ASSERT_LE(o.x - t.carrier.x, 3) << "předpoklad: soupeř po postupu v pruhu";
+        ASSERT_LE(std::abs(o.y - t.carrier.y), 2) << "předpoklad: soupeř po postupu v pruhu (řady)";
+        for (const Macro& m : t.macros) EXPECT_NE(m.type, MacroType::BLITZ) << "bez N2b žádný blitz řadiče";
+    }
+    Board b = board();
+    const CageTurn t = cageTurn(b);
+    const bool by6 = hasMacro(t, MacroType::BLITZ, 6, 13), by7 = hasMacro(t, MacroType::BLITZ, 7, 13);
+    EXPECT_TRUE(by6 || by7) << "N2b: blitz do pruhu hráčem mimo klec";
+    size_t step = t.macros.size(), hit = t.macros.size();
+    for (size_t i = 0; i < t.macros.size(); ++i) {
+        if (t.macros[i].type == MacroType::REPOSITION && t.macros[i].playerId == 1 && step == t.macros.size()) step = i;
+        if (t.macros[i].type == MacroType::BLITZ && hit == t.macros.size()) hit = i;
+    }
+    EXPECT_LT(step, hit) << "napřed postup klece, pak blitz";
+    // pořadí proti zaostalcům (review N2b T2) se tady tvrdit nedá: druhý hráč mimo klec (6) je připravený hráč P180 a jde
+    //   už v kroku klece — proto také neblitzuje on, ale 7
+    EXPECT_TRUE(by7) << "připravený hráč 6 neblitzuje";
+}
+
+// N2b: blitz do pruhu nikdy rohem klece (review N2b T1). Táž deska bez hráčů 6 a 7 — v pruhu soupeř je (čítač [0]),
+//   roh by k němu doběhl (pozitivní kontrola na desce po tahu, roh znovu čerstvý), ale blitz se nezahraje.
+TEST(OneCageLaneBlitz, ACageCornerNeverPlaysTheLaneBlitz) {
+    P217Off p217;
+    Board b(3);
+    b.put(1, TeamSide::HOME, {8, 7}, 4);
+    b.put(2, TeamSide::HOME, {7, 6});
+    b.put(3, TeamSide::HOME, {7, 8});
+    b.put(4, TeamSide::HOME, {9, 6});
+    b.put(5, TeamSide::HOME, {9, 8});
+    b.put(13, TeamSide::AWAY, {15, 5}, 6);
+    b.s.ball = BallState::carried({8, 7}, 1);
+    long n2b[2];
+    takeN2bLaneBlitz(n2b);
+    const CageTurn t = cageTurn(b);
+    takeN2bLaneBlitz(n2b);
+    const Position o = b.s.getPlayer(13).position;
+    ASSERT_GT(t.carrier.x, 8) << "předpoklad: klec postoupí";
+    ASSERT_GE(n2b[0], 1) << "předpoklad: po postupu je soupeř v pruhu";
+    bool reach = false;
+    for (int id = 2; id <= 5; ++id) {
+        GameState g = b.s.clone();
+        Player& c = g.getPlayer(id);
+        c.hasMoved = false;
+        c.hasActed = false;
+        c.movementRemaining = c.stats.movement;
+        Position landing{-1, -1};
+        int steps = 0;
+        if (blitzLandingDiceFree(g, c, o, landing, steps)) reach = true;
+    }
+    ASSERT_TRUE(reach) << "pozitivní kontrola: roh by k soupeři doběhl";
+    for (const Macro& m : t.macros) EXPECT_NE(m.type, MacroType::BLITZ) << "roh klece blitzoval (hráč " << m.playerId << ")";
+    EXPECT_EQ(n2b[1], 0) << "blitzující se nenašel";
+}
+
 // N1c (uživatel 26.11.: „N1 - ano“). Plánovač krok vpřed přijme s rizikem (P232, hrozba nad 0,15) — se soupeřem na (14,7)
 // sraženým by šel do 0,15. Pak N1 napřed bije i tak. Bez N1c ne (krok přijatý s rizikem bral N1 jako bezpečný).
 TEST(OneCageClearPath, N1cHitsEvenWhenTheRiskyStepWasAccepted) {
@@ -3700,7 +3792,7 @@ TEST(OneCageClearPath, N1cHitsEvenWhenTheRiskyStepWasAccepted) {
     };
     {
         Board off = board();
-        setExtraFeaturesOff(kP217BestChance | kN1OverRisk);
+        setExtraFeaturesOff(kP217BestChance | kN1OverRisk | kN2bLaneBlitzPlay);   // N2b by blitzl po postupu
         const CageTurn t = cageTurn(off);
         setExtraFeaturesOff(kP217BestChance);
         EXPECT_FALSE(hitsAhead(t)) << "bez N1c řadič při přijatém riziku nebije";

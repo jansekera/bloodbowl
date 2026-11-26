@@ -764,7 +764,7 @@ TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
     // soupeřů) a plánovač pak klec posílá jinam (P187). Tento test hlídá samotnou zálohu
     // „postup nejde ⇒ dostavba“, proto běží se starou hrozbou. Že pomalejší klec u zdi dostaví
     // i s P228, hlídá řadič: OneCageWallBreak.SlowerCageWithoutFrontCornersFillsInsteadOfGoingAround.
-    const unsigned savedMask = extraFeaturesOff();
+    const uint64_t savedMask = extraFeaturesOff();
     setExtraFeaturesOff(kP228DirtyCorner);
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
@@ -1283,9 +1283,9 @@ TEST(BlitzThreat, TwoCornersTowardTheBlitzBeatThreeCornersWithTheHoleFacingIt) {
 // ---------------------------------------------------------------------------
 namespace {
 struct P228Mask {
-    explicit P228Mask(unsigned m) : saved(extraFeaturesOff()) { setExtraFeaturesOff(m); }
+    explicit P228Mask(uint64_t m) : saved(extraFeaturesOff()) { setExtraFeaturesOff(m); }
     ~P228Mask() { setExtraFeaturesOff(saved); }
-    unsigned saved;
+    uint64_t saved;
 };
 double threatWith(const GameState& s, unsigned off) {
     P228Mask m(off);

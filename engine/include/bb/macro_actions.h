@@ -150,6 +150,7 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kN2CageLaneBlitz = 1ull << 41    // N2 (uživatel 25.11.2026: „1 A - vyhodnocení blitzu pro klec má vždy přednost“): v útoku soupeř v pruhu postupu klece (1–3 sloupce před nosičem, řady ±2) = cíl blitzu před vším ostatním
     , kN5FreeBackCorner = 1ull << 43   // N5 (uživatel 26.11.2026: „N5 začni“; zadání „každý zadní roh zvlášť“): zadní roh, jehož odchod hrozbu na nosiče nezvýší, je volný hráč (rána, přesun, křídlo)
     , kN1OverRisk = 1ull << 44         // N1c (uživatel 26.11.2026: „N1 - ano“): N1 i když plánovač krok přijal s rizikem (P232), pokud po sražení vyjde bezpečně (≤ 0,15)
+    , kN2bLaneBlitzPlay = 1ull << 45   // N2b (uživatel 26.11.2026: „1 má se zahrát když se vybere - nevybírat z jiných“): blitz do pruhu klece zahraje řadič sám, po postupu klece
     , kN1bWiderHit = 1ull << 42        // N1b (uživatel 25.11.2026): N1 smí ránu na 1 kostku s Block/Wrestle a blitz/1 kostku rohem klece jen se zálohou
     , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
@@ -199,6 +200,9 @@ void takeN1PathClear(long* out6);
 // N2: [0] nabídnutý blitz v útoku s míčem, [1] z nich cíl v pruhu klece, [2] z nich v pruhu nějaký kandidát byl.
 //   Počítá i hledání, i s vypnutým N2 (pro srovnání ramen). Nuluje se čtením.
 void takeN2LaneBlitz(long* out3);
+// N2b: [0] po postupu klece byl v pruhu soupeř a blitz volný, [1] našel se blitzující (se zapnutým N2b ho řadič zahraje).
+//   Počítá i s vypnutým N2b (základna pro srovnání ramen) a i v simulacích, kde běží řadič klece. Nuluje se čtením.
+void takeN2bLaneBlitz(long* out2);
 long p220StopsTotal();
 void addP220RealStops(long n);
 long takeP220RealStops();

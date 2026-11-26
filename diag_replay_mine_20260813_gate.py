@@ -121,6 +121,7 @@ def _game_worker(args: tuple) -> dict:
         # N1 čítač (vyzkoušeno, cíl, blok, blitz) — počítá i hledání; chybí u starších enginů
         "n1": list(bb_engine.take_n1_path_clear()) if hasattr(bb_engine, "take_n1_path_clear") else None,
         "n2": list(bb_engine.take_n2_lane_blitz()) if hasattr(bb_engine, "take_n2_lane_blitz") else None,
+        "n2b": list(bb_engine.take_n2b_lane_blitz()) if hasattr(bb_engine, "take_n2b_lane_blitz") else None,
     }
     with gzip.open(out_path, "wt") as f:
         json.dump(rec, f, default=lambda o: o.tolist() if hasattr(o, "tolist") else o)
