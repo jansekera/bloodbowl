@@ -743,9 +743,9 @@ PYBIND11_MODULE(bb_engine, m) {
         long v[3]; bb::takeN2LaneBlitz(v);
         return py::make_tuple(v[0], v[1], v[2]);
     });
-    m.def("take_n2b_lane_blitz", []() {   // N2b: [v pruhu soupeř a blitz volný, řadič blitz zahrál], čte a nuluje
-        long v[2]; bb::takeN2bLaneBlitz(v);
-        return py::make_tuple(v[0], v[1]);
+    m.def("take_n2b_lane_blitz", []() {   // N2b: [v pruhu a blitz volný, blitzující nalezen, zdržování, blitz použit, pruh prázdný, nikdo], čte a nuluje
+        long v[6]; bb::takeN2bLaneBlitz(v);
+        return py::make_tuple(v[0], v[1], v[2], v[3], v[4], v[5]);
     });
     m.def("take_dodge4_real_log", []() {   // P157d: jednotlivé úhyby na 4+ (tah, hráč, z, na, cíl, makro, druh)
         std::vector<std::array<int, 9>> v; bb::takeDodge4RealLog(v);

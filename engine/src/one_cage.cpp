@@ -2124,6 +2124,7 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
         const Player* bestBlock = nullptr;
         std::tuple<int, int, int> bestKey{INT_MAX, INT_MAX, INT_MAX};
         state.forEachOnPitch(side, [&](const Player& a) {
+            if (pass == 1) return;   // 2. průchod jen blitz rohem (bloky zkusil 1. průchod)
             if (a.id == carrier.id || !freeToAct(a) || a.position.distanceTo(d.position) != 1) return;
             if (frenzyCorner(a, carrier)) return;
             const int dice = blockDiceCount(state, a, d);
@@ -2177,8 +2178,8 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
 //   odvedli dopředu a blitzovat by neměl kdo — test OneCageLaneBlitz), soupeř v pruhu před
 //   NOVÝM polem nosiče (1–3 sloupce, řady ±2), nejbližší k nosiči; blitzující jako u N1 (bestCageBlitzer) — rohy klece
 //   ne (klec musí stát na konci tahu), volný zadní roh (N5) ano.
-thread_local long g_n2b[2] = {0, 0};
-void takeN2bLaneBlitz(long* out2) { for (int i = 0; i < 2; ++i) { out2[i] = g_n2b[i]; g_n2b[i] = 0; } }
+thread_local long g_n2b[6] = {0, 0, 0, 0, 0, 0};
+void takeN2bLaneBlitz(long* out6) { for (int i = 0; i < 6; ++i) { out6[i] = g_n2b[i]; g_n2b[i] = 0; } }
 
 // Zeď (P233) = souvislý úsek stojících soupeřů se zónami ve sloupci dva před nosičem, který zasahuje do řádků
 //   nosiče ±1, aspoň dva hráči (review F5: odtržený hráč o tři řádky dál zdí není). lo..hi = řádky úseku.
@@ -2204,10 +2205,10 @@ bool CageController::planLaneBlitz(const GameState& state) {
     // čítač běží i s vypnutým N2b (základna pro srovnání ramen A/B); bit rozhoduje až o zařazení blitzu
     if (!ourBall(state)) return false;
     // zdržování TD (P175): míč je v bezpečí a cestu není třeba čistit — blitz by jen riskoval turnover
-    if (stalling_) return false;
+    if (stalling_) { ++g_n2b[2]; return false; }
     const Player& carrier = state.getPlayer(state.ball.carrierId);
     const TeamSide side = carrier.teamSide;
-    if (state.getTeamState(side).blitzUsedThisTurn) return false;
+    if (state.getTeamState(side).blitzUsedThisTurn) { ++g_n2b[3]; return false; }
     const int dir = side == TeamSide::HOME ? 1 : -1;
     const Position cp = carrier.position;
     // o ranách do zdi před klecí rozhoduje P233 (2 kostky naše, od kraje) — N2b na zeď nesahá
@@ -2223,7 +2224,7 @@ bool CageController::planLaneBlitz(const GameState& state) {
     });
     if (std::getenv("BB_CAGE_DEBUG"))
         std::fprintf(stderr, "[cage ctl] N2b: nosič (%d,%d), v pruhu %zu soupeřů\n", cp.x, cp.y, lane.size());
-    if (lane.empty()) return false;
+    if (lane.empty()) { ++g_n2b[4]; return false; }
     ++g_n2b[0];
     std::sort(lane.begin(), lane.end(), [&](const Player* a, const Player* b) {
         return std::make_tuple(a->position.distanceTo(cp), a->id) < std::make_tuple(b->position.distanceTo(cp), b->id);
@@ -2263,6 +2264,7 @@ bool CageController::planLaneBlitz(const GameState& state) {
         queue_ = {bz};
         return true;
     }
+    ++g_n2b[5];   // v pruhu soupeř, ale blitzujícího nikdo (doběh, kostky, držení, hrozba)
     return false;
 }
 
@@ -2378,16 +2380,23 @@ bool CageController::planWallClear(const GameState& state) {
 
     // Kostky rány: 2+ naše (asistenti se přidávají, dokud nejsou). N6: jedno pravidlo s ostatními ranami řadiče — když
     //   2 nevyjdou, stačí 1 kostka útočníkem s Block / Wrestle (hitAllowed); asistenti pak jen ti, bez nichž by ani
-    //   ta 1 nebyla (bez užitku se nikdo nepřesouvá).
+    //   ta 1 nebyla (bez užitku se nikdo nepřesouvá): od posledního se zkouší vynechat — zůstanou-li kostky, jde pryč.
     auto wallDiceOk = [&](GameState& board, const Player& a, Position from, int targetId, Hit& h) {
         if (h.dice >= 2) return true;
         if (!extraFeatureOn(kN6UnifiedHit) || !hitAllowed(board, board.getPlayer(a.id), h.dice)) return false;
-        GameState bare = state.clone();
-        bare.getPlayer(a.id).position = from;
-        if (blockDiceCount(bare, bare.getPlayer(a.id), bare.getPlayer(targetId)) == h.dice) {
-            board = state.clone();
-            h.assists.clear();
+        auto boardWith = [&](const std::vector<Macro>& as) {
+            GameState g = state.clone();
+            for (const Macro& m : as) g.getPlayer(m.playerId).position = m.targetPos;
+            return g;
+        };
+        for (size_t k = h.assists.size(); k-- > 0;) {
+            std::vector<Macro> without = h.assists;
+            without.erase(without.begin() + static_cast<long>(k));
+            GameState g = boardWith(without);
+            g.getPlayer(a.id).position = from;
+            if (blockDiceCount(g, g.getPlayer(a.id), g.getPlayer(targetId)) == h.dice) h.assists = std::move(without);
         }
+        board = boardWith(h.assists);
         return true;
     };
     for (const Player* target : ends) {
@@ -2435,7 +2444,7 @@ bool CageController::planWallClear(const GameState& state) {
         });
     }
     if (!best) {
-        if (dbg) std::fprintf(stderr, "[cage ctl] P233 zeď od kraje: rána na 2 kostky naše nejde (zeď %d)\n", hi - lo + 1);
+        if (dbg) std::fprintf(stderr, "[cage ctl] P233 zeď od kraje: rána na 2 kostky naše (N6: nebo 1 s Block/Wrestle) nejde (zeď %d)\n", hi - lo + 1);
         return false;
     }
     if (dbg) {
@@ -3123,7 +3132,7 @@ static bool wallHitKeepsCage(const GameState& state, const Macro& m) {
 
 // P233: rána do zdi jen na 2+ kostky naše, i útočníkem s Block (stillValid pustí s Block i 1 kostku — review 2).
 //   N6: jedno pravidlo pro všechny rány řadiče ⇒ i do zdi 2+, nebo 1 s Block / Wrestle (hitAllowed).
-static bool wallHitTwoDice(const GameState& state, const Macro& m) {
+static bool wallHitDiceOk(const GameState& state, const Macro& m) {
     if (m.type != MacroType::BLOCK && m.type != MacroType::BLITZ) return true;
     GameState sim = state.clone();
     if (m.type == MacroType::BLITZ && m.viaPos.isOnPitch()) sim.getPlayer(m.playerId).position = m.viaPos;
@@ -3183,7 +3192,7 @@ bool CageController::next(const GameState& state, Macro& out) {
                 ++idx_;                    // GFI bez přehozu / úhyb: jen tento blitz se nehraje, tah řadiče jde dál (30.10.)
                 continue;
             }
-            if (!broken && stage_ == Stage::WALL_CLEAR && ourBall(state) && (!stillValid(state, m) || !wallHitTwoDice(state, m) || cageBroken)) {
+            if (!broken && stage_ == Stage::WALL_CLEAR && ourBall(state) && (!stillValid(state, m) || !wallHitDiceOk(state, m) || cageBroken)) {
                 // P233: rána nevyšla na 2 kostky naše (asistent nedošel…) ⇒ nebije se; zaostalci jako po ranách (review F7)
                 queue_.clear();
                 idx_ = 0;

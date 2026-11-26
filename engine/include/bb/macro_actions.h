@@ -202,9 +202,10 @@ void takeN1PathClear(long* out6);
 // N2: [0] nabídnutý blitz v útoku s míčem, [1] z nich cíl v pruhu klece, [2] z nich v pruhu nějaký kandidát byl.
 //   Počítá i hledání, i s vypnutým N2 (pro srovnání ramen). Nuluje se čtením.
 void takeN2LaneBlitz(long* out3);
-// N2b: [0] po postupu klece byl v pruhu soupeř a blitz volný, [1] našel se blitzující (se zapnutým N2b ho řadič zahraje).
+// N2b: [0] po postupu klece byl v pruhu soupeř a blitz volný, [1] našel se blitzující (se zapnutým N2b ho řadič zahraje);
+//   proč ne: [2] zdržování TD, [3] blitz už použit, [4] pruh prázdný, [5] v pruhu soupeř, ale blitzující nikdo.
 //   Počítá i s vypnutým N2b (základna pro srovnání ramen) a i v simulacích, kde běží řadič klece. Nuluje se čtením.
-void takeN2bLaneBlitz(long* out2);
+void takeN2bLaneBlitz(long* out6);
 long p220StopsTotal();
 void addP220RealStops(long n);
 long takeP220RealStops();

@@ -755,6 +755,11 @@ TEST(OneCageWallBreak, N5bTheBlitzGoesToAPlayerOutsideTheCageBeforeAFreeBackCorn
     const CageTurn t = run(0);
     EXPECT_TRUE(hasMacro(t, MacroType::BLITZ, 8, 15)) << "N5b: blitz hráčem mimo klec";
     EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 2)) << "zadní roh zůstal v kleci";
+    Board b = wallWithBlockers(4);                    // motivace g0001: roh 2 zůstane rohem
+    b.s.getPlayer(2).skills.add(SkillName::Block);
+    cageTurn(b);
+    const Position c = b.s.getPlayer(1).position, r = b.s.getPlayer(2).position;
+    EXPECT_EQ(std::max(std::abs(r.x - c.x), std::abs(r.y - c.y)), 1) << "hráč 2 stojí u nosiče";
 }
 
 // Review 27.10.: kostky se počítají znovu těsně před ranou. Křídlo (13,5) po přesunu zmizí (tady ručně —
@@ -2903,12 +2908,13 @@ TEST(OneCageWallClear, AHitWhoseAssistDidNotArriveIsNotPlayedEvenWithBlock) {
                 s.getPlayer(m.playerId).position = m.viaPos;
                 const int dice = blockDiceCount(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId));
                 if (off) EXPECT_GE(dice, 2) << "bez N6: blitz hráče " << m.playerId;
-                if (dice == 1) { ++oneDie; EXPECT_TRUE(s.getPlayer(m.playerId).hasSkill(SkillName::Block)); }
+                if (dice == 1 && m.playerId == 6) ++oneDie;   // blitz do zdi hráčem 6 s Block (ne blitz do pruhu N2b jiným)
+                if (dice == 1) EXPECT_TRUE(s.getPlayer(m.playerId).hasSkill(SkillName::Block));
             }
             play(b.s, m);
         }
         ASSERT_TRUE(skipped);
-        if (!off) EXPECT_GT(oneDie, 0) << "N6: blitz s Block na 1 kostku do zdi se zahraje";
+        if (!off) EXPECT_GT(oneDie, 0) << "N6: blitz hráče 6 s Block na 1 kostku do zdi se zahraje";
     }
 }
 
@@ -3762,7 +3768,7 @@ TEST(OneCageLaneBlitz, ACageCornerNeverPlaysTheLaneBlitz) {
     b.put(5, TeamSide::HOME, {9, 8});
     b.put(13, TeamSide::AWAY, {15, 5}, 6);
     b.s.ball = BallState::carried({8, 7}, 1);
-    long n2b[2];
+    long n2b[6];
     takeN2bLaneBlitz(n2b);
     const CageTurn t = cageTurn(b);
     takeN2bLaneBlitz(n2b);
@@ -3783,6 +3789,7 @@ TEST(OneCageLaneBlitz, ACageCornerNeverPlaysTheLaneBlitz) {
     ASSERT_TRUE(reach) << "pozitivní kontrola: roh by k soupeři doběhl";
     for (const Macro& m : t.macros) EXPECT_NE(m.type, MacroType::BLITZ) << "roh klece blitzoval (hráč " << m.playerId << ")";
     EXPECT_EQ(n2b[1], 0) << "blitzující se nenašel";
+    EXPECT_GE(n2b[5], 1) << "důvod v čítači: v pruhu soupeř, blitzující nikdo";
 }
 
 // N1c (uživatel 26.11.: „N1 - ano“). Plánovač krok vpřed přijme s rizikem (P232, hrozba nad 0,15) — se soupeřem na (14,7)
