@@ -735,9 +735,13 @@ PYBIND11_MODULE(bb_engine, m) {
         return py::make_tuple(c.offered, c.armour, c.injury);
     });
     m.def("take_p220_stops", []() { return bb::takeP220RealStops(); });   // P220: jen skutečně hrané tahy; čte a nuluje
-    m.def("take_n1_path_clear", []() {   // N1: [vyzkoušeno, cíl nalezen, blok, blitz] (i hledání), čte a nuluje
-        long v[4]; bb::takeN1PathClear(v);
-        return py::make_tuple(v[0], v[1], v[2], v[3]);
+    m.def("take_n1_path_clear", []() {   // N1: [vyzkoušeno, cíl, blok, blitz, z toho 1 kostka, z toho rohem klece], čte a nuluje
+        long v[6]; bb::takeN1PathClear(v);
+        return py::make_tuple(v[0], v[1], v[2], v[3], v[4], v[5]);
+    });
+    m.def("take_n2_lane_blitz", []() {   // N2: [nabídky v útoku s míčem, cíl v pruhu, kandidát v pruhu byl], čte a nuluje
+        long v[3]; bb::takeN2LaneBlitz(v);
+        return py::make_tuple(v[0], v[1], v[2]);
     });
     m.def("take_dodge4_real_log", []() {   // P157d: jednotlivé úhyby na 4+ (tah, hráč, z, na, cíl, makro, druh)
         std::vector<std::array<int, 9>> v; bb::takeDodge4RealLog(v);

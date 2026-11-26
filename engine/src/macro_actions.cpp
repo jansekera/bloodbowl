@@ -1340,6 +1340,15 @@ int blockDiceCountAsOffered(const GameState& state, const Player& attacker, cons
     return getBlockDiceCount(state, attacker, defender, false, true, Position{-1, -1}, false);
 }
 
+// N2: soupeř v pruhu postupu klece — 1–3 sloupce před nosičem ve směru útoku, řady ±2 (týž pruh, který čte N1).
+static bool inCageLane(const Player& def, const Player& carrier) {
+    const int dirX = carrier.teamSide == TeamSide::HOME ? 1 : -1;
+    const int dx = (def.position.x - carrier.position.x) * dirX;
+    return dx >= 1 && dx <= 3 && std::abs(def.position.y - carrier.position.y) <= 2;
+}
+thread_local long g_n2[3] = {0, 0, 0};
+void takeN2LaneBlitz(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_n2[i]; g_n2[i] = 0; } }
+
 bool hitAllowed(const GameState& state, const Player& attacker, int dice) {
     if (dice >= 2) return true;
     if (dice != 1) return false;
@@ -2409,6 +2418,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
         struct BlitzCandidate {
             int targetId;
             int bestScore;
+            bool lane = false;   // N2: v pruhu postupu klece (počítá se i s vypnutým N2 — kvůli čítači)
         };
         std::vector<BlitzCandidate> candidates;
 
@@ -2496,6 +2506,12 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                     } else if (distToCarrier <= 2) {
                         score += 2;   // hrozí, ale musí na to svůj jediný blitz
                     }
+                    // ⭐ N2 (uživatel 25.11.2026: „1 A - vyhodnocení blitzu pro klec má vždy přednost“): soupeř v pruhu
+                    //   postupu klece (1–3 sloupce před nosičem ve směru útoku, řady ±2 — týž pruh, který čte N1) dostane
+                    //   prémii větší než všechny ostatní složky útoku dohromady (kraj +3, soused nosiče +8, soupeřův nosič
+                    //   +5) ⇒ v útoku jde jediný nabízený blitz napřed na něj. Do 25.11. vyhrával soupeř u kraje (+3)
+                    //   i 9 polí od nosiče (rozbor M11, g0035).
+                    if (iHaveBall && inCageLane(def, *carrier) && extraFeatureOn(kN2CageLaneBlitz)) score += 20;
                     if (state.ball.isHeld && state.ball.carrierId == def.id) {
                         score += 5;
                     }
@@ -2512,7 +2528,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             });
 
             if (targetBestScore > -999) {
-                candidates.push_back({def.id, targetBestScore});
+                candidates.push_back({def.id, targetBestScore, !onDef && iHaveBall && inCageLane(def, *carrier)});
             }
         });
 
@@ -2570,6 +2586,11 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             }
             out.push_back(m);
             ++offered;
+            if (!onDef && iHaveBall) {   // N2 čítač: nabídka v útoku s míčem; cíl v pruhu; v pruhu byl kandidát
+                ++g_n2[0];
+                if (candidates[i].lane) ++g_n2[1];
+                if (std::any_of(candidates.begin(), candidates.end(), [](const BlitzCandidate& c) { return c.lane; })) ++g_n2[2];
+            }
         }
         // P157c (uživatel 25.11.: „3 ano“): tah bez blitzu jen kvůli stropu — bez stropu by se nějaký cíl nabídl.
         if (offered == 0 && !candidates.empty() && g_dodgeCapEnabled) {

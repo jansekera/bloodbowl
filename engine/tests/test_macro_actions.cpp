@@ -670,6 +670,53 @@ TEST(MacroActions, P211EscapeIsNotOfferedDuringTheTurn) {
         EXPECT_FALSE(m.type == MacroType::REPOSITION && m.playerId == 1) << "útěk až na konci tahu";
 }
 
+// ⭐ N2 (uživatel 25.11.2026: „1 A - vyhodnocení blitzu pro klec má vždy přednost“). V útoku se nabízí jediný cíl
+//   blitzu. Soupeř v pruhu postupu klece (2 sloupce před nosičem, o řadu vedle) má přednost před soupeřem u lajny
+//   (+3), který stojí mimo pruh. Do 25.11. vyhrával ten u lajny (pruh +2 za vzdálenost 2 < kraj +3; rozbor M11, g0035).
+//   Oba cíle 1 kostka bez asistencí, blitzující dosáhne na oba.
+TEST(MacroActions, N2OffenseBlitzGoesToTheOpponentInTheCageLane) {
+    auto build = []() {
+        GameState state = makeMinimalState();
+        state.homeTeam.blitzUsedThisTurn = false;
+        Player& car = state.getPlayer(1);
+        car.position = {10, 7};
+        car.stats = {4, 3, 2, 9};
+        state.ball = BallState::carried({10, 7}, 1);
+        Player& mine = state.getPlayer(2);
+        mine.id = 2; mine.teamSide = TeamSide::HOME;
+        mine.state = PlayerState::STANDING; mine.position = {12, 5};
+        mine.stats = {6, 3, 3, 8}; mine.movementRemaining = 6;
+        mine.hasMoved = false; mine.hasActed = false;
+        Player& lane = state.getPlayer(12);
+        lane.position = {12, 8};
+        Player& rival = state.getPlayer(13);
+        rival.id = 13; rival.teamSide = TeamSide::AWAY;
+        rival.state = PlayerState::STANDING; rival.position = {12, 1};
+        rival.stats = {6, 3, 3, 8}; rival.movementRemaining = 6;
+        return state;
+    };
+    auto offeredTarget = [](const GameState& s) {
+        std::vector<Macro> macros;
+        getAvailableMacros(s, macros);
+        int n = 0, id = -1;
+        for (const Macro& m : macros)
+            if (m.type == MacroType::BLITZ) { ++n; id = m.targetId; }
+        EXPECT_EQ(n, 1) << "v útoku jediný cíl";
+        return id;
+    };
+    const GameState state = build();
+    ASSERT_EQ(state.getPlayer(12).position.distanceTo(state.getPlayer(1).position), 2) << "cíl v pruhu nesousedí s nosičem";
+    ASSERT_LE(state.getPlayer(13).position.y, 2) << "konkurent má bonus u lajny";
+    ASSERT_GT(std::abs(state.getPlayer(13).position.y - state.getPlayer(1).position.y), 2) << "konkurent mimo pruh";
+    ASSERT_EQ(blockDiceCount(state, state.getPlayer(2), state.getPlayer(12)), 1);
+    ASSERT_EQ(blockDiceCount(state, state.getPlayer(2), state.getPlayer(13)), 1);
+    setExtraFeaturesOff(kN2CageLaneBlitz);
+    const int before = offeredTarget(state);
+    setExtraFeaturesOff(0);
+    EXPECT_EQ(before, 13) << "pozitivní kontrola: bez N2 vyhrává soupeř u lajny";
+    EXPECT_EQ(offeredTarget(state), 12) << "N2: blitz na soupeře v pruhu klece";
+}
+
 TEST(MacroActions, P211OnOffenseTheEscapeGoesOutOfBlitzReach) {
     const GameState state = p211State(true);
     Macro esc;

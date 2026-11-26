@@ -3508,14 +3508,14 @@ TEST(OneCage, P241DoubleGfiOnlyOutOfReachOrCheapFall) {
 // u soupeře na (15,6) — drží ho dva soupeři, takže rány řadiče na uvolnění (P154 a: jediný držitel, útočník s Block) na
 // soupeře nebijí; s asistencí obou předních rohů má blok 2 kostky naše a odtlačení vede od klece.
 namespace {
-Board pathBoard() {
+Board pathBoard(bool withSix = true) {
     Board b(3);
     b.put(1, TeamSide::HOME, {12, 7}, 4);
     b.put(2, TeamSide::HOME, {11, 6});
     b.put(3, TeamSide::HOME, {11, 8});
     b.put(4, TeamSide::HOME, {13, 6});
     b.put(5, TeamSide::HOME, {13, 8});
-    b.put(6, TeamSide::HOME, {15, 6}, 4, 4);
+    if (withSix) b.put(6, TeamSide::HOME, {15, 6}, 4, 4);
     b.put(13, TeamSide::AWAY, {14, 7}, 6);
     b.put(14, TeamSide::AWAY, {15, 5}, 6);
     b.put(15, TeamSide::AWAY, {15, 9}, 6);
@@ -3558,4 +3558,68 @@ TEST(OneCageClearPath, OpponentThreateningTheStepIsHitFirstThenTheCageAdvances) 
     }
     EXPECT_LT(hit, step) << "napřed rána, pak postup klece";
     EXPECT_GT(t.carrier.x, 12) << "po sražení soupeře klec postoupila";
+}
+
+// N1b (uživatel 25.11.: „block jednou kostkou s block nebo wrestle povoluji“). Táž deska, soupeř na (14,7) má ST 5 ⇒
+// blok hráče 6 (ST 4 + 2 asistence rohů proti ST 5 + 1 asistence) je na 1 kostku. Bez Block rána nepřijde, s Block ano.
+TEST(OneCageClearPath, OneDieHitOnlyWithBlockOrWrestle) {
+    P217Off p217;
+    auto board = [](std::vector<SkillName> sk) {
+        Board b = pathBoard();
+        b.put(13, TeamSide::AWAY, {14, 7}, 6, 5);
+        b.put(6, TeamSide::HOME, {15, 6}, 4, 4, sk);
+        return b;
+    };
+    {
+        Board b = board({});
+        GameState down = b.s.clone();
+        down.getPlayer(13).state = PlayerState::PRONE;
+        ASSERT_FALSE(safeStep(b.s));
+        ASSERT_TRUE(safeStep(down));
+        ASSERT_EQ(blockDiceCount(b.s, b.s.getPlayer(6), b.s.getPlayer(13)), 1) << "předpoklad: 1 kostka";
+    }
+    {   // pozitivní kontrola: bez N1b se na 1 kostku nebije ani s Block
+        Board off = board({SkillName::Block});
+        setExtraFeaturesOff(kP217BestChance | kN1bWiderHit);
+        const CageTurn t = cageTurn(off);
+        setExtraFeaturesOff(kP217BestChance);
+        EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 6, 13)) << "bez N1b rána na 1 kostku nepřijde";
+    }
+    Board plain = board({});
+    const CageTurn t0 = cageTurn(plain);
+    EXPECT_FALSE(hasMacro(t0, MacroType::BLOCK, 6, 13)) << "bez Block/Wrestle se na 1 kostku nebije";
+    for (SkillName sk : {SkillName::Block, SkillName::Wrestle}) {
+        Board b = board({sk});
+        const CageTurn t = cageTurn(b);
+        EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 6, 13)) << "s Block/Wrestle blok na 1 kostku smí";
+    }
+}
+
+// N1b (uživatel 25.11.: „pokud blitzujeme rohem klece - musíme mít v záloze náhradníka pro ten roh“). Deska N1 bez hráče 6,
+// přední rohy ST 2 (na soupeře na (14,7) jen 1 kostka, Block nemají): srazit ho by mohl jen zadní roh 2 blitzem (ST 4,
+// z pole (14,6) 2 kostky). Náhradník není ⇒ roh neblitzuje, i když by po ráně krok vpřed vyšel.
+// ⚠️ Kladnou stranu (s náhradníkem roh blitzuje) deskou ukázat nejde: sonda 25.11. (náhradník MA 1–8 na všech polích
+// x 3–12, soupeři navíc, P232 zapnutý i vypnutý) — kdykoli náhradník na uvolněný roh dojde, plánovač s ním klec posune
+// bezpečně i bez rány, takže N1 se nespustí. Větev „rohem se zálohou“ je proto pojistka; čítač N1 [5] ukáže, zda v hrách
+// vůbec nastane.
+TEST(OneCageClearPath, CornerDoesNotBlitzWithoutAReplacement) {
+    P217Off p217;
+    Board b = pathBoard(false);
+    b.put(2, TeamSide::HOME, {11, 6}, 4, 4);
+    b.put(4, TeamSide::HOME, {13, 6}, 4, 2);
+    b.put(5, TeamSide::HOME, {13, 8}, 4, 2);
+    {
+        GameState down = b.s.clone();
+        down.getPlayer(13).state = PlayerState::PRONE;
+        ASSERT_FALSE(safeStep(b.s));
+        ASSERT_TRUE(safeStep(down));
+        GameState after = down.clone();
+        after.getPlayer(2).position = {14, 6};
+        after.getPlayer(2).hasMoved = after.getPlayer(2).hasActed = true;
+        ASSERT_TRUE(safeStep(after)) << "předpoklad: plán sám by roh oželel — zálohu musí vynutit N1b";
+        ASSERT_EQ(blockDiceCount(after, after.getPlayer(2), after.getPlayer(13)), 2);
+        ASSERT_EQ(blockDiceCount(b.s, b.s.getPlayer(4), b.s.getPlayer(13)), 1);
+    }
+    const CageTurn t = cageTurn(b);
+    EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 2, 13)) << "bez náhradníka roh neblitzuje";
 }
