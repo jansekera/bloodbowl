@@ -1960,7 +1960,7 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
         const Position frontSq = at(1, 0);
         const Player* best = nullptr;
         Position bestLanding{-1, -1};
-        std::tuple<int, int, int, int> bestKey{INT_MAX, INT_MAX, INT_MAX, INT_MAX};
+        std::tuple<int, int, int, int, int> bestKey{INT_MAX, INT_MAX, INT_MAX, INT_MAX, INT_MAX};
         state.forEachOnPitch(side, [&](const Player& p) {
             if (!cageMayMove(p) || isUsed(p.id) || holdsCage(p)) return;
             Position landing{-1, -1};
@@ -1976,7 +1976,10 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
             if (!hitAllowed(sim, p, dice)) return;
             if (!hitKeepsCage(sim, carrier.id, p.id, landing, centre->id, true)) return;   // ne zezadu do klece (29.10.)
             // bez GFI před GFI (review 30.10. nález 1: jinak riziko a přehoz, i když jde blitz bez hodu)
-            const std::tuple<int, int, int, int> key{landing == frontSq ? 0 : 1, blitzGfiCount(p, steps), -dice, steps};
+            // napřed hráč mimo klec, volný zadní roh (N5) až po nich (uživatel 27.10.: křídla napřed z hráčů mimo klec,
+            //   pak zadní rohy; dřív bližší volný roh vyhrál a plán postupu o něj přišel — hra g0001 26.11.)
+            const int cornerRank = (extraFeatureOn(kN5bOutsideFirst) && inCage(p)) ? 1 : 0;
+            const std::tuple<int, int, int, int, int> key{cornerRank, landing == frontSq ? 0 : 1, blitzGfiCount(p, steps), -dice, steps};
             if (key < bestKey) { bestKey = key; best = &p; bestLanding = landing; }
         });
         if (best) {

@@ -741,6 +741,22 @@ TEST(OneCageWallBreak, SlowerCageBreaksTheWallInTheUsersOrder) {
     EXPECT_EQ(t.carrier, (Position{12, 7})) << "nosič stojí — neobíhá";
 }
 
+// N5b (hra g0001 26.11.; pořadí uživatele 27.10.: napřed hráči mimo klec, pak zadní rohy): volný zadní roh 2 s Block
+//   (N5) je k soupeři před nosičem blíž než blitzer 8 mimo klec. Bez N5b blitzuje roh (pozitivní kontrola), s N5b hráč 8.
+TEST(OneCageWallBreak, N5bTheBlitzGoesToAPlayerOutsideTheCageBeforeAFreeBackCorner) {
+    auto run = [](uint64_t off) {
+        struct Off { uint64_t saved = extraFeaturesOff(); explicit Off(uint64_t m) { setExtraFeaturesOff(saved | m); } ~Off() { setExtraFeaturesOff(saved); } } guard(off);
+        Board b = wallWithBlockers(4);
+        b.s.getPlayer(2).skills.add(SkillName::Block);
+        return cageTurn(b);
+    };
+    const CageTurn old = run(kN5bOutsideFirst);
+    ASSERT_TRUE(hasMacro(old, MacroType::BLITZ, 2, 15)) << "předpoklad: bez N5b blitzuje bližší volný zadní roh";
+    const CageTurn t = run(0);
+    EXPECT_TRUE(hasMacro(t, MacroType::BLITZ, 8, 15)) << "N5b: blitz hráčem mimo klec";
+    EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 2)) << "zadní roh zůstal v kleci";
+}
+
 // Review 27.10.: kostky se počítají znovu těsně před ranou. Křídlo (13,5) po přesunu zmizí (tady ručně —
 // ve hře třeba nevyjde přesun) ⇒ soupeř 13 na (14,5) zase asistuje a roh 4 na soupeře 14 by bil na dvě
 // kostky, které volí obránce ⇒ rána se nehraje (zbytek tahu přebírá hledání).

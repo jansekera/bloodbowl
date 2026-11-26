@@ -152,6 +152,7 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kN1OverRisk = 1ull << 44         // N1c (uživatel 26.11.2026: „N1 - ano“): N1 i když plánovač krok přijal s rizikem (P232), pokud po sražení vyjde bezpečně (≤ 0,15)
     , kN2bLaneBlitzPlay = 1ull << 45   // N2b (uživatel 26.11.2026: „1 má se zahrát když se vybere - nevybírat z jiných“): blitz do pruhu klece zahraje řadič sám, po postupu klece
     , kN6UnifiedHit = 1ull << 46       // N6 (uživatel 26.11.2026: „Jsem pro zjednodušení a sjednocení pravidel obecně“; „2 sjednotit na povolení jedné kostky s block nebo wrestle všude“; „roh blitzuje jen když je za něj náhrada a zároven nikdo jiný není volný a zároven je potřeba pro Blitz dopředu pro posun klece“): všechny rány řadiče klece (i zeď P233) = 2+ kostky naše, nebo 1 s Block / Wrestle; roh klece blitzuje jen v N1, se zálohou a když nikdo jiný ránu nemá
+    , kN5bOutsideFirst = 1ull << 47    // N5b (oprava N5, 26.11.2026; pořadí uživatele 27.10.: napřed hráči mimo klec, pak zadní rohy): blitz P229 bere volný zadní roh až po hráčích mimo klec (hra g0001: bližší volný roh vyhrál a klec přišla o roh pro postup)
     , kN1bWiderHit = 1ull << 42        // N1b (uživatel 25.11.2026): N1 smí ránu na 1 kostku s Block/Wrestle a blitz/1 kostku rohem klece jen se zálohou
     , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
