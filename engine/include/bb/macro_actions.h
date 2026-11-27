@@ -206,6 +206,22 @@ void takeN2LaneBlitz(long* out3);
 //   proč ne: [2] zdržování TD, [3] blitz už použit, [4] pruh prázdný, [5] v pruhu soupeř, ale blitzující nikdo.
 //   Počítá i s vypnutým N2b (základna pro srovnání ramen) a i v simulacích, kde běží řadič klece. Nuluje se čtením.
 void takeN2bLaneBlitz(long* out6);
+// N2b je od 27.11.2026 vypnuté (A/B škodilo); zapíná se jen výslovně (testy, A/B)
+void setN2bLaneBlitzEnabled(bool on);
+bool n2bLaneBlitzEnabled();
+// Masky po stranách pro A/B (27.11.2026): po setSideFeatures platí při rozhodování AI maska strany na tahu
+//   (SideFeatureScope v MacroMCTSPolicy::operator(); i pro její simulace). Bez volání beze změny (jedna maska).
+void setSideFeatures(uint64_t homeOff, uint64_t awayOff, bool n2bHome, bool n2bAway);
+struct SideFeatureScope {
+    explicit SideFeatureScope(TeamSide side);
+    ~SideFeatureScope();
+    SideFeatureScope(const SideFeatureScope&) = delete;
+    SideFeatureScope& operator=(const SideFeatureScope&) = delete;
+private:
+    bool active_;
+    uint64_t savedMask_;
+    bool savedN2b_;
+};
 long p220StopsTotal();
 void addP220RealStops(long n);
 long takeP220RealStops();

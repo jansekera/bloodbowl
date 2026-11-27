@@ -97,10 +97,22 @@ def _game_worker(args: tuple) -> dict:
     import bb_engine
     # EXTRA_FEATURES_OFF (25.11.2026, N1 A/B): maska vypnutých úprav (ExtraFeature) pro rameno A/B, obě strany
     off = int(os.environ.get("EXTRA_FEATURES_OFF", "0"), 0)
-    if off:
-        bb_engine.set_extra_features_off(off)
+    n2b = os.environ.get("N2B_ON") == "1"   # N2B_ON=1 (27.11.2026): N2b je v enginu vypnuté, pro A/B jde zapnout
     opp = OPPONENTS[(idx // 2) % len(OPPONENTS)]
     dwarf_home = (idx % 2 == 0)          # obě orientace, ať se nemíchá bias
+    if os.environ.get("BOTH_SIDES") == "1":
+        # staré chování (do 26.11.2026): maska i N2b oběma stranám — soupeř má tutéž AI s řadičem klece
+        if off:
+            bb_engine.set_extra_features_off(off)
+        if n2b:
+            bb_engine.set_n2b_lane_blitz(True)
+    else:
+        # 27.11.2026: rameno A/B mění jen trpaslíky; soupeř hraje s OPP_FEATURES_OFF / OPP_N2B_ON (výchozí: produkce)
+        opp_off = int(os.environ.get("OPP_FEATURES_OFF", "0"), 0)
+        opp_n2b = os.environ.get("OPP_N2B_ON") == "1"
+        home_off, away_off = (off, opp_off) if dwarf_home else (opp_off, off)
+        home_n2b, away_n2b = (n2b, opp_n2b) if dwarf_home else (opp_n2b, n2b)
+        bb_engine.set_side_features(home_off, away_off, home_n2b, away_n2b)
     ra, rb = (HOME_RACE, opp) if dwarf_home else (opp, HOME_RACE)
     hr = bb_engine.get_developed_roster(ra, TV)
     ar = bb_engine.get_developed_roster(rb, TV)

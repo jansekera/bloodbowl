@@ -662,10 +662,14 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("set_activation_value", [](double v) { bb::setActivationValue(v); });
     m.def("activation_value", []() { return bb::activationValue(); });
     m.def("set_dodge_cap", [](bool on) { bb::setDodgeCapEnabled(on); });
+    m.def("set_n2b_lane_blitz", [](bool on) { bb::setN2bLaneBlitzEnabled(on); });   // N2b vypnuto od 27.11.2026
     m.def("set_foul_only_last", [](bool on) { bb::setFoulOnlyLastEnabled(on); });
     m.def("set_cage_features_off", [](unsigned mask) { bb::setCageFeaturesOff(mask); });
     // jen pro měření: 1 = P213 útěk před TD vypnut, 2 = P213 útěk s GFI/úhybem vypnut, 4 = P216 příprava i bez bezpečného pole vypnuta
     m.def("set_extra_features_off", [](unsigned long long mask) { bb::setExtraFeaturesOff(mask); });
+    m.def("set_side_features", [](unsigned long long homeOff, unsigned long long awayOff, bool n2bHome, bool n2bAway) {
+        bb::setSideFeatures(homeOff, awayOff, n2bHome, n2bAway);   // A/B jen pro jednu stranu (27.11.2026)
+    });
     m.def("cage_features_off", []() { return bb::cageFeaturesOff(); });
     // Měřidlo P178: hrozba nejlepší rány soupeře na nosiče na této desce (0–1); −1, když míč nikdo nedrží.
     m.def("carrier_blitz_threat", [](const bb::GameState& s) {

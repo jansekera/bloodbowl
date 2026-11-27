@@ -1113,6 +1113,7 @@ void MacroMCTSPolicy::setLogDecisions(bool log, int topK) {
 }
 
 Action MacroMCTSPolicy::operator()(const GameState& state) {
+    SideFeatureScope sideFeatures(state.activeTeam);   // A/B po stranách: maska strany na tahu (bez setSideFeatures nic)
     // Check if current plan still valid
     if (planIndex_ < static_cast<int>(currentPlan_.size())) {
         const Action& planned = currentPlan_[planIndex_];

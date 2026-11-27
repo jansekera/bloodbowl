@@ -70,6 +70,28 @@ unsigned cageFeaturesOff() { return g_cageFeaturesOff; }
 static uint64_t g_extraFeaturesOff = 0;
 void setExtraFeaturesOff(uint64_t mask) { g_extraFeaturesOff = mask; }
 uint64_t extraFeaturesOff() { return g_extraFeaturesOff; }
+// Masky po stranách (27.11.2026): A/B úpravy jen pro jednu stranu — soupeř hraje beze změny. Dřív maska platila
+//   oběma stranám (obě AI mají řadič klece), takže A/B měřilo „obě strany s úpravou“ proti „obě bez“.
+static bool g_sideFeaturesOn = false;
+static uint64_t g_sideMask[2] = {0, 0};
+static bool g_sideN2b[2] = {false, false};
+void setSideFeatures(uint64_t homeOff, uint64_t awayOff, bool n2bHome, bool n2bAway) {
+    g_sideFeaturesOn = true;
+    g_sideMask[0] = homeOff; g_sideMask[1] = awayOff;
+    g_sideN2b[0] = n2bHome; g_sideN2b[1] = n2bAway;
+}
+SideFeatureScope::SideFeatureScope(TeamSide side)
+    : active_(g_sideFeaturesOn), savedMask_(g_extraFeaturesOff), savedN2b_(n2bLaneBlitzEnabled()) {
+    if (!active_) return;
+    const int i = side == TeamSide::HOME ? 0 : 1;
+    g_extraFeaturesOff = g_sideMask[i];
+    setN2bLaneBlitzEnabled(g_sideN2b[i]);
+}
+SideFeatureScope::~SideFeatureScope() {
+    if (!active_) return;
+    g_extraFeaturesOff = savedMask_;
+    setN2bLaneBlitzEnabled(savedN2b_);
+}
 static long g_p250[3] = {0, 0, 0};
 // P302 krok 2 / P305: pole z `squares`, na kterém má soupeř nejmenší šanci zvednout míč (shoda ⇒ bližší hráči);
 // `what` je kopie desky — hráč se na kandidáty jen přesune a na konci vrátí.

@@ -2179,6 +2179,12 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
 //   NOVÝM polem nosiče (1–3 sloupce, řady ±2), nejbližší k nosiči; blitzující jako u N1 (bestCageBlitzer) — rohy klece
 //   ne (klec musí stát na konci tahu), volný zadní roh (N5) ano.
 thread_local long g_n2b[6] = {0, 0, 0, 0, 0, 0};
+// ⛔ N2b VYPNUTO (uživatel 27.11.2026: „1 ano“ k vypnutí po A/B 128+128 her: výhry proti elfům 12 → 4, TD soupeřů
+//   43 → 58, turnovery s míčem u orků 9 → 14 %; blitzů do pruhu ve hře skoro beze změny). Zapnout jen výslovně
+//   (testy, A/B: set_n2b_lane_blitz(True) / N2B_ON=1); čítač g_n2b běží i vypnutý.
+static bool g_n2bEnabled = false;
+void setN2bLaneBlitzEnabled(bool on) { g_n2bEnabled = on; }
+bool n2bLaneBlitzEnabled() { return g_n2bEnabled; }
 void takeN2bLaneBlitz(long* out6) { for (int i = 0; i < 6; ++i) { out6[i] = g_n2b[i]; g_n2b[i] = 0; } }
 
 // Zeď (P233) = souvislý úsek stojících soupeřů se zónami ve sloupci dva před nosičem, který zasahuje do řádků
@@ -2255,7 +2261,7 @@ bool CageController::planLaneBlitz(const GameState& state) {
         BlitzKey key;
         if (!bestCageBlitzer(state, carrier, *d, wider, nullptr, best, landing, key, moveOk)) continue;
         ++g_n2b[1];
-        if (!extraFeatureOn(kN2bLaneBlitzPlay)) return false;
+        if (!g_n2bEnabled || !extraFeatureOn(kN2bLaneBlitzPlay)) return false;
         if (std::getenv("BB_CAGE_DEBUG"))
             std::fprintf(stderr, "[cage ctl] N2b blitz do pruhu: %d -> %d z (%d,%d)\n", best->id, d->id, landing.x, landing.y);
         Macro bz{MacroType::BLITZ, best->id, d->id, {-1, -1}};

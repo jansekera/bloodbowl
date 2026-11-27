@@ -27,6 +27,12 @@ struct P217Off {
     ~P217Off() { setExtraFeaturesOff(0); }
 };
 
+// N2b je od 27.11.2026 v enginu vypnuté — testy N2b ho zapínají výslovně
+struct N2bOn {
+    N2bOn() { setN2bLaneBlitzEnabled(true); }
+    ~N2bOn() { setN2bLaneBlitzEnabled(false); }
+};
+
 struct Board {
     GameState s;
     Board(int turn = 1) {
@@ -2998,6 +3004,7 @@ TEST(OneCageWallClear, ADetachedPlayerBeyondAGapIsNotTheEnd) {
             EXPECT_TRUE(wallClearTurn(b).empty());
         }
         // ...a se zapnutým N2b je jediná rána tahu blitz do pruhu na 13 na 2 kostky (review N2b T4)
+        N2bOn n2bOn;
         const std::vector<Hit> hits = wallClearTurn(withN2b);
         ASSERT_EQ(hits.size(), 1u);
         EXPECT_EQ(hits[0].m.type, MacroType::BLITZ);
@@ -3716,6 +3723,7 @@ TEST(OneCageClearPath, N5FreeBackCornerHitsWithoutAReplacement) {
 // až po kroku nosiče. Bez N2b řadič neblitzuje (zbytek tahu nechá hledání).
 TEST(OneCageLaneBlitz, AfterTheAdvanceTheControllerBlitzesTheOpponentInTheLane) {
     P217Off p217;
+    N2bOn n2b;
     auto board = []() {
         Board b(3);
         b.put(1, TeamSide::HOME, {8, 7}, 4);
@@ -3760,6 +3768,7 @@ TEST(OneCageLaneBlitz, AfterTheAdvanceTheControllerBlitzesTheOpponentInTheLane) 
 //   roh by k němu doběhl (pozitivní kontrola na desce po tahu, roh znovu čerstvý), ale blitz se nezahraje.
 TEST(OneCageLaneBlitz, ACageCornerNeverPlaysTheLaneBlitz) {
     P217Off p217;
+    N2bOn n2bOn;
     Board b(3);
     b.put(1, TeamSide::HOME, {8, 7}, 4);
     b.put(2, TeamSide::HOME, {7, 6});
@@ -3830,4 +3839,25 @@ TEST(OneCageClearPath, N1cHitsEvenWhenTheRiskyStepWasAccepted) {
         EXPECT_FALSE(hitsAhead(t)) << "bez N1c řadič při přijatém riziku nebije";
     }
     EXPECT_TRUE(hitsAhead(cageTurn(b))) << "N1c: rána na soupeře, po níž je krok bezpečný";
+}
+
+// Masky po stranách (27.11.2026): A/B úprava jen pro jednu stranu. Bez setSideFeatures platí jedna maska; po něm
+//   SideFeatureScope nastaví masku a N2b strany na tahu a po skončení vrátí předchozí stav.
+TEST(SideFeatures, TheScopeAppliesTheMaskOfTheSideOnTheMoveAndRestoresIt) {
+    setExtraFeaturesOff(0);
+    { SideFeatureScope none(TeamSide::AWAY); EXPECT_EQ(extraFeaturesOff(), 0u) << "bez setSideFeatures nic"; }
+    setSideFeatures(kN6UnifiedHit, kN5bOutsideFirst, true, false);
+    {
+        SideFeatureScope home(TeamSide::HOME);
+        EXPECT_EQ(extraFeaturesOff(), uint64_t{kN6UnifiedHit});
+        EXPECT_TRUE(n2bLaneBlitzEnabled());
+    }
+    EXPECT_EQ(extraFeaturesOff(), 0u);
+    EXPECT_FALSE(n2bLaneBlitzEnabled());
+    {
+        SideFeatureScope away(TeamSide::AWAY);
+        EXPECT_EQ(extraFeaturesOff(), uint64_t{kN5bOutsideFirst});
+        EXPECT_FALSE(n2bLaneBlitzEnabled());
+    }
+    setSideFeatures(0, 0, false, false);
 }
