@@ -740,16 +740,16 @@ PYBIND11_MODULE(bb_engine, m) {
     });
     m.def("take_p220_stops", []() { return bb::takeP220RealStops(); });   // P220: jen skutečně hrané tahy; čte a nuluje
     m.def("take_n1_path_clear", []() {   // N1: [vyzkoušeno, cíl, blok, blitz, z toho 1 kostka, z toho rohem klece], čte a nuluje
-        long v[6]; bb::takeN1PathClear(v);
-        return py::make_tuple(v[0], v[1], v[2], v[3], v[4], v[5]);
+        long v[12]; bb::takeN1PathClear(v);   // 27.11.: [domácí 6, hosté 6]
+        py::list l; for (long x : v) l.append(x); return py::tuple(l);
     });
     m.def("take_n2_lane_blitz", []() {   // N2: [nabídky v útoku s míčem, cíl v pruhu, kandidát v pruhu byl], čte a nuluje
-        long v[3]; bb::takeN2LaneBlitz(v);
-        return py::make_tuple(v[0], v[1], v[2]);
+        long v[6]; bb::takeN2LaneBlitz(v);   // 27.11.: [domácí 3, hosté 3]
+        py::list l; for (long x : v) l.append(x); return py::tuple(l);
     });
     m.def("take_n2b_lane_blitz", []() {   // N2b: [v pruhu a blitz volný, blitzující nalezen, zdržování, blitz použit, pruh prázdný, nikdo], čte a nuluje
-        long v[6]; bb::takeN2bLaneBlitz(v);
-        return py::make_tuple(v[0], v[1], v[2], v[3], v[4], v[5]);
+        long v[12]; bb::takeN2bLaneBlitz(v);   // 27.11.: [domácí 6, hosté 6]
+        py::list l; for (long x : v) l.append(x); return py::tuple(l);
     });
     m.def("take_dodge4_real_log", []() {   // P157d: jednotlivé úhyby na 4+ (tah, hráč, z, na, cíl, makro, druh)
         std::vector<std::array<int, 9>> v; bb::takeDodge4RealLog(v);

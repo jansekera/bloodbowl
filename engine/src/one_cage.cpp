@@ -2061,14 +2061,15 @@ static bool bestCageBlitzer(const GameState& state, const Player& carrier, const
     return best != nullptr;
 }
 
-thread_local long g_n1[6] = {0, 0, 0, 0, 0, 0};   // [0] vyzkoušeno, [1] cíl, [2] blok, [3] blitz, [4] 1 kostka, [5] rohem
-void takeN1PathClear(long* out6) { for (int i = 0; i < 6; ++i) { out6[i] = g_n1[i]; g_n1[i] = 0; } }
+thread_local long g_n1[2][6] = {};   // po stranách [domácí, hosté] (audit 27.11.); [0] vyzkoušeno, [1] cíl, [2] blok, [3] blitz, [4] 1 kostka, [5] rohem
+void takeN1PathClear(long* out12) { for (int k = 0; k < 2; ++k) for (int i = 0; i < 6; ++i) { out12[6 * k + i] = g_n1[k][i]; g_n1[k][i] = 0; } }
 
 bool CageController::planPathClear(const GameState& state, const Player& carrier, bool strict) {
     const TeamSide side = carrier.teamSide;
     const int dir = side == TeamSide::HOME ? 1 : -1;
     const Position cp = carrier.position;
-    ++g_n1[0];
+    long* n1 = g_n1[side == TeamSide::HOME ? 0 : 1];
+    ++n1[0];
     auto planSafeOn = [&](const CageAdvancePlan& p) {
         return p.valid && p.step >= 1 && (p.blitzThreat <= kSafeBlitzThreat || (p.riskAccepted && !strict));
     };
@@ -2084,7 +2085,7 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
         if (planSafeOn(p)) cands.push_back({o.id, p.blitzThreat, p.step});
     });
     if (cands.empty()) return false;
-    ++g_n1[1];
+    ++n1[1];
     std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) {
         if (std::abs(a.threat - b.threat) > 1e-9) return a.threat < b.threat;
         return a.step > b.step;
@@ -2135,9 +2136,9 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
             if (key < bestKey) { bestKey = key; bestBlock = &a; }
         });
         if (bestBlock && pass == 0) {
-            ++g_n1[2];
-            if (std::get<1>(bestKey) == -1) ++g_n1[4];
-            if (std::get<0>(bestKey) == 2) ++g_n1[5];
+            ++n1[2];
+            if (std::get<1>(bestKey) == -1) ++n1[4];
+            if (std::get<0>(bestKey) == 2) ++n1[5];
             if (std::getenv("BB_CAGE_DEBUG"))
                 std::fprintf(stderr, "[cage ctl] N1 uvolnit cestu: blok %d -> %d (hrozba po %.2f, krok %d)\n",
                              bestBlock->id, d.id, c.threat, c.step);
@@ -2155,9 +2156,9 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
         if (n6 ? pass == 1 : wider) cornerOk = [&](const Player& p, Position at, int dice) { return cornerCovered(p.id, at, d.id, dice); };
         if (bestCageBlitzer(state, carrier, d, wider, cornerOk, best, bestLanding, bestBz) &&
             (pass == 0 || std::get<0>(bestBz) == 2)) {
-            ++g_n1[3];
-            if (std::get<2>(bestBz) == -1) ++g_n1[4];
-            if (std::get<0>(bestBz) == 2) ++g_n1[5];
+            ++n1[3];
+            if (std::get<2>(bestBz) == -1) ++n1[4];
+            if (std::get<0>(bestBz) == 2) ++n1[5];
             if (std::getenv("BB_CAGE_DEBUG"))
                 std::fprintf(stderr, "[cage ctl] N1 uvolnit cestu: blitz %d -> %d z (%d,%d) (hrozba po %.2f, krok %d)\n",
                              best->id, d.id, bestLanding.x, bestLanding.y, c.threat, c.step);
@@ -2178,14 +2179,14 @@ bool CageController::planPathClear(const GameState& state, const Player& carrier
 //   odvedli dopředu a blitzovat by neměl kdo — test OneCageLaneBlitz), soupeř v pruhu před
 //   NOVÝM polem nosiče (1–3 sloupce, řady ±2), nejbližší k nosiči; blitzující jako u N1 (bestCageBlitzer) — rohy klece
 //   ne (klec musí stát na konci tahu), volný zadní roh (N5) ano.
-thread_local long g_n2b[6] = {0, 0, 0, 0, 0, 0};
+thread_local long g_n2b[2][6] = {};   // po stranách [domácí, hosté] (audit 27.11.)
 // ⛔ N2b VYPNUTO (uživatel 27.11.2026: „1 ano“ k vypnutí po A/B 128+128 her: výhry proti elfům 12 → 4, TD soupeřů
 //   43 → 58, turnovery s míčem u orků 9 → 14 %; blitzů do pruhu ve hře skoro beze změny). Zapnout jen výslovně
 //   (testy, A/B: set_n2b_lane_blitz(True) / N2B_ON=1); čítač g_n2b běží i vypnutý.
 static bool g_n2bEnabled = false;
 void setN2bLaneBlitzEnabled(bool on) { g_n2bEnabled = on; }
 bool n2bLaneBlitzEnabled() { return g_n2bEnabled; }
-void takeN2bLaneBlitz(long* out6) { for (int i = 0; i < 6; ++i) { out6[i] = g_n2b[i]; g_n2b[i] = 0; } }
+void takeN2bLaneBlitz(long* out12) { for (int k = 0; k < 2; ++k) for (int i = 0; i < 6; ++i) { out12[6 * k + i] = g_n2b[k][i]; g_n2b[k][i] = 0; } }
 
 // Zeď (P233) = souvislý úsek stojících soupeřů se zónami ve sloupci dva před nosičem, který zasahuje do řádků
 //   nosiče ±1, aspoň dva hráči (review F5: odtržený hráč o tři řádky dál zdí není). lo..hi = řádky úseku.
@@ -2210,11 +2211,12 @@ static bool wallSpan(const GameState& state, const Player& carrier, int& lo, int
 bool CageController::planLaneBlitz(const GameState& state) {
     // čítač běží i s vypnutým N2b (základna pro srovnání ramen A/B); bit rozhoduje až o zařazení blitzu
     if (!ourBall(state)) return false;
-    // zdržování TD (P175): míč je v bezpečí a cestu není třeba čistit — blitz by jen riskoval turnover
-    if (stalling_) { ++g_n2b[2]; return false; }
     const Player& carrier = state.getPlayer(state.ball.carrierId);
     const TeamSide side = carrier.teamSide;
-    if (state.getTeamState(side).blitzUsedThisTurn) { ++g_n2b[3]; return false; }
+    long* n2b = g_n2b[side == TeamSide::HOME ? 0 : 1];
+    // zdržování TD (P175): míč je v bezpečí a cestu není třeba čistit — blitz by jen riskoval turnover
+    if (stalling_) { ++n2b[2]; return false; }
+    if (state.getTeamState(side).blitzUsedThisTurn) { ++n2b[3]; return false; }
     const int dir = side == TeamSide::HOME ? 1 : -1;
     const Position cp = carrier.position;
     // o ranách do zdi před klecí rozhoduje P233 (2 kostky naše, od kraje) — N2b na zeď nesahá
@@ -2230,12 +2232,15 @@ bool CageController::planLaneBlitz(const GameState& state) {
     });
     if (std::getenv("BB_CAGE_DEBUG"))
         std::fprintf(stderr, "[cage ctl] N2b: nosič (%d,%d), v pruhu %zu soupeřů\n", cp.x, cp.y, lane.size());
-    if (lane.empty()) { ++g_n2b[4]; return false; }
-    ++g_n2b[0];
+    if (lane.empty()) { ++n2b[4]; return false; }
+    ++n2b[0];
     std::sort(lane.begin(), lane.end(), [&](const Player* a, const Player* b) {
         return std::make_tuple(a->position.distanceTo(cp), a->id) < std::make_tuple(b->position.distanceTo(cp), b->id);
     });
-    const bool wider = extraFeatureOn(kN1bWiderHit) || extraFeatureOn(kN6UnifiedHit);   // N6: 1 kostka s Block / Wrestle všude
+    // ⭐ N2b2 (uživatel 27.11.2026: „n2b vrat naše 2 kostky - oddělí se“): blitz do pruhu jen na 2+ kostky naše — je
+    //   nepovinný (klec už postoupila), 1 kostka s Block jen přidá riziko turnoveru (A/B ab8: rány na 1 kostku po postupu
+    //   u orků 99 → 145, pád útočníka 2 → 9, turnovery s míčem 33 → 58). N1 (cesta pro klec) má 1 kostku s Block dál.
+    const bool wider = !extraFeatureOn(kN2bTwoDice) && (extraFeatureOn(kN1bWiderHit) || extraFeatureOn(kN6UnifiedHit));
     // Kdo blitzovat nesmí: hráč, kterého v tomto tahu čeká jiná úloha klece — roh přes GFI odložený na konec tahu
     //   (P230 deferredGfi_), připravený hráč (P180) a záloha (P230); a hráč držený P232 (threatHeld_ — plní se hlavně
     //   v zaostalcích, kteří jdou až po N2b, takže tady chytí jen držení z hledání). Doběh nesmí zvednout hrozbu na
@@ -2260,7 +2265,7 @@ bool CageController::planLaneBlitz(const GameState& state) {
         Position landing{-1, -1};
         BlitzKey key;
         if (!bestCageBlitzer(state, carrier, *d, wider, nullptr, best, landing, key, moveOk)) continue;
-        ++g_n2b[1];
+        ++n2b[1];
         if (!g_n2bEnabled || !extraFeatureOn(kN2bLaneBlitzPlay)) return false;
         if (std::getenv("BB_CAGE_DEBUG"))
             std::fprintf(stderr, "[cage ctl] N2b blitz do pruhu: %d -> %d z (%d,%d)\n", best->id, d->id, landing.x, landing.y);
@@ -2270,7 +2275,7 @@ bool CageController::planLaneBlitz(const GameState& state) {
         queue_ = {bz};
         return true;
     }
-    ++g_n2b[5];   // v pruhu soupeř, ale blitzujícího nikdo (doběh, kostky, držení, hrozba)
+    ++n2b[5];   // v pruhu soupeř, ale blitzujícího nikdo (doběh, kostky, držení, hrozba)
     return false;
 }
 

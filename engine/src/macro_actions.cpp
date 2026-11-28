@@ -68,17 +68,24 @@ thread_local unsigned g_cageFeaturesOff = 0;
 void setCageFeaturesOff(unsigned mask) { g_cageFeaturesOff = mask; }
 unsigned cageFeaturesOff() { return g_cageFeaturesOff; }
 static uint64_t g_extraFeaturesOff = 0;
-void setExtraFeaturesOff(uint64_t mask) { g_extraFeaturesOff = mask; }
+static bool g_sideFeaturesOn = false;
+// jedna maska pro obě strany — ruší i masky po stranách (audit 27.11.: jinak by je SideFeatureScope tiše přepsal)
+void setExtraFeaturesOff(uint64_t mask) { g_extraFeaturesOff = mask; g_sideFeaturesOn = false; }
 uint64_t extraFeaturesOff() { return g_extraFeaturesOff; }
 // Masky po stranách (27.11.2026): A/B úpravy jen pro jednu stranu — soupeř hraje beze změny. Dřív maska platila
 //   oběma stranám (obě AI mají řadič klece), takže A/B měřilo „obě strany s úpravou“ proti „obě bez“.
-static bool g_sideFeaturesOn = false;
 static uint64_t g_sideMask[2] = {0, 0};
 static bool g_sideN2b[2] = {false, false};
 void setSideFeatures(uint64_t homeOff, uint64_t awayOff, bool n2bHome, bool n2bAway) {
     g_sideFeaturesOn = true;
     g_sideMask[0] = homeOff; g_sideMask[1] = awayOff;
     g_sideN2b[0] = n2bHome; g_sideN2b[1] = n2bAway;
+}
+// Úprava čtená až při provedení akce (blok: odsun, následování, přehoz, Stand Firm — mimo SideFeatureScope):
+//   při maskách po stranách maska strany, která volbu dělá (audit 27.11.2026), jinak jedna maska.
+bool extraFeatureOnFor(TeamSide side, ExtraFeature f) {
+    if (!g_sideFeaturesOn) return extraFeatureOn(f);
+    return (g_sideMask[side == TeamSide::HOME ? 0 : 1] & f) == 0;
 }
 SideFeatureScope::SideFeatureScope(TeamSide side)
     : active_(g_sideFeaturesOn), savedMask_(g_extraFeaturesOff), savedN2b_(n2bLaneBlitzEnabled()) {
@@ -1368,8 +1375,8 @@ static bool inCageLane(const Player& def, const Player& carrier) {
     const int dx = (def.position.x - carrier.position.x) * dirX;
     return dx >= 1 && dx <= 3 && std::abs(def.position.y - carrier.position.y) <= 2;
 }
-thread_local long g_n2[3] = {0, 0, 0};
-void takeN2LaneBlitz(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_n2[i]; g_n2[i] = 0; } }
+thread_local long g_n2[2][3] = {};   // po stranách [domácí, hosté] (audit 27.11.)
+void takeN2LaneBlitz(long* out6) { for (int k = 0; k < 2; ++k) for (int i = 0; i < 3; ++i) { out6[3 * k + i] = g_n2[k][i]; g_n2[k][i] = 0; } }
 
 bool hitAllowed(const GameState& state, const Player& attacker, int dice) {
     if (dice >= 2) return true;
@@ -2609,9 +2616,10 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             out.push_back(m);
             ++offered;
             if (!onDef && iHaveBall) {   // N2 čítač: nabídka v útoku s míčem; cíl v pruhu; v pruhu byl kandidát
-                ++g_n2[0];
-                if (candidates[i].lane) ++g_n2[1];
-                if (std::any_of(candidates.begin(), candidates.end(), [](const BlitzCandidate& c) { return c.lane; })) ++g_n2[2];
+                long* n2 = g_n2[mySide == TeamSide::HOME ? 0 : 1];
+                ++n2[0];
+                if (candidates[i].lane) ++n2[1];
+                if (std::any_of(candidates.begin(), candidates.end(), [](const BlitzCandidate& c) { return c.lane; })) ++n2[2];
             }
         }
         // P157c (uživatel 25.11.: „3 ano“): tah bez blitzu jen kvůli stropu — bez stropu by se nějaký cíl nabídl.

@@ -493,14 +493,14 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
         }
     }
 
-    const bool p249dCarrier = extraFeatureOn(kP249dCarrierPush) && pushed.teamSide != blockingSide &&
+    const bool p249dCarrier = extraFeatureOnFor(blockingSide, kP249dCarrierPush) && pushed.teamSide != blockingSide &&
                               state.ball.isHeld && state.ball.carrierId == pushed.id;
     // P250 (uživatel 5.11.2026: „případně pushnout blockem někoho na balon — klidně i našeho přes chainpush — když
     //   máme okolo převahu“): ř. 640-641 „a player pushed to it will cause the ball to bounce“. Při převaze našich
     //   stojících kolem volného míče se odtlačený (soupeř i náš v řetězu) pošle na pole s míčem; nepovedené chycení
     //   odrazu není turnover (na rozdíl od nepovedeného zvednutí).
     bool p250Ball = false;
-    if (extraFeatureOn(kP250PushOntoBall) && !state.ball.isHeld && state.ball.position.isOnPitch()) {
+    if (extraFeatureOnFor(defenderChooses ? pushed.teamSide : blockingSide, kP250PushOntoBall) && !state.ball.isHeld && state.ball.position.isOnPitch()) {
         int ours = 0, theirs = 0;
         for (const Position& q : state.ball.position.getAdjacent()) {
             if (!q.isOnPitch()) continue;
@@ -919,7 +919,7 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
         // (frenzyTrapReady). Rozhoduje se TADY, ne v holdsGround: přímo blokovaného obránce řeší
         // jen tahle větev; holdsGround slouží řetězu a pushAwayFrom, kde past nevzniká (viz tam).
         if (!juggernautOverride && !declined && !coachModeOn() && frenzyTrapPossible &&
-            extraFeatureOn(kP225FrenzyTrapStandFirm) &&
+            extraFeatureOnFor(defender.teamSide, kP225FrenzyTrapStandFirm) &&   // volí obránce
             frenzyTrapReady(state, attacker, defender, isBlitz, followUpAllowed)) {
             declined = true;
             ++g_standFirmDeclinedForFrenzy;
@@ -1039,7 +1039,7 @@ static bool wantsFollowUp(const GameState& state, const Player& att, const Playe
         }
     }
     // P249d: za soupeřovým nosičem, který po odtlačení stojí s míčem, následovat — ať ho dál markujeme.
-    if (extraFeatureOn(kP249dCarrierPush) && def.teamSide != att.teamSide && def.state == PlayerState::STANDING &&
+    if (extraFeatureOnFor(att.teamSide, kP249dCarrierPush) && def.teamSide != att.teamSide && def.state == PlayerState::STANDING &&
         state.ball.isHeld && state.ball.carrierId == def.id) {
         return true;
     }
@@ -1349,7 +1349,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
     // Pro/team reroll on bad result
     // P249c: na soupeřova nosiče je „špatný výsledek“ každý, který ho nesrazí ani nevezme míč.
-    const bool onOppCarrier = extraFeatureOn(kP249cCarrierReroll) && def.teamSide != att.teamSide &&
+    const bool onOppCarrier = extraFeatureOnFor(att.teamSide, kP249cCarrierReroll) && def.teamSide != att.teamSide &&
                               state.ball.isHeld && state.ball.carrierId == def.id;
     auto wantsReroll = [&](BlockDiceFace f) {
         return shouldRerollBlock(state, f, att, def, params.isBlitz) || (onOppCarrier && !blockFaceDownsOrStrips(state, f, att, def, params.isBlitz));

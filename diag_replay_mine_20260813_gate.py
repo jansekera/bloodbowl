@@ -90,6 +90,20 @@ def _add_engine_to_path() -> None:
             sys.path.insert(0, p)
 
 
+def _dwarf_half(bb_engine, name: str, dwarf_home: bool):
+    """Čítač enginu: starší vrací jedno pole (obě strany dohromady), nový [domácí…, hosté…] — vrátí trpasličí část."""
+    if not hasattr(bb_engine, name):
+        return None
+    v = list(getattr(bb_engine, name)())
+    if name == "take_n2_lane_blitz":
+        per = 3
+    else:
+        per = 6
+    if len(v) == 2 * per:
+        return v[:per] if dwarf_home else v[per:]
+    return v
+
+
 def _game_worker(args: tuple) -> dict:
     seed, idx, out_path = args
     os.nice(19)
@@ -131,9 +145,10 @@ def _game_worker(args: tuple) -> dict:
         "home_score": lgr.result.home_score, "away_score": lgr.result.away_score,
         "turn_logs": turns,
         # N1 čítač (vyzkoušeno, cíl, blok, blitz) — počítá i hledání; chybí u starších enginů
-        "n1": list(bb_engine.take_n1_path_clear()) if hasattr(bb_engine, "take_n1_path_clear") else None,
-        "n2": list(bb_engine.take_n2_lane_blitz()) if hasattr(bb_engine, "take_n2_lane_blitz") else None,
-        "n2b": list(bb_engine.take_n2b_lane_blitz()) if hasattr(bb_engine, "take_n2b_lane_blitz") else None,
+        # čítače: od 27.11.2026 po stranách [domácí, hosté] ⇒ uloží se jen trpasličí polovina (+ celé pod *_obe)
+        "n1": _dwarf_half(bb_engine, "take_n1_path_clear", dwarf_home),
+        "n2": _dwarf_half(bb_engine, "take_n2_lane_blitz", dwarf_home),
+        "n2b": _dwarf_half(bb_engine, "take_n2b_lane_blitz", dwarf_home),
     }
     with gzip.open(out_path, "wt") as f:
         json.dump(rec, f, default=lambda o: o.tolist() if hasattr(o, "tolist") else o)

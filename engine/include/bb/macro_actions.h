@@ -153,6 +153,7 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kN2bLaneBlitzPlay = 1ull << 45   // N2b (uživatel 26.11.2026: „1 má se zahrát když se vybere - nevybírat z jiných“): blitz do pruhu klece zahraje řadič sám, po postupu klece
     , kN6UnifiedHit = 1ull << 46       // N6 (uživatel 26.11.2026: „Jsem pro zjednodušení a sjednocení pravidel obecně“; „2 sjednotit na povolení jedné kostky s block nebo wrestle všude“; „roh blitzuje jen když je za něj náhrada a zároven nikdo jiný není volný a zároven je potřeba pro Blitz dopředu pro posun klece“): všechny rány řadiče klece (i zeď P233) = 2+ kostky naše, nebo 1 s Block / Wrestle; roh klece blitzuje jen v N1, se zálohou a když nikdo jiný ránu nemá
     , kN5bOutsideFirst = 1ull << 47    // N5b (oprava N5, 26.11.2026; pořadí uživatele 27.10.: napřed hráči mimo klec, pak zadní rohy): blitz P229 bere volný zadní roh až po hráčích mimo klec (hra g0001: bližší volný roh vyhrál a klec přišla o roh pro postup)
+    , kN2bTwoDice = 1ull << 48         // N2b2 (uživatel 27.11.2026: „n2b vrat naše 2 kostky - oddělí se“): blitz do pruhu N2b jen na 2+ kostky naše (vypnuto = 1 kostka s Block/Wrestle jako N1)
     , kN1bWiderHit = 1ull << 42        // N1b (uživatel 25.11.2026): N1 smí ránu na 1 kostku s Block/Wrestle a blitz/1 kostku rohem klece jen se zálohou
     , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
@@ -198,20 +199,22 @@ bool carrierBlitzOdds(const GameState& state, double& fail, double& success);
 // Real = jen skutečně hraný tah (macro_mcts.cpp), čte a nuluje.
 // N1: [0] vyzkoušeno, [1] cíl nalezen, [2] blok, [3] blitz, [4] z ran [2]+[3] na 1 kostku (Block/Wrestle), [5] z ran rohem
 // klece (se zálohou). Počítá i hledání (řadič klece běží i v simulacích). Nuluje se čtením.
-void takeN1PathClear(long* out6);
+void takeN1PathClear(long* out12);   // 27.11.: [domácí 6, hosté 6]
 // N2: [0] nabídnutý blitz v útoku s míčem, [1] z nich cíl v pruhu klece, [2] z nich v pruhu nějaký kandidát byl.
 //   Počítá i hledání, i s vypnutým N2 (pro srovnání ramen). Nuluje se čtením.
-void takeN2LaneBlitz(long* out3);
+void takeN2LaneBlitz(long* out6);   // 27.11.: [domácí 3, hosté 3]
 // N2b: [0] po postupu klece byl v pruhu soupeř a blitz volný, [1] našel se blitzující (se zapnutým N2b ho řadič zahraje);
 //   proč ne: [2] zdržování TD, [3] blitz už použit, [4] pruh prázdný, [5] v pruhu soupeř, ale blitzující nikdo.
 //   Počítá i s vypnutým N2b (základna pro srovnání ramen) a i v simulacích, kde běží řadič klece. Nuluje se čtením.
-void takeN2bLaneBlitz(long* out6);
+void takeN2bLaneBlitz(long* out12);   // 27.11.: [domácí 6, hosté 6]
 // N2b je od 27.11.2026 vypnuté (A/B škodilo); zapíná se jen výslovně (testy, A/B)
 void setN2bLaneBlitzEnabled(bool on);
 bool n2bLaneBlitzEnabled();
 // Masky po stranách pro A/B (27.11.2026): po setSideFeatures platí při rozhodování AI maska strany na tahu
 //   (SideFeatureScope v MacroMCTSPolicy::operator(); i pro její simulace). Bez volání beze změny (jedna maska).
 void setSideFeatures(uint64_t homeOff, uint64_t awayOff, bool n2bHome, bool n2bAway);
+// úprava čtená při provedení akce (mimo rozhodování AI) — maska strany `side`, která volbu dělá
+bool extraFeatureOnFor(TeamSide side, ExtraFeature f);
 struct SideFeatureScope {
     explicit SideFeatureScope(TeamSide side);
     ~SideFeatureScope();

@@ -3764,6 +3764,32 @@ TEST(OneCageLaneBlitz, AfterTheAdvanceTheControllerBlitzesTheOpponentInTheLane) 
     EXPECT_TRUE(by7) << "připravený hráč 6 neblitzuje";
 }
 
+// N2b2 (uživatel 27.11.: „n2b vrat naše 2 kostky - oddělí se“): soupeř v pruhu ST 4, blitzeři 6 a 7 ST 4 s Block ⇒ jen
+//   1 kostka. S N2b2 se blitz do pruhu nehraje; bez N2b2 (1 kostka s Block jako N1) ano — pozitivní kontrola.
+TEST(OneCageLaneBlitz, N2b2OnlyOnTwoDiceOurs) {
+    P217Off p217;
+    N2bOn n2bOn;
+    auto run = [](uint64_t off) {
+        struct Off { uint64_t saved = extraFeaturesOff(); explicit Off(uint64_t m) { setExtraFeaturesOff(saved | m); } ~Off() { setExtraFeaturesOff(saved); } } guard(off);
+        Board b(3);
+        b.put(1, TeamSide::HOME, {8, 7}, 4);
+        b.put(2, TeamSide::HOME, {7, 6});
+        b.put(3, TeamSide::HOME, {7, 8});
+        b.put(4, TeamSide::HOME, {9, 6});
+        b.put(5, TeamSide::HOME, {9, 8});
+        b.put(6, TeamSide::HOME, {11, 3}, 6, 4).skills.add(SkillName::Block);
+        b.put(7, TeamSide::HOME, {11, 2}, 6, 4).skills.add(SkillName::Block);
+        b.put(13, TeamSide::AWAY, {15, 5}, 6, 4);
+        b.s.ball = BallState::carried({8, 7}, 1);
+        return cageTurn(b);
+    };
+    const CageTurn old = run(kN2bTwoDice);
+    ASSERT_TRUE(hasMacro(old, MacroType::BLITZ, 6, 13) || hasMacro(old, MacroType::BLITZ, 7, 13))
+        << "předpoklad: bez N2b2 blitz na 1 kostku s Block";
+    const CageTurn t = run(0);
+    for (const Macro& m : t.macros) EXPECT_NE(m.type, MacroType::BLITZ) << "N2b2: blitz do pruhu na 1 kostku se nehraje";
+}
+
 // N2b: blitz do pruhu nikdy rohem klece (review N2b T1). Táž deska bez hráčů 6 a 7 — v pruhu soupeř je (čítač [0]),
 //   roh by k němu doběhl (pozitivní kontrola na desce po tahu, roh znovu čerstvý), ale blitz se nezahraje.
 TEST(OneCageLaneBlitz, ACageCornerNeverPlaysTheLaneBlitz) {
@@ -3777,7 +3803,7 @@ TEST(OneCageLaneBlitz, ACageCornerNeverPlaysTheLaneBlitz) {
     b.put(5, TeamSide::HOME, {9, 8});
     b.put(13, TeamSide::AWAY, {15, 5}, 6);
     b.s.ball = BallState::carried({8, 7}, 1);
-    long n2b[6];
+    long n2b[12];   // [domácí 6, hosté 6]; naši = domácí
     takeN2bLaneBlitz(n2b);
     const CageTurn t = cageTurn(b);
     takeN2bLaneBlitz(n2b);
@@ -3859,5 +3885,11 @@ TEST(SideFeatures, TheScopeAppliesTheMaskOfTheSideOnTheMoveAndRestoresIt) {
         EXPECT_EQ(extraFeaturesOff(), uint64_t{kN5bOutsideFirst});
         EXPECT_FALSE(n2bLaneBlitzEnabled());
     }
-    setSideFeatures(0, 0, false, false);
+    // úprava čtená při provedení akce: maska strany, která volí (audit 27.11.)
+    EXPECT_FALSE(extraFeatureOnFor(TeamSide::HOME, kN6UnifiedHit));
+    EXPECT_TRUE(extraFeatureOnFor(TeamSide::AWAY, kN6UnifiedHit));
+    EXPECT_FALSE(extraFeatureOnFor(TeamSide::AWAY, kN5bOutsideFirst));
+    setExtraFeaturesOff(0);   // ruší i masky po stranách
+    EXPECT_TRUE(extraFeatureOnFor(TeamSide::HOME, kN6UnifiedHit));
+    { SideFeatureScope after(TeamSide::AWAY); EXPECT_EQ(extraFeaturesOff(), 0u) << "po setExtraFeaturesOff masky po stranách neplatí"; }
 }
