@@ -1002,3 +1002,318 @@ TEST(RiskyForward, WildAnimalLaggardsDoNotRaiseTheThreatEither) {
         else EXPECT_EQ(p2, (Position{7, 6})) << "zůstal stát";
     }
 }
+
+// N4a (uživatel 27.11.2026: „B nepodceňovat riziko vysurfování, bránit se mu“): hrozba rány na nosiče počítá
+// odtlačení do davu. Nosič na lajně (y = 0), soupeř dosáhne na pole pod ním — všechna tři pole odtlačení jsou
+// mimo hřiště ⇒ míč pryč při Pushed i Stumbles i Down (ř. 650-651).
+namespace {
+double crowdThreat(bool n4a, int carrierY, bool fourCorners, std::vector<SkillName> carrierSkills = {},
+                   std::vector<Position> fillers = {}) {
+    const uint64_t saved = extraFeaturesOff();
+    setExtraFeaturesOff(n4a ? 0 : static_cast<uint64_t>(kN4aCrowdThreat));
+    Board b;
+    b.put(1, TeamSide::HOME, {10, static_cast<int8_t>(carrierY)}, 4, 3, carrierSkills);
+    b.s.ball.isHeld = true;
+    b.s.ball.carrierId = 1;
+    b.s.ball.position = b.s.getPlayer(1).position;
+    if (fourCorners) {
+        int id = 2;
+        for (int cx : {-1, 1}) for (int cy : {-1, 1})
+            b.put(id++, TeamSide::HOME, {static_cast<int8_t>(10 + cx), static_cast<int8_t>(carrierY + cy)});
+    }
+    int fid = 6;   // 2-5 rohy; 1-11 = naše sloty, 12-22 soupeřovy
+    // Jen zaplní pole, nic jiného: ležící hráči neblokují (špinavé rohy P228 počítají jen stojící) a pole drží obsazené.
+    for (const Position& f : fillers) b.put(fid++, TeamSide::HOME, f).state = PlayerState::PRONE;
+    b.put(12, TeamSide::AWAY, {10, static_cast<int8_t>(carrierY + 3)}, 6, 3);
+    const double t = blitzThreat(b.s, b.s.getPlayer(1));
+    setExtraFeaturesOff(saved);
+    return t;
+}
+}  // namespace
+
+TEST(CrowdThreat, SidelineCarrierIsThreatenedMoreWithN4a) {
+    const double off = crowdThreat(false, 0, false);
+    const double on = crowdThreat(true, 0, false);
+    EXPECT_GT(off, 0.0) << "pozitivní kontrola: soupeř na nosiče dosáhne";
+    EXPECT_GT(on, off + 0.05) << "vysurfování se počítá";
+}
+
+TEST(CrowdThreat, MidPitchCarrierIsUnchanged) {
+    const double off = crowdThreat(false, 7, true);
+    EXPECT_GT(off, 0.0);
+    EXPECT_DOUBLE_EQ(crowdThreat(true, 7, true), off);
+}
+
+TEST(CrowdThreat, StandFirmCarrierAtTheSidelineIsUnchanged) {
+    const double off = crowdThreat(false, 0, false, {SkillName::StandFirm});
+    EXPECT_GT(off, 0.0);
+    EXPECT_DOUBLE_EQ(crowdThreat(true, 0, false, {SkillName::StandFirm}), off);
+}
+
+// Side Step (ř. 8470-8480; uživatel 27.11.2026: „u sideline pozor na kombinaci sidestep a žádné volné pole k ústupu“):
+// nosič volí pole odsunu sám, takže dav obejde — ale jen s volným sousedním polem na hřišti.
+TEST(CrowdThreat, SideStepCarrierWithAnOpenAdjacentSquareAvoidsTheCrowd) {
+    const double off = crowdThreat(false, 0, false, {SkillName::SideStep});
+    EXPECT_GT(off, 0.0);
+    EXPECT_DOUBLE_EQ(crowdThreat(true, 0, false, {SkillName::SideStep}), off);
+}
+
+// Všechna sousední pole na hřišti obsazená kromě pole (10,1), odkud soupeř bije ⇒ Side Step nelze použít.
+TEST(CrowdThreat, SideStepCarrierWithNoOpenAdjacentSquareIsPushedIntoTheCrowd) {
+    const std::vector<Position> ring = {{9, 0}, {11, 0}, {9, 1}, {11, 1}};
+    const double off = crowdThreat(false, 0, false, {SkillName::SideStep}, ring);
+    const double on = crowdThreat(true, 0, false, {SkillName::SideStep}, ring);
+    EXPECT_GT(off, 0.0) << "pozitivní kontrola: soupeř na (10,1) dojde";
+    EXPECT_GT(on, off + 0.05) << "bez volného pole Side Step neplatí, dav hrozí";
+    EXPECT_DOUBLE_EQ(on, crowdThreat(true, 0, false, {}, ring)) << "totéž jako bez Side Step";
+}
+
+// N4a, revize 27.11.2026: číselné hodnoty, domovské pole útočníka, Juggernaut / Grab / Wrestle, koncová čára a roh hřiště,
+// jedno volné pole odtlačení u kraje, P228. Jeden útočník (pohyb 6), nosič bez rohů; `ours` / `opps` = ležící hráči,
+// kteří jen drží pole obsazená (neblokují, nemají zónu ani asistenci).
+namespace {
+struct HitSetup {
+    Position carrier{10, 0};
+    int8_t carrierSt = 3;
+    std::vector<SkillName> carrierSkills;
+    Position att{10, 3};
+    int8_t attSt = 3;
+    std::vector<SkillName> attSkills;
+    std::vector<Position> ours, opps;
+};
+double hitThreat(const HitSetup& h, bool n4a) {
+    const uint64_t saved = extraFeaturesOff();
+    setExtraFeaturesOff(n4a ? 0 : static_cast<uint64_t>(kN4aCrowdThreat));
+    Board b;
+    b.put(1, TeamSide::HOME, h.carrier, 4, h.carrierSt, h.carrierSkills);
+    b.s.ball = BallState::carried(h.carrier, 1);
+    int id = 2;                                                  // sloty: naši 1-11, soupeřovi 12-22 (útočník 12)
+    for (const Position& p : h.ours) b.put(id++, TeamSide::HOME, p).state = PlayerState::PRONE;
+    id = 13;
+    for (const Position& p : h.opps) b.put(id++, TeamSide::AWAY, p).state = PlayerState::PRONE;
+    b.put(12, TeamSide::AWAY, h.att, 6, h.attSt, h.attSkills);
+    const double t = blitzThreat(b.s, b.s.getPlayer(1));
+    setExtraFeaturesOff(saved);
+    return t;
+}
+}  // namespace
+
+// (i) čísla: 1 kostka útočníka bez Block nosiče = 5/6, s Block = 4/6; 2 kostky obránce (útočník síla 2) = (5/6)²
+TEST(CrowdThreat, NumbersOneDieNoBlockOneDieBlockTwoDiceDefender) {
+    HitSetup h;
+    EXPECT_NEAR(hitThreat(h, true), 5.0 / 6.0, 1e-9);
+    h.carrierSkills = {SkillName::Block};
+    EXPECT_NEAR(hitThreat(h, true), 4.0 / 6.0, 1e-9);
+    h.carrierSkills = {};
+    h.attSt = 2;
+    EXPECT_NEAR(hitThreat(h, true), 25.0 / 36.0, 1e-9);
+    EXPECT_LT(hitThreat(h, false), 0.2) << "pozitivní kontrola: bez N4a jen sražení (2 kostky obránce)";
+}
+
+// (ii) domovské pole útočníka je po jeho přesunu volné ⇒ když je polem odtlačení, dav nehrozí. Útočník z (9,0) jde blitzem na
+// (11,1)/(11,0) (pole (10,1) je obsazené, obchází se přes řádek 2); odtlačení z (11,1) míří na (9,0) = jeho vyklizený domov.
+// Kontrola: tentýž útočník začíná jinde a na (9,0) leží cizí tělo ⇒ dav.
+TEST(CrowdThreat, TheAttackersVacatedHomeSquareIsAFreePushSquare) {
+    HitSetup h;
+    h.att = {9, 0};
+    h.ours = {{10, 1}};
+    EXPECT_LT(hitThreat(h, true), 0.4) << "domov (9,0) se uvolní ⇒ dav nehrozí (jen sražení)";
+    HitSetup c;
+    c.att = {9, 2};
+    c.ours = {{10, 1}};
+    c.opps = {{9, 0}};
+    EXPECT_NEAR(hitThreat(c, true), 5.0 / 6.0, 1e-9) << "pozitivní kontrola: na (9,0) leží tělo ⇒ dav";
+}
+
+// (ii) Side Step nosiče: jediné volné sousední pole (kromě pole rány) je vyklizený domov útočníka ⇒ uteče. Útočník stojí na (9,0),
+// (10,1) je pole rány, ostatní sousedé obsazení. Kontrola: útočník jinde, na (9,0) tělo ⇒ žádné volné pole ⇒ dav.
+TEST(CrowdThreat, SideStepEscapesToTheAttackersVacatedHomeSquare) {
+    HitSetup h;
+    h.carrierSkills = {SkillName::SideStep};
+    h.att = {9, 0};
+    h.ours = {{11, 0}, {9, 1}, {11, 1}};
+    EXPECT_DOUBLE_EQ(hitThreat(h, true), hitThreat(h, false));
+    HitSetup c = h;
+    c.att = {10, 4};
+    c.opps = {{9, 0}};
+    EXPECT_GT(hitThreat(c, true), hitThreat(c, false) + 0.3) << "pozitivní kontrola: bez volného pole Side Step neplatí";
+}
+
+// (iii) Juggernaut v blitzu (ř. 8190-8195): Stand Firm nosiče nepomůže, Block taky ne (Both Down = Pushed); v bloku z místa ano
+TEST(CrowdThreat, JuggernautInABlitzBeatsStandFirmAndBlock) {
+    HitSetup h;
+    h.carrierSkills = {SkillName::StandFirm};
+    h.attSkills = {SkillName::Juggernaut};
+    EXPECT_NEAR(hitThreat(h, true), 5.0 / 6.0, 1e-9) << "blitz s Juggernautem: Stand Firm neplatí";
+    h.att = {10, 1};                                             // útočník už stojí vedle nosiče = blok, ne blitz
+    EXPECT_DOUBLE_EQ(hitThreat(h, true), hitThreat(h, false)) << "blok bez blitzu: Juggernaut nepůsobí, Stand Firm drží";
+    HitSetup g;
+    g.carrierSkills = {SkillName::Block};
+    g.attSkills = {SkillName::Juggernaut};
+    EXPECT_NEAR(hitThreat(g, true), 5.0 / 6.0, 1e-9) << "Juggernaut: Both Down jako Pushed, Block nepomůže";
+}
+
+// (iii) Grab a Side Step se ruší (ř. 8151-8153): útočník s Grabem Side Step nosiče vypíná
+TEST(CrowdThreat, GrabCancelsTheCarriersSideStep) {
+    HitSetup h;
+    h.carrierSkills = {SkillName::SideStep};
+    EXPECT_DOUBLE_EQ(hitThreat(h, true), hitThreat(h, false)) << "pozitivní kontrola: bez Grabu Side Step dav obejde";
+    h.attSkills = {SkillName::Grab};
+    EXPECT_NEAR(hitThreat(h, true), 5.0 / 6.0, 1e-9);
+}
+
+// (iii) Wrestle útočníka přebíjí Block nosiče: Both Down = oba na zem ⇒ míč pryč
+TEST(CrowdThreat, AttackersWrestleBeatsTheCarriersBlock) {
+    HitSetup h;
+    h.carrierSkills = {SkillName::Block};
+    EXPECT_NEAR(hitThreat(h, true), 4.0 / 6.0, 1e-9) << "pozitivní kontrola: bez Wrestle drží Block";
+    h.attSkills = {SkillName::Wrestle};
+    EXPECT_NEAR(hitThreat(h, true), 5.0 / 6.0, 1e-9);
+}
+
+// (iv) jiná osa než y = 0: koncová čára (x = 25) a roh hřiště (0,0)
+TEST(CrowdThreat, EndLineAndPitchCornerAreCrowdsToo) {
+    HitSetup h;
+    h.carrier = {25, 7};
+    h.att = {22, 7};
+    EXPECT_NEAR(hitThreat(h, true), 5.0 / 6.0, 1e-9) << "koncová čára";
+    EXPECT_LT(hitThreat(h, false), 0.4);
+    HitSetup c;
+    c.carrier = {0, 0};
+    c.att = {3, 3};
+    EXPECT_NEAR(hitThreat(c, true), 5.0 / 6.0, 1e-9) << "roh hřiště";
+}
+
+// (v) u kraje jedno (onPitch = 1) i dvě (onPitch = 2) pole odtlačení na hřišti volná ⇒ dav nehrozí; všechna obsazená ⇒ dav.
+// Sousedé nosiče (10,0) jsou zaplněni tak, aby šlo bít jen z (11,1), resp. z (11,0).
+TEST(CrowdThreat, AFreeOnPitchPushSquareMeansNoCrowd) {
+    HitSetup one;                                                // bije se z (11,1): pole odtlačení na hřišti jen (9,0)
+    one.att = {12, 3};
+    one.ours = {{9, 1}, {10, 1}, {11, 0}};
+    EXPECT_LT(hitThreat(one, true), 0.4) << "(9,0) volné ⇒ dav nehrozí";
+    HitSetup oneTaken = one;
+    oneTaken.opps = {{9, 0}};
+    EXPECT_NEAR(hitThreat(oneTaken, true), 5.0 / 6.0, 1e-9) << "pozitivní kontrola: (9,0) obsazené ⇒ dav";
+    HitSetup two;                                                // bije se z (11,0): pole odtlačení na hřišti (9,0), (9,1)
+    two.att = {13, 3};
+    two.ours = {{9, 1}, {10, 1}, {11, 1}};
+    EXPECT_LT(hitThreat(two, true), 0.4) << "(9,0) volné ⇒ dav nehrozí";
+    HitSetup twoTaken = two;
+    twoTaken.opps = {{9, 0}};
+    EXPECT_NEAR(hitThreat(twoTaken, true), 5.0 / 6.0, 1e-9) << "pozitivní kontrola: obě pole obsazená ⇒ dav";
+}
+
+// (vi) P228: náš roh na poli odtlačení (9,0) stojí v zóně soupeře (soupeř na (8,1)); roh se napadne a buď zmizí, nebo leží —
+// sražený roh pole odtlačení OBSAZUJE, takže dav hrozí (nikdy ne méně, než když roh stojí).
+TEST(CrowdThreat, ADirtyCornerOnThePushSquareStillMakesTheCrowd) {
+    const uint64_t saved = extraFeaturesOff();
+    for (bool n4a : {false, true}) {
+        setExtraFeaturesOff(n4a ? 0 : static_cast<uint64_t>(kN4aCrowdThreat));
+        Board b;
+        b.put(1, TeamSide::HOME, {10, 0}, 4);
+        b.put(2, TeamSide::HOME, {9, 0}, 4);                    // roh na boku
+        b.put(3, TeamSide::HOME, {9, 1}, 4).state = PlayerState::PRONE;
+        b.put(4, TeamSide::HOME, {10, 1}, 4).state = PlayerState::PRONE;
+        b.put(5, TeamSide::HOME, {11, 0}, 4).state = PlayerState::PRONE;
+        b.put(13, TeamSide::AWAY, {8, 1}, 6, 4);                // dotýká se rohu (9,0)
+        b.put(12, TeamSide::AWAY, {12, 3}, 6, 3);               // bije z (11,1)
+        b.s.ball = BallState::carried({10, 0}, 1);
+        const double t = blitzThreat(b.s, b.s.getPlayer(1));
+        if (n4a) EXPECT_GE(t, 5.0 / 6.0 - 1e-9) << "dav se počítá i s rohem na poli odtlačení";
+        else EXPECT_LT(t, 0.7) << "pozitivní kontrola: bez N4a dav nehrozí";
+    }
+    setExtraFeaturesOff(saved);
+}
+
+// N4b (uživatel 26.11./27.11.2026 — citace u kN4bEdgeCage): v tísni smí nosič stát na kraji jen se dvěma vnitřními rohy.
+namespace {
+// Trpaslíci (pohyb 4, síla 3) proti silnějším a rychlejším (pohyb 6, síla 4); 7. kolo ⇒ chybí pole k TD a rezerva není.
+// Uprostřed neprostupná zeď (zóny soupeřů na x = 16..18, řádky 2..14), u kraje volno.
+Board edgeBoard(int carrierY = 3, std::vector<Position> extraOpp = {}, std::vector<Position> extraOurs = {}, int turn = 7) {
+    Board b(turn);
+    b.put(1, TeamSide::HOME, {15, static_cast<int8_t>(carrierY)}, 4);
+    const Position mates[] = {{14, 2}, {14, 4}, {13, 3}, {13, 1}, {15, 5}, {13, 5}};
+    int id = 2;
+    for (const Position& p : mates) b.put(id++, TeamSide::HOME, p, 4);
+    for (const Position& p : extraOurs) b.put(id++, TeamSide::HOME, p, 4);
+    int oid = 13;
+    for (int y = 3; y <= 13; y += 2) b.put(oid++, TeamSide::AWAY, {17, static_cast<int8_t>(y)}, 6, 4);
+    for (const Position& p : extraOpp) b.put(oid++, TeamSide::AWAY, p, 6, 4);
+    b.s.ball = BallState::carried({15, static_cast<int8_t>(carrierY)}, 1);
+    return b;
+}
+Position edgeTarget(const GameState& s, bool n4b, double* threat = nullptr) {
+    const uint64_t saved = extraFeaturesOff();
+    setExtraFeaturesOff(n4b ? 0 : static_cast<uint64_t>(kN4bEdgeCage));
+    CageAdvancePlanner planner(nullptr, cfg(), 1);
+    const CageAdvancePlan plan = planner.build(s);
+    setExtraFeaturesOff(saved);
+    if (threat) *threat = plan.blitzThreat;
+    if (plan.valid)
+        for (const Macro& m : plan.macros)
+            if (m.playerId == 1 && m.type == MacroType::REPOSITION) return m.targetPos;
+    return {-1, -1};
+}
+}  // namespace
+
+// (a) tíseň: bez N4b nosič kraj nevybere (ustoupí), s N4b jde na y = 0 se dvěma rohy a prázdnými boky i dírou
+TEST(EdgeCage, InDistressTheCarrierGoesToTheEdgeWithTwoCorners) {
+    Board b = edgeBoard();
+    ASSERT_GE(missingSquares(b.s, b.s.getPlayer(1)), 1) << "předpoklad: chybí pole, rezerva není";
+    ASSERT_TRUE(tdStillReachable(b.s, b.s.getPlayer(1)));
+    const Position off = edgeTarget(b.s, false);
+    EXPECT_NE(off.y, 0) << "pozitivní kontrola: bez N4b se kraj nevybere";
+    const Position on = edgeTarget(b.s, true);
+    EXPECT_EQ(on.y, 0) << "s N4b nosič stojí na kraji";
+    EXPECT_GE(on.x, 16) << "a je to krok vpřed";
+}
+
+// (b) soupeř z díry (zóna jen na pole vedle kraje) dojde bez úhybu a bije na dvě kostky ⇒ vysurfování nad mezí ⇒ kraj ne
+TEST(EdgeCage, AnOpponentReachingTheHoleKeepsTheCarrierOffTheEdge) {
+    Board b = edgeBoard(3, {{17, 2}});
+    Player& hunter = b.s.getPlayer(19);                  // 7. soupeř = ten na (17,2); obratný, úhyb z naší zóny mu vyjde
+    ASSERT_EQ(hunter.position, (Position{17, 2}));
+    hunter.stats.agility = 5;
+    hunter.skills.add(SkillName::Dodge);
+    ASSERT_GE(missingSquares(b.s, b.s.getPlayer(1)), 1);
+    EXPECT_NE(edgeTarget(b.s, true).y, 0);
+}
+
+// (c) s časovou rezervou není tíseň ⇒ kraj ne (rezerva = brzké kolo, TD se stihne po klidném postupu)
+TEST(EdgeCage, WithTimeToSpareThereIsNoDistressAndNoEdge) {
+    Board b = edgeBoard(3, {}, {}, 2);
+    ASSERT_EQ(missingSquares(b.s, b.s.getPlayer(1)), 0) << "předpoklad: nic nechybí";
+    EXPECT_NE(edgeTarget(b.s, true).y, 0);
+}
+
+// (d) náš hráč na boku cílového pole ⇒ kraj ne (klec jen rohy a prázdno, aby nešel řetěz); všechna pole vpřed na kraji mají
+//     náš bok
+TEST(EdgeCage, OurPlayerOnTheFlankKeepsTheCarrierOffTheEdge) {
+    Board b = edgeBoard(3, {}, {{15, 0}, {16, 0}, {18, 0}, {19, 0}});
+    ASSERT_GE(missingSquares(b.s, b.s.getPlayer(1)), 1);
+    EXPECT_NE(edgeTarget(b.s, true).y, 0);
+}
+
+// (e) nosič už na kraji stojí ⇒ s N4b se klec dostaví na místě dvěma rohy, bez N4b ne
+TEST(EdgeCage, ACarrierAlreadyOnTheEdgeGetsHisTwoCornersInPlace) {
+    Board b(7);
+    b.put(1, TeamSide::HOME, {16, 0}, 4);
+    b.put(2, TeamSide::HOME, {14, 1}, 4);
+    b.put(3, TeamSide::HOME, {16, 3}, 4);
+    b.put(13, TeamSide::AWAY, {23, 8}, 6, 4);
+    b.s.ball = BallState::carried({16, 0}, 1);
+    for (bool on : {false, true}) {
+        const uint64_t saved = extraFeaturesOff();
+        setExtraFeaturesOff(on ? 0 : static_cast<uint64_t>(kN4bEdgeCage));
+        CageAdvancePlanner planner(nullptr, cfg(), 1);
+        const CageAdvancePlan fill = planner.buildFillOnly(b.s, {});
+        setExtraFeaturesOff(saved);
+        if (on) {
+            ASSERT_TRUE(fill.valid) << "s N4b se dostaví";
+            EXPECT_EQ(fill.filledCorners, 2);
+            EXPECT_EQ(fill.macros.size(), 2u);
+        } else {
+            EXPECT_FALSE(fill.valid) << "pozitivní kontrola: bez N4b na kraji dostavba není";
+        }
+    }
+}

@@ -249,6 +249,8 @@ static double singleHitThreat(const GameState& state, const Player& carrier, dou
         if (dice == -2) return 0.11;
         return 0.04;
     };
+    const bool crowdOn = extraFeatureOn(kN4aCrowdThreat);
+    const bool standFirm = carrier.hasSkill(SkillName::StandFirm);
     std::vector<Position> around;
     for (const Position& a : carrier.position.getAdjacent()) if (a.isOnPitch()) around.push_back(a);
     double worst = 0.0;
@@ -280,7 +282,51 @@ static double singleHitThreat(const GameState& state, const Player& carrier, dou
                 arrive = 1.0 - fail;
             }
             o.position = a;
-            const double p = arrive * downChance(blockDiceCount(sim, o, sim.getPlayer(carrier.id)));
+            const int dice = blockDiceCount(sim, o, sim.getPlayer(carrier.id));
+            double hit = downChance(dice);
+            // N4a: odtlačení do davu = míč pryč. Dav není volba útočníka, je POVINNÝ: nosič „must be pushed off the pitch
+            // if there are no eligible empty squares on the pitch“ (ř. 650-651), a to i když je pole odtlačení obsazené
+            // (řetěz platí jen tehdy, jsou-li VŠECHNA pole obsazená hráči, ř. 641-644, a žádné není mimo hřiště).
+            // Juggernaut v blitzu (ř. 8190-8195): soupeři nesmí použít Fend, Stand Firm ani Wrestle a Both Down smí
+            // útočník vzít jako Pushed ⇒ Stand Firm nosiče nepomůže. Block nosiče Juggernaut neruší, ale Both Down
+            // může brát jako Pushed ⇒ u kraje odsun do davu i přes Block; mimo dav Block platí (uživatel 28.11.).
+            const bool blitz = a != home;
+            const bool jugg = blitz && o.hasSkill(SkillName::Juggernaut);
+            if (crowdOn && !(standFirm && !jugg)) {
+                Position three[3];
+                const int onPitch = getPushbackSquares(a, carrier.position, three);
+                if (onPitch < 3) {
+                    bool anyEmpty = false;
+                    for (int i = 0; i < onPitch; ++i) {
+                        const Player* q = state.getPlayerAtPosition(three[i]);
+                        if (!q || q->id == o.id) { anyEmpty = true; break; }   // útočníkovo domovské pole se uvolní
+                    }
+                    // Side Step (ř. 8470-8480): nosič volí pole odsunu sám a smí na kterékoli sousední, takže dav obejde —
+                    // ale jen když má vedle sebe aspoň jedno prázdné pole NA HŘIŠTI („may not use this skill if there are
+                    // no open squares on the pitch adjacent to this player“). Pole rány `a` je obsazené útočníkem,
+                    // jeho domovské pole je uvolněné (jen když útočník na `a` nestojí od začátku). Bez volného pole
+                    // platí běžný odsun ⇒ dav jako bez Side Step. Grab a Side Step se navzájem ruší (ř. 8151-8153,
+                    // block_handler.cpp:750) ⇒ útočník s Grabem Side Step nosiče vypíná.
+                    if (!anyEmpty && carrier.state == PlayerState::STANDING && carrier.hasSkill(SkillName::SideStep) &&
+                        !o.hasSkill(SkillName::Grab)) {
+                        for (const Position& q : around) {
+                            if (q == a) continue;
+                            const Player* qp = state.getPlayerAtPosition(q);
+                            if (!qp || qp->id == o.id) { anyEmpty = true; break; }
+                        }
+                    }
+                    if (!anyEmpty) {
+                        // Block nosiče zachrání jen před Both Down; Wrestle útočníka ho přebije (oba na zem); Juggernaut Block
+                        // neruší, jen Both Down smí vzít jako Pushed ⇒ tady (do davu) Block nepomůže.
+                        const bool blockHolds = carrier.hasSkill(SkillName::Block) && !o.hasSkill(SkillName::Wrestle) && !jugg;
+                        const double s = blockHolds ? 4.0 / 6.0 : 5.0 / 6.0;   // Pushed + Stumbles + Down (+ Both Down bez účinného Block)
+                        const int n = std::max(1, std::abs(dice));
+                        const double crowd = dice > 0 ? 1.0 - std::pow(1.0 - s, n) : std::pow(s, n);
+                        hit = std::max(hit, crowd);
+                    }
+                }
+            }
+            const double p = arrive * hit;
             o.position = home;
             if (p > worst) worst = p;
             if (worst > stopAbove) return worst;
@@ -338,6 +384,7 @@ double blitzThreat(const GameState& state, const Player& carrier, double stopAbo
     const double plain = singleHitThreat(state, carrier, stopAbove, kNone);
     if (!extraFeatureOn(kP228DirtyCorner) || !carrier.isOnPitch() || plain > stopAbove) return plain;
     const TeamSide side = carrier.teamSide;
+    const bool crowdOn = extraFeatureOn(kN4aCrowdThreat);
     std::vector<int> dirty;
     for (const Position& a : carrier.position.getAdjacent()) {
         const Player* p = a.isOnPitch() ? state.getPlayerAtPosition(a) : nullptr;
@@ -368,21 +415,29 @@ double blitzThreat(const GameState& state, const Player& carrier, double stopAbo
         const int h = static_cast<int>(hits.size());
         for (int gone = 0; gone < (1 << h); ++gone) {                    // které rohy blok odstranil
             double pr = 1.0;
-            GameState sim = state.clone();
-            for (int i = 0; i < h; ++i) {
-                if (gone & (1 << i)) {
-                    pr *= hits[i].second.removed;
-                    // Roh pryč z desky. Sražený by ležel na poli (pole by blokoval, jen bez zóny a asistence),
-                    // odtlačený pole uvolní — bere se horší z obou: pole volné.
+            for (int i = 0; i < h; ++i) pr *= (gone & (1 << i)) ? hits[i].second.removed : hits[i].second.nothing;   // turnover soupeře do rizika nejde
+            if (pr <= 0.0) continue;
+            // Roh pryč z desky. Sražený by ležel na poli (pole by blokoval, jen bez zóny a asistence), odtlačený pole
+            // uvolní — bere se horší z obou: pole volné (soupeř do něj může vstoupit a bít odtamtud).
+            auto threatWith = [&](bool lieInPlace) {
+                GameState sim = state.clone();
+                for (int i = 0; i < h; ++i) {
+                    if (!(gone & (1 << i))) continue;
                     Player& gone1 = sim.getPlayer(hits[i].first);
+                    if (lieInPlace) { gone1.state = PlayerState::PRONE; continue; }
                     gone1.state = PlayerState::OFF_PITCH;
                     gone1.position = Position{-1, -1};
-                } else {
-                    pr *= hits[i].second.nothing;                        // turnover soupeře do rizika nejde
                 }
-            }
-            if (pr <= 0.0) continue;
-            risk += pr * singleHitThreat(sim, sim.getPlayer(carrier.id), 2.0, blockers);
+                return singleHitThreat(sim, sim.getPlayer(carrier.id), 2.0, blockers);
+            };
+            double th = threatWith(false);
+            // N4a: pro odtlačení do davu je to naopak — sražený roh leží na svém poli a pole odtlačení nosiče OBSAZUJE
+            // (ř. 639-651: bez prázdného pole na hřišti jde nosič mimo hřiště). U kraje hřiště (jen tam může pole odtlačení
+            // ležet mimo hřiště) se proto počítá i varianta „sražený leží“ a bere se horší z obou.
+            const Position cp = carrier.position;
+            if (crowdOn && (cp.x == 0 || cp.x == Position::PITCH_WIDTH - 1 || cp.y == 0 || cp.y == Position::PITCH_HEIGHT - 1))
+                th = std::max(th, threatWith(true));
+            risk += pr * th;
         }
         return risk;
     };
@@ -435,6 +490,30 @@ CageAdvancePlanner::ProbeStats CageAdvancePlanner::probeMacro(const GameState& s
     return r;
 }
 
+// N4b (uživatel 26.11.2026: „N4 v tísni proti orkům i možnost i stát na kraji jen se dvěma rohy - nejen na kraji celá klec“;
+//   27.11.: „1 tíseň je, když nemáme kudy jinudy jít k TD a nemáme rezervu … 5 ne - klec vždy jen rohy a prázdno aby nešel
+//   chainpush“). Smí nosič stát na poli `newPos` na samém kraji (y = 0 / 14)? Dosud ne (rohy musí mít řádek na obě strany).
+//   Ano, když (1) je to jeho pole už teď (krok 0: dostavba na místě — jinak by se klec stojícího nosiče na kraji nikdy
+//   nedostavila), nebo je tíseň = druhý průchod P232 (`riskyLimit` > 0, jiná cesta k TD nevyšla) a chybí aspoň jedno
+//   pole (bez časové rezervy); a (2) klec je jen rohy a prázdno: na bocích (x ± 1, kraj) ani v díře (x, kraj ± 1)
+//   nestojí náš hráč (jinak by šlo odtlačení řetězem). Dva vnitřní rohy (x ± dx, kraj ± 1) si ohlídá tryAssign
+//   (feasible = aspoň dva rohy, na kraji jiná pole neexistují). Hrozbu po kroku (i vysurfování — N4a) hlídá volající
+//   mezí `riskyLimit_`; výjimka pro Frenzy není (surf hrozí i bez něj).
+static bool n4bEdgeCageOk(const GameState& state, const Player& carrier, Position newPos, int step, double riskyLimit) {
+    if (!extraFeatureOn(kN4bEdgeCage) || (newPos.y != 0 && newPos.y != 14)) return false;
+    const bool distress = riskyLimit > 0.0 && missingSquares(state, carrier) >= 1;
+    if (step == 0 ? carrier.position != newPos : !distress) return false;
+    const int inward = newPos.y == 0 ? 1 : -1;
+    const Position guarded[3] = {{static_cast<int8_t>(newPos.x - 1), newPos.y},
+                                 {static_cast<int8_t>(newPos.x + 1), newPos.y},
+                                 {newPos.x, static_cast<int8_t>(newPos.y + inward)}};
+    for (const Position& q : guarded) {
+        const Player* o = state.getPlayerAtPosition(q);
+        if (o && o->teamSide == carrier.teamSide && o->id != carrier.id) return false;
+    }
+    return true;
+}
+
 CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         const GameState& state, const Player& carrier, int step,
         const std::vector<int>& reservedPlayerIds, int dy, bool diceFreeReach,
@@ -464,7 +543,7 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
                              : Position{static_cast<int8_t>(carrier.position.x + dx * step),
                                         static_cast<int8_t>(carrier.position.y + dy)};
     if (!newPos.isOnPitch()) return res;
-    if (newPos.y < 1 || newPos.y > 13) return res;  // corner rows must exist
+    if ((newPos.y < 1 || newPos.y > 13) && !n4bEdgeCageOk(state, carrier, newPos, step, riskyLimit_)) return res;  // corner rows must exist (N4b: kraj jen v tísni / už na něm stojí)
     // The carrier's target may hold a TEAMMATE: real formations right after
     // a pickup are scrum piles, and the untangling doctrine (user,
     // 2026-08-04) is "the ones in FRONT move first so they stop blocking".
@@ -1197,7 +1276,8 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
                     const int progress = (sq.x - carrier.position.x) * dx;
                     if (progress < minProgress || progress > maxProgress) continue;
                     if (cageFeatureOn(kFeatSideline) && (sq.y < 2 || sq.y > 12) &&
-                        std::abs(sq.y - 7) >= std::abs(carrier.position.y - 7)) continue;
+                        std::abs(sq.y - 7) >= std::abs(carrier.position.y - 7) &&
+                        !n4bEdgeCageOk(state, carrier, sq, 1, riskyLimit_)) continue;   // N4b: kraj v tísni (tryAssign hlídá zbytek)
                     if (countTacklezones(state, sq, mySide, carrier.id) > 0) continue;
                     // > 0 = cesta přes hod. Záměrně NE „!= 0“: −1 vrací i pole, na kterém teď stojí
                     // spoluhráč, a ten ho v plánu napřed uvolní (test CarrierTargetBlockedByTeammate…).
@@ -1240,6 +1320,11 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         // Předvýběr je drahý (pro každého soupeře v dosahu hledání cesty na každé pole u nosiče) ⇒
         // jen prvních 24 kandidátů v pořadí výš a s koncem výpočtu, jakmile hrozba mez překročí.
         // (Bez omezení trval jeden plán při 80 kandidátech ~10 s.)
+        // N4b: pole na samém kraji se bere jen do hranice kroku vpřed (forwardRiskEdge), ne do pásem až 1,0 — jinak by ho
+        //   ve třetím průchodu P232 (mez roste po 0,10 až k 1,0) nepřevážila žádná hrozba, ani vysurfování z díry.
+        auto limitAt = [&](Position sq) {
+            return (extraFeatureOn(kN4bEdgeCage) && (sq.y == 0 || sq.y == 14)) ? std::min(limit, forwardRiskEdge(state, carrier)) : limit;
+        };
         auto screen = [&](const Cand& c) {
             GameState proj = state.clone();
             for (const auto& sa : c.a.slots) {
@@ -1250,8 +1335,9 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
             }
             proj.getPlayer(carrier.id).position = c.sq;
             proj.ball = BallState::carried(c.sq, carrier.id);
-            const double t = bb::blitzThreat(proj, proj.getPlayer(carrier.id), limit);
-            if (t <= limit) ranked.push_back({&c, t});
+            const double lim = limitAt(c.sq);
+            const double t = bb::blitzThreat(proj, proj.getPlayer(carrier.id), lim);
+            if (t <= lim) ranked.push_back({&c, t});
         };
         // ⭐⭐ P177 (uživatel 08.10.2026: „rychlejší týmy mohou s klecí dojít spíše bezpečně než co
         //   nejdál — např. skaveni proti orkům, protože pak jim zbyde dost pohybu na TD později“;
@@ -1290,7 +1376,7 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
                 CageAdvancePlan candidate = plan;
                 candidate.carrierGfi = 0;
                 if (!legsAreSafe(candidate, carrier.position.distanceTo(r.c->sq), r.c->a)) continue;
-                if (candidate.blitzThreat > limit) continue;
+                if (candidate.blitzThreat > limitAt(r.c->sq)) continue;
                 best = std::move(candidate);
                 bestProgress = r.c->progress;
                 haveBest = true;
